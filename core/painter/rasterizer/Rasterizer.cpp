@@ -21,7 +21,7 @@ void Rasterizer::rasterizeTriangle(
 
     float area = VertexProcessor::triangleArea2D(p0, p1, p2);
 
-    if (backface_culling && area >= 0.0f) {
+    if (backface_culling && area <= 0.0f) {
         return;
     }
 
@@ -45,9 +45,9 @@ void Rasterizer::rasterizeTriangle(
         for (int x = startX; x <= endX; ++x) {
             Vec2 pixel = {static_cast<float>(x) + 0.5f, static_cast<float>(y) + 0.5f};
 
-            float e0 = (p1.x - p0.x) * (pixel.y - p0.y) - (p1.y - p0.y) * (pixel.x - p0.x);
-            float e1 = (p2.x - p1.x) * (pixel.y - p1.y) - (p2.y - p1.y) * (pixel.x - p1.x);
-            float e2 = (p0.x - p2.x) * (pixel.y - p2.y) - (p0.y - p2.y) * (pixel.x - p2.x);
+            float e0 = (pixel.x - p0.x) * (p1.y - p0.y) - (pixel.y - p0.y) * (p1.x - p0.x);
+            float e1 = (pixel.x - p1.x) * (p2.y - p1.y) - (pixel.y - p1.y) * (p2.x - p1.x);
+            float e2 = (pixel.x - p2.x) * (p0.y - p2.y) - (pixel.y - p2.y) * (p0.x - p2.x);
 
             bool sameSign = false;
             if (area < 0.0f) {
@@ -58,7 +58,7 @@ void Rasterizer::rasterizeTriangle(
 
             if (!sameSign) continue;
 
-            // Edge functions: e0 is the signed area of (p0,p1,p) (weight of v2),
+            // Edge functions: e0 is the negated signed area of (p0,p1,p) (weight of v2),
             // e1 of (p1,p2,p) (weight of v0), e2 of (p2,p0,p) (weight of v1).
             float lambda0 = e1 * invArea;
             float lambda1 = e2 * invArea;

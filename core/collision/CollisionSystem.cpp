@@ -12,7 +12,7 @@ void CollisionSystem::addShape(CollisionID id, const CollisionShapeData& shape) 
     auto tit = transforms_.find(id);
     if (tit == transforms_.end()) {
         Transform t;
-        t.position = shape.center;
+        t.position = Vec3(0, 0, 0);
         t.rotation_euler = Vec3(0, 0, 0);
         t.scale = Vec3(1, 1, 1);
         transforms_[id] = t;

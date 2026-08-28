@@ -114,7 +114,7 @@ VertexProcessor::ClipResult VertexProcessor::clipTriangle(
 }
 
 float VertexProcessor::triangleArea2D(const Vec2& a, const Vec2& b, const Vec2& c) {
-    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
 }
 
 Vec3 VertexProcessor::barycentricCoords(const Vec2& p, const Vec2& a, const Vec2& b, const Vec2& c) {

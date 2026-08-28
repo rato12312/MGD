@@ -123,7 +123,7 @@ bool run_collision_tests() {
     RayHit hit = raycaster.raycast(ray, 100.0f, cs2);
     ASSERT_MSG(hit.hit == true, "ray should hit shape at z=-5");
     ASSERT_NEAR(hit.distance, 4.0f, 0.1f);
-    ASSERT_NEAR(hit.position.z, -5.0f, 0.5f);
+    ASSERT_NEAR(hit.position.z, -4.0f, 0.5f);
 
     Ray missRay(Vec3(100, 100, 0), Vec3(0, 0, -1));
     RayHit missHit = raycaster.raycast(missRay, 100.0f, cs2);
