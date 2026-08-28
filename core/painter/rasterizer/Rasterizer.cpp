@@ -80,7 +80,7 @@ void Rasterizer::rasterizeTriangle(
 
             RGBA finalColor;
             if (tex) {
-                finalColor = TextureSampler::sample(tex, pcU, pcV);
+                finalColor = TextureSampler::sample(*tex, pcU, pcV);
             } else {
                 float r = lambda0 * v0.color.r + lambda1 * v1.color.r + lambda2 * v2.color.r;
                 float g = lambda0 * v0.color.g + lambda1 * v1.color.g + lambda2 * v2.color.g;

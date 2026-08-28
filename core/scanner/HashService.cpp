@@ -17,7 +17,7 @@ uint64_t HashService::hashFile(const std::string& path) {
     }
 
     file.seekg(0, std::ios::end);
-    auto file_size = file.tellg();
+    std::streamoff file_size = file.tellg();
     file.seekg(0, std::ios::beg);
 
     uint64_t hash = static_cast<uint64_t>(file_size);
@@ -35,7 +35,7 @@ uint64_t HashService::hashFile(const std::string& path) {
     return hash;
 }
 
-uint64_t HashService::hashData(const uint8_t* data, size_t len) {
+uint64_t HashService::hashData(const uint8_t* data, size_t len) const {
     uint64_t hash = len;
     for (size_t i = 0; i < len; ++i) {
         hash ^= static_cast<uint64_t>(data[i]) << (i % 8 * 8);

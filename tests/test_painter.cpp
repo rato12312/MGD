@@ -65,7 +65,7 @@ bool run_painter_tests() {
     RenderFrameOutput output = painter.render(input);
 
     ASSERT_MSG(output.framebuffer != nullptr, "output framebuffer should not be null");
-    Framebuffer& outFb = *output.framebuffer;
+    IFramebuffer& outFb = *output.framebuffer;
     ASSERT_EQ(outFb.width(), 800);
     ASSERT_EQ(outFb.height(), 600);
 

@@ -36,6 +36,7 @@ public:
     struct Config {
         ScanMode mode = ScanMode::FULL_ANALYSIS;
         bool resume = false;
+        Config() = default;
     };
 
     void setCache(ICache* cache);

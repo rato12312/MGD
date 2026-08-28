@@ -4,8 +4,6 @@
 
 namespace mgd {
 
-constexpr Vec4::Vec4(const Vec3& v, float w_) : x(v.x), y(v.y), z(v.z), w(w_) {}
-
 Vec3 Vec4::xyz() const { return {x, y, z}; }
 
 Vec4 Vec4::perspectiveDivide() const {

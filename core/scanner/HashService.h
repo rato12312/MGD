@@ -11,7 +11,7 @@ class HashService {
 
 public:
     uint64_t hashFile(const std::string& path);
-    uint64_t hashData(const uint8_t* data, size_t len);
+    uint64_t hashData(const uint8_t* data, size_t len) const;
     void clearCache();
     size_t cacheSize() const;
 };

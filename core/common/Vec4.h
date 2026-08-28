@@ -1,8 +1,8 @@
 #pragma once
 
-namespace mgd {
+#include "Vec3.h"
 
-struct Vec3;
+namespace mgd {
 
 struct Vec4 {
     float x = 0.0f;
@@ -12,7 +12,7 @@ struct Vec4 {
 
     constexpr Vec4() = default;
     constexpr Vec4(float x_, float y_, float z_, float w_) : x(x_), y(y_), z(z_), w(w_) {}
-    constexpr Vec4(const Vec3& v, float w_);
+    constexpr Vec4(const Vec3& v, float w_) : x(v.x), y(v.y), z(v.z), w(w_) {}
 
     constexpr Vec4 operator+(const Vec4& o) const { return {x + o.x, y + o.y, z + o.z, w + o.w}; }
     constexpr Vec4 operator-(const Vec4& o) const { return {x - o.x, y - o.y, z - o.z, w - o.w}; }

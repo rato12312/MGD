@@ -3,7 +3,7 @@
 namespace mgd {
 
 EntityRecord Infector::normalizeEntity(uint32_t id, const Vec3& pos, const AABB& bounds,
-                                        uint32_t visual_ref, RegionID region) {
+                                        uint32_t visual_ref, RegionID region) const {
     EntityRecord rec;
     rec.entity_id = id;
     rec.resource_id = 0;
@@ -21,7 +21,7 @@ EntityRecord Infector::normalizeEntity(uint32_t id, const Vec3& pos, const AABB&
 
 ResourceRecord Infector::normalizeResource(ResourceID id, const std::string& name,
                                             const std::string& path, uint64_t hash,
-                                            const AABB& bounds) {
+                                            const AABB& bounds) const {
     ResourceRecord rec;
     rec.id = id;
     rec.name = name;
@@ -34,7 +34,7 @@ ResourceRecord Infector::normalizeResource(ResourceID id, const std::string& nam
 }
 
 CollisionRecord Infector::normalizeCollision(CollisionID id, ShapeType type,
-                                              const AABB& bounds) {
+                                              const AABB& bounds) const {
     CollisionRecord rec;
     rec.id = id;
     rec.shape_type = type;
@@ -54,7 +54,7 @@ CollisionRecord Infector::normalizeCollision(CollisionID id, ShapeType type,
     return rec;
 }
 
-ScanMaterialRecord Infector::normalizeMaterial(MaterialID id, const RGBA& base_color) {
+ScanMaterialRecord Infector::normalizeMaterial(MaterialID id, const RGBA& base_color) const {
     ScanMaterialRecord rec;
     rec.id = id;
     rec.base_color = base_color;
@@ -66,7 +66,7 @@ ScanMaterialRecord Infector::normalizeMaterial(MaterialID id, const RGBA& base_c
 }
 
 TextureRecord Infector::normalizeTexture(TextureID id, const std::string& path,
-                                          int w, int h) {
+                                          int w, int h) const {
     TextureRecord rec;
     rec.id = id;
     rec.path = path;

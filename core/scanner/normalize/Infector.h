@@ -15,15 +15,15 @@ namespace mgd {
 class Infector {
 public:
     EntityRecord normalizeEntity(uint32_t id, const Vec3& pos, const AABB& bounds,
-                                 uint32_t visual_ref, RegionID region);
+                                 uint32_t visual_ref, RegionID region) const;
     ResourceRecord normalizeResource(ResourceID id, const std::string& name,
                                      const std::string& path, uint64_t hash,
-                                     const AABB& bounds);
+                                     const AABB& bounds) const;
     CollisionRecord normalizeCollision(CollisionID id, ShapeType type,
-                                       const AABB& bounds);
-    ScanMaterialRecord normalizeMaterial(MaterialID id, const RGBA& base_color);
+                                       const AABB& bounds) const;
+    ScanMaterialRecord normalizeMaterial(MaterialID id, const RGBA& base_color) const;
     TextureRecord normalizeTexture(TextureID id, const std::string& path,
-                                    int w, int h);
+                                    int w, int h) const;
 };
 
 } // namespace mgd
