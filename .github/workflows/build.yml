@@ -20,17 +20,12 @@ jobs:
 
       - name: Configure
         run: |
-          mkdir build
-          cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
-      - name: Build core library
-        run: cmake --build build --config Release -- -j$(nproc)
-
-      - name: Build tests
-        run: cmake --build build --config Release --target mgd_tests -- -j$(nproc)
+      - name: Build all targets
+        working-directory: build
+        run: cmake --build . -- -j$(nproc)
 
       - name: Run tests
-        run: |
-          cd build
-          ./mgd_tests || true
+        working-directory: build
+        run: ctest --output-on-failure

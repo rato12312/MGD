@@ -70,14 +70,14 @@ set(MGD_CORE_SOURCES
     core/collision/queries/Raycast.cpp
 
     # Camera
-    core/camera/Camera.cpp
+    core/camera/camera.cpp
     core/camera/CameraController.cpp
 
     # Visibility
     core/visibility/BasicVisibility.cpp
 
     # Painter
-    core/painter/Painter.cpp
+    core/painter/painter.cpp
     core/painter/framebuffer/Framebuffer.cpp
     core/painter/framebuffer/DepthBuffer.cpp
     core/painter/material/MaterialSystem.cpp
