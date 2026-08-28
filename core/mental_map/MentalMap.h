@@ -3,6 +3,7 @@
 #include "Entity.h"
 #include "Region.h"
 #include "events/EventManager.h"
+#include "events/MentalMapEvents.h"
 #include <vector>
 #include <unordered_map>
 #include <algorithm>
