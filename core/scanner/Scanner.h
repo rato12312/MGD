@@ -50,7 +50,7 @@ public:
     void setCache(ICache* cache);
     void setAdapter(ISourceAdapter* adapter);
 
-    void scan(const std::string& source_root, Config config = {});
+    void scan(const std::string& source_root, Config config = Config());
     ScanReport getReport() const;
     ScanProgress getProgress() const;
 
