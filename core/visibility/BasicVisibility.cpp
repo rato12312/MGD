@@ -5,6 +5,7 @@
 #include "../camera/Camera.h"
 #include <algorithm>
 #include <chrono>
+#include <unordered_map>
 
 namespace mgd {
 
@@ -23,12 +24,22 @@ VisibleSet BasicVisibility::compute(const MentalMap& map, const Camera& camera, 
             for (int cx = 0; cx <= 1; ++cx) {
                 float nx = cx * 2.0f - 1.0f;
                 float ny = cy * 2.0f - 1.0f;
-                float nz = cz * 2.0f - 1.0f;
+                float nz = static_cast<float>(cz); // NDC z in [0, 1] (D3D)
                 Vec4 corner = inv_vp.transformPoint(Vec4(nx, ny, nz, 1.0f));
                 if (corner.w > 1e-8f) {
                     frustum_aabb = frustum_aabb.expanded(Vec3(corner.x / corner.w, corner.y / corner.w, corner.z / corner.w));
                 }
             }
+        }
+    }
+
+    // Map collision ids (as returned by the spatial index) back to entities via
+    // their collision_id, instead of assuming collision_id == entity_id.
+    std::unordered_map<CollisionID, EntityID> entity_by_collision;
+    for (EntityID eid : map.getActiveEntities()) {
+        auto e = map.getEntity(eid);
+        if (e && e->get().collision_id != INVALID_COLLISION_ID) {
+            entity_by_collision[e->get().collision_id] = eid;
         }
     }
 
@@ -49,7 +60,9 @@ VisibleSet BasicVisibility::compute(const MentalMap& map, const Camera& camera, 
             continue;
         }
 
-        auto entity_opt = map.getEntity(cid);
+        auto eit = entity_by_collision.find(cid);
+        if (eit == entity_by_collision.end()) continue;
+        auto entity_opt = map.getEntity(eit->second);
         if (!entity_opt) continue;
         const MentalEntity& entity = entity_opt->get();
         if (entity.state != EntityState::ACTIVE && entity.state != EntityState::DIRTY) continue;
@@ -62,6 +75,7 @@ VisibleSet BasicVisibility::compute(const MentalMap& map, const Camera& camera, 
         ve.material_id = entity.resource_id;
         ve.distance_to_camera = dist;
         ve.flags = entity.flags;
+        ve.scale = entity.transform.scale;
 
         result.entities.push_back(ve);
     }

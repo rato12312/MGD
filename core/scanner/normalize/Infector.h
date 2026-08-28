@@ -15,7 +15,9 @@ namespace mgd {
 class Infector {
 public:
     EntityRecord normalizeEntity(uint32_t id, const Vec3& pos, const AABB& bounds,
-                                 uint32_t visual_ref, RegionID region) const;
+                                 uint32_t visual_ref, RegionID region,
+                                 uint32_t resource_id = 0, uint32_t collision_id = 0,
+                                 EntityID parent_id = INVALID_ENTITY_ID) const;
     ResourceRecord normalizeResource(ResourceID id, const std::string& name,
                                      const std::string& path, uint64_t hash,
                                      const AABB& bounds) const;

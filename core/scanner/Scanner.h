@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "../common/Types.h"
 #include "../cache/ICache.h"
@@ -30,7 +31,14 @@ class Scanner {
     ScanReport report;
     bool resume_enabled = false;
 
+    mutable std::vector<EntityRecord> entity_records_;
+    mutable std::vector<ResourceRecord> resource_records_;
+    mutable std::vector<CollisionRecord> collision_records_;
+    mutable std::unordered_map<std::string, uint64_t> file_hash_by_path_;
+    mutable bool records_built_ = false;
+
     void processFile(const FileInfo& file);
+    void buildRecords() const;
 
 public:
     struct Config {

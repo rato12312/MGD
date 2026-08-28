@@ -5,7 +5,7 @@ namespace mgd {
 MentalMapBuilder::MentalMapBuilder(MentalMap& map)
     : mental_map(map) {}
 
-void MentalMapBuilder::buildFromCacheRecords(const std::vector<CacheRecordData>& records) {
+void MentalMapBuilder::buildFromRecords(const std::vector<EntityRecord>& records) {
     mental_map.clear();
 
     for (const auto& rec : records) {
@@ -34,7 +34,7 @@ void MentalMapBuilder::buildFromCacheRecords(const std::vector<CacheRecordData>&
     }
 }
 
-void MentalMapBuilder::updateFromCacheRecord(const CacheRecordData& record) {
+void MentalMapBuilder::updateFromRecord(const EntityRecord& record) {
     EntityID id = static_cast<EntityID>(record.entity_id);
     auto existing = mental_map.getEntity(id);
 

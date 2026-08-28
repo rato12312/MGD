@@ -3,18 +3,20 @@
 namespace mgd {
 
 EntityRecord Infector::normalizeEntity(uint32_t id, const Vec3& pos, const AABB& bounds,
-                                        uint32_t visual_ref, RegionID region) const {
+                                        uint32_t visual_ref, RegionID region,
+                                        uint32_t resource_id, uint32_t collision_id,
+                                        EntityID parent_id) const {
     EntityRecord rec;
     rec.entity_id = id;
-    rec.resource_id = 0;
-    rec.collision_id = 0;
+    rec.resource_id = resource_id;
+    rec.collision_id = collision_id;
     rec.position = pos;
     rec.rotation = {0.0f, 0.0f, 0.0f};
     rec.scale = {1.0f, 1.0f, 1.0f};
     rec.bounds = bounds;
     rec.region_id = region;
     rec.visual_ref = visual_ref;
-    rec.parent_id = INVALID_ENTITY_ID;
+    rec.parent_id = parent_id;
     rec.flags = 0;
     return rec;
 }

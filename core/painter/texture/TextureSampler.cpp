@@ -4,6 +4,23 @@
 
 namespace mgd {
 
+namespace {
+
+int modFloor(int a, int size) {
+    int r = a % size;
+    return r < 0 ? r + size : r;
+}
+
+int clampTexel(int a, int size) {
+    return a < 0 ? 0 : (a >= size ? size - 1 : a);
+}
+
+int resolveTexel(int a, int size, WrapMode mode) {
+    return mode == WrapMode::REPEAT ? modFloor(a, size) : clampTexel(a, size);
+}
+
+} // namespace
+
 float TextureSampler::wrapCoordinate(float coord, int size, WrapMode mode) {
     if (mode == WrapMode::REPEAT) {
         coord = coord - std::floor(coord);
@@ -22,11 +39,15 @@ RGBA TextureSampler::sample(const TextureData& tex, float u, float v) {
     u = wrapCoordinate(u, tex.width, tex.sampler_state.wrap_u);
     v = wrapCoordinate(v, tex.height, tex.sampler_state.wrap_v);
 
-    if (tex.sampler_state.filter == TextureFilter::NEAREST) {
-        int px = static_cast<int>(u * tex.width) % tex.width;
-        int py = static_cast<int>(v * tex.height) % tex.height;
+    auto getPixel = [&](int px, int py) -> RGBA {
         size_t idx = (static_cast<size_t>(py) * tex.width + px) * 4;
         return {tex.pixels[idx + 0], tex.pixels[idx + 1], tex.pixels[idx + 2], tex.pixels[idx + 3]};
+    };
+
+    if (tex.sampler_state.filter == TextureFilter::NEAREST) {
+        int px = resolveTexel(static_cast<int>(u * tex.width), tex.width, tex.sampler_state.wrap_u);
+        int py = resolveTexel(static_cast<int>(v * tex.height), tex.height, tex.sampler_state.wrap_v);
+        return getPixel(px, py);
     }
 
     float fx = u * tex.width - 0.5f;
@@ -37,18 +58,15 @@ RGBA TextureSampler::sample(const TextureData& tex, float u, float v) {
     int x1 = x0 + 1;
     int y1 = y0 + 1;
 
-    x0 = ((x0 % tex.width) + tex.width) % tex.width;
-    y0 = ((y0 % tex.height) + tex.height) % tex.height;
-    x1 = ((x1 % tex.width) + tex.width) % tex.width;
-    y1 = ((y1 % tex.height) + tex.height) % tex.height;
+    // Resolve neighbours according to wrap mode: repeat must wrap, clamp must clamp
+    // (no seamless bleeding across the CLAMP edge).
+    x0 = resolveTexel(x0, tex.width, tex.sampler_state.wrap_u);
+    y0 = resolveTexel(y0, tex.height, tex.sampler_state.wrap_v);
+    x1 = resolveTexel(x1, tex.width, tex.sampler_state.wrap_u);
+    y1 = resolveTexel(y1, tex.height, tex.sampler_state.wrap_v);
 
     float tx = fx - std::floor(fx);
     float ty = fy - std::floor(fy);
-
-    auto getPixel = [&](int px, int py) -> RGBA {
-        size_t idx = (static_cast<size_t>(py) * tex.width + px) * 4;
-        return {tex.pixels[idx + 0], tex.pixels[idx + 1], tex.pixels[idx + 2], tex.pixels[idx + 3]};
-    };
 
     RGBA c00 = getPixel(x0, y0);
     RGBA c10 = getPixel(x1, y0);

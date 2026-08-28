@@ -3,23 +3,10 @@
 #include "../Entity.h"
 #include "../Region.h"
 #include "../MentalMap.h"
+#include "../../scanner/normalize/EntityRecord.h"
 #include <vector>
 
 namespace mgd {
-
-struct CacheRecordData {
-    uint32_t entity_id;
-    uint32_t resource_id;
-    uint32_t collision_id;
-    Vec3 position;
-    Vec3 rotation;
-    Vec3 scale;
-    AABB bounds;
-    RegionID region_id;
-    uint32_t visual_ref;
-    EntityID parent_id;
-    uint32_t flags;
-};
 
 class MentalMapBuilder {
     MentalMap& mental_map;
@@ -27,8 +14,8 @@ class MentalMapBuilder {
 public:
     MentalMapBuilder(MentalMap& map);
 
-    void buildFromCacheRecords(const std::vector<CacheRecordData>& records);
-    void updateFromCacheRecord(const CacheRecordData& record);
+    void buildFromRecords(const std::vector<EntityRecord>& records);
+    void updateFromRecord(const EntityRecord& record);
     void removeByEntityID(EntityID id);
 };
 

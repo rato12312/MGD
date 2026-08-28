@@ -15,6 +15,7 @@ struct VisibleEntity {
     uint32_t material_id;
     float distance_to_camera;
     uint32_t flags;
+    Vec3 scale = Vec3(1.0f, 1.0f, 1.0f);
 };
 
 struct VisibleSet {

@@ -49,12 +49,13 @@ struct Frustum {
         float topD = vp.m[15] - vp.m[13];
         planes[TOP] = Plane(topNormal, topD);
 
+        // D3D clip convention: near at z = 0 -> plane is the 3rd row alone.
         Vec3 nearNormal(
-            vp.m[3] + vp.m[2],
-            vp.m[7] + vp.m[6],
-            vp.m[11] + vp.m[10]
+            vp.m[2],
+            vp.m[6],
+            vp.m[10]
         );
-        float nearD = vp.m[15] + vp.m[14];
+        float nearD = vp.m[14];
         planes[NEAR] = Plane(nearNormal, nearD);
 
         Vec3 farNormal(

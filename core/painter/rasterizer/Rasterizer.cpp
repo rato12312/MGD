@@ -25,6 +25,10 @@ void Rasterizer::rasterizeTriangle(
         return;
     }
 
+    if (std::abs(area) < 1e-10f) {
+        return;
+    }
+
     float minX = std::min({p0.x, p1.x, p2.x});
     float minY = std::min({p0.y, p1.y, p2.y});
     float maxX = std::max({p0.x, p1.x, p2.x});
@@ -54,9 +58,11 @@ void Rasterizer::rasterizeTriangle(
 
             if (!sameSign) continue;
 
-            float lambda0 = e0 * invArea;
-            float lambda1 = e1 * invArea;
-            float lambda2 = e2 * invArea;
+            // Edge functions: e0 is the signed area of (p0,p1,p) (weight of v2),
+            // e1 of (p1,p2,p) (weight of v0), e2 of (p2,p0,p) (weight of v1).
+            float lambda0 = e1 * invArea;
+            float lambda1 = e2 * invArea;
+            float lambda2 = e0 * invArea;
 
             // Depth: linear in screen space (correct for z-buffer)
             float z = lambda0 * v0.position.z + lambda1 * v1.position.z + lambda2 * v2.position.z;

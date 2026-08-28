@@ -25,3 +25,6 @@ jobs:
 
       - name: Run tests
         run: ./build/mgd_tests
+
+      - name: Run headless demo
+        run: ./build/mgd_app

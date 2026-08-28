@@ -37,13 +37,11 @@ void Scanner::scan(const std::string& source_root, Config config) {
     report.stats = progress;
     report.total_duration_seconds = progress.elapsedSeconds();
 
-    auto entities = getEntityRecords();
-    auto resources = getResourceRecords();
-    auto collisions = getCollisionRecords();
+    buildRecords();
 
-    report.entity_records = static_cast<uint32_t>(entities.size());
-    report.resource_records = static_cast<uint32_t>(resources.size());
-    report.collision_records = static_cast<uint32_t>(collisions.size());
+    report.entity_records = static_cast<uint32_t>(entity_records_.size());
+    report.resource_records = static_cast<uint32_t>(resource_records_.size());
+    report.collision_records = static_cast<uint32_t>(collision_records_.size());
 }
 
 void Scanner::processFile(const FileInfo& file) {
@@ -89,6 +87,7 @@ void Scanner::processFile(const FileInfo& file) {
     }
 
     progress.files_analyzed++;
+    file_hash_by_path_[file.path] = file_hash;
 
     uint32_t asset_id = registry.registerAsset(file, analysis_result);
 
@@ -132,49 +131,62 @@ ScanProgress Scanner::getProgress() const {
     return progress;
 }
 
-std::vector<EntityRecord> Scanner::getEntityRecords() const {
-    std::vector<EntityRecord> results;
+void Scanner::buildRecords() const {
+    entity_records_.clear();
+    resource_records_.clear();
+    collision_records_.clear();
+
     auto mesh_assets = registry.getAssetsByType(AssetType::MESH);
 
-    uint32_t entity_id = 1;
+    uint32_t idx = 0;
     for (const auto& asset : mesh_assets) {
-        Vec3 pos = asset.result.spatial_bounds.center();
-        EntityRecord rec = infector.normalizeEntity(
-            entity_id++, pos, asset.result.spatial_bounds,
-            asset.result.metadata.count("visual_ref") ?
-                static_cast<uint32_t>(std::stoul(asset.result.metadata.at("visual_ref"))) : 0,
-            INVALID_REGION_ID);
-        results.push_back(rec);
+        ResourceID rid = idx + 1;
+
+        AABB bounds = asset.result.spatial_bounds;
+        bool valid = bounds.min.x <= bounds.max.x &&
+                     bounds.min.y <= bounds.max.y &&
+                     bounds.min.z <= bounds.max.z;
+        if (!valid) {
+            bounds = AABB{Vec3(-1.0f, -1.0f, -1.0f), Vec3(1.0f, 1.0f, 1.0f)};
+        }
+
+        auto hit = file_hash_by_path_.find(asset.file.path);
+        uint64_t hash = (hit != file_hash_by_path_.end()) ? hit->second : 0;
+
+        resource_records_.push_back(
+            infector.normalizeResource(rid, asset.file.filename, asset.file.path, hash, bounds));
+
+        collision_records_.push_back(
+            infector.normalizeCollision(rid, ShapeType::AABB, bounds));
+
+        uint32_t visual_ref = 0;
+        auto vit = asset.result.metadata.find("visual_ref");
+        if (vit != asset.result.metadata.end()) {
+            visual_ref = static_cast<uint32_t>(std::stoul(vit->second));
+        }
+
+        entity_records_.push_back(infector.normalizeEntity(
+            rid, bounds.center(), bounds, visual_ref, INVALID_REGION_ID, rid, rid));
+
+        ++idx;
     }
 
-    return results;
+    records_built_ = true;
+}
+
+std::vector<EntityRecord> Scanner::getEntityRecords() const {
+    if (!records_built_) buildRecords();
+    return entity_records_;
 }
 
 std::vector<ResourceRecord> Scanner::getResourceRecords() const {
-    std::vector<ResourceRecord> results;
-    auto mesh_assets = registry.getAssetsByType(AssetType::MESH);
-
-    for (uint32_t i = 0; i < static_cast<uint32_t>(mesh_assets.size()); ++i) {
-        ResourceRecord rec = infector.normalizeResource(
-            i + 1, mesh_assets[i].file.filename, mesh_assets[i].file.path,
-            hasher.hashData(nullptr, 0), mesh_assets[i].result.spatial_bounds);
-        results.push_back(rec);
-    }
-
-    return results;
+    if (!records_built_) buildRecords();
+    return resource_records_;
 }
 
 std::vector<CollisionRecord> Scanner::getCollisionRecords() const {
-    std::vector<CollisionRecord> results;
-    auto mesh_assets = registry.getAssetsByType(AssetType::MESH);
-
-    for (uint32_t i = 0; i < static_cast<uint32_t>(mesh_assets.size()); ++i) {
-        CollisionRecord rec = infector.normalizeCollision(
-            i + 1, ShapeType::AABB, mesh_assets[i].result.spatial_bounds);
-        results.push_back(rec);
-    }
-
-    return results;
+    if (!records_built_) buildRecords();
+    return collision_records_;
 }
 
 } // namespace mgd

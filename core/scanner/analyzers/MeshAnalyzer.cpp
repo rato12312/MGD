@@ -47,9 +47,11 @@ RawAnalysisResult MeshAnalyzer::analyze(const FileInfo& file) {
 
     // TODO: Full NIF header parsing - version string, block counts, block types,
     //       triangle/vertex counts, NiNode tree traversal, AABB computation.
-    //       Current implementation only validates magic bytes.
-
-    result.spatial_bounds = AABB::invalid();
+    //       Current implementation only validates magic bytes and emits a valid
+    //       conservative placeholder bounds so downstream records keep finite
+    //       values and the scanner -> mental map -> collision chain stays wired.
+    result.spatial_bounds = AABB{Vec3(-1.0f, -1.0f, -1.0f), Vec3(1.0f, 1.0f, 1.0f)};
+    result.metadata["bounds_source"] = "placeholder";
     result.success = true;
     return result;
 }

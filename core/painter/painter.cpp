@@ -54,7 +54,7 @@ std::vector<RenderEntity> Painter::prepareRenderEntities(const VisibleSet& visib
         re.id = ve.id;
         re.transform.position = ve.position;
         re.transform.rotation_euler = {0.0f, 0.0f, 0.0f};
-        re.transform.scale = {1.0f, 1.0f, 1.0f};
+        re.transform.scale = ve.scale;
         re.mesh_id = 1;
         re.material_id = static_cast<MaterialID>(ve.material_id);
         re.bounds = ve.bounds;
@@ -140,21 +140,28 @@ void Painter::rasterizeBatches(const std::vector<RenderBatch>& batches,
                 const RenderVertex& sv1 = mesh->vertices[mesh->indices[i + 1]];
                 const RenderVertex& sv2 = mesh->vertices[mesh->indices[i + 2]];
 
-                RenderVertex tv0 = VertexProcessor::transformVertex(sv0, mvp, sw, sh);
-                RenderVertex tv1 = VertexProcessor::transformVertex(sv1, mvp, sw, sh);
-                RenderVertex tv2 = VertexProcessor::transformVertex(sv2, mvp, sw, sh);
+                // Transform to clip space, clip against the frustum there,
+                // then perspective divide + screen mapping (clip must happen
+                // BEFORE the divide to be correct).
+                VertexProcessor::ClipVertex cv0 = VertexProcessor::toClipSpace(sv0, mvp);
+                VertexProcessor::ClipVertex cv1 = VertexProcessor::toClipSpace(sv1, mvp);
+                VertexProcessor::ClipVertex cv2 = VertexProcessor::toClipSpace(sv2, mvp);
 
-                auto clipResult = VertexProcessor::clipTriangle(tv0, tv1, tv2);
-                stats.triangles_clipped += static_cast<uint32_t>(clipResult.vertices.size()) > 3 ?
-                    static_cast<uint32_t>(clipResult.vertices.size()) - 2 : 0;
-
+                auto clipResult = VertexProcessor::clipTriangle(cv0, cv1, cv2);
                 if (clipResult.vertices.size() < 3) continue;
 
-                for (size_t ci = 0; ci + 2 < clipResult.vertices.size(); ci += 3) {
+                stats.triangles_clipped += static_cast<uint32_t>(clipResult.vertices.size()) - 2;
+                // Note: fan triangulation of a convex polygon (Sutherland-Hodgman
+                // output keeps the polygon convex and consistently wound).
+
+                for (size_t ci = 1; ci + 1 < clipResult.vertices.size(); ++ci) {
+                    RenderVertex s0 = VertexProcessor::toScreen(clipResult.vertices[0], sw, sh);
+                    RenderVertex s1 = VertexProcessor::toScreen(clipResult.vertices[ci], sw, sh);
+                    RenderVertex s2 = VertexProcessor::toScreen(clipResult.vertices[ci + 1], sw, sh);
                     Rasterizer::rasterizeTriangle(
-                        clipResult.vertices[ci],
-                        clipResult.vertices[ci + 1],
-                        clipResult.vertices[ci + 2],
+                        s0,
+                        s1,
+                        s2,
                         framebuffer,
                         depth_buffer,
                         tex,

@@ -1,7 +1,9 @@
 #include <iostream>
+#include <fstream>
 #include <memory>
 #include <cmath>
 #include <cstring>
+#include <string>
 
 #include "core/common/Types.h"
 #include "core/common/Vec3.h"
@@ -26,6 +28,9 @@
 #include "core/painter/RenderFrameOutput.h"
 #include "core/painter/RenderSettings.h"
 #include "core/painter/resources/MockResourceProvider.h"
+
+#include "core/scanner/Scanner.h"
+#include "core/scanner/adapters/SkyrimPCAdapter.h"
 
 #ifdef MGD_HAS_SDL2
 #include "core/renderer/renderer.h"
@@ -118,6 +123,8 @@ private:
                    Vec3 half_extents, uint32_t color_hex, uint32_t visual_ref, RegionID region) {
         MentalEntity e;
         e.id = id;
+        e.resource_id = 1;
+        e.collision_id = id;
         e.transform.position = pos;
         e.transform.rotation_euler = rot;
         e.transform.scale = scale;
@@ -144,19 +151,6 @@ private:
 
     void setupCollision() {
         collision_.syncFromMentalMap(mental_map_);
-
-        auto all = mental_map_.getActiveEntities();
-        for (EntityID eid : all) {
-            auto ent = mental_map_.getEntity(eid);
-            if (!ent) continue;
-            const MentalEntity& entity = ent->get();
-            CollisionShapeData shape;
-            shape.id = static_cast<CollisionID>(entity.id);
-            shape.type = ShapeType::AABB;
-            shape.center = entity.bounds.aabb.center();
-            shape.half_extents = entity.bounds.aabb.extents();
-            collision_.addShape(shape.id, shape);
-        }
     }
 
     void onUpdate(float dt) {
@@ -257,8 +251,141 @@ int main(int argc, char* argv[]) {
     game.run();
     return 0;
 #else
-    std::cout << "MGD Engine requires SDL2 to run the prototype application." << std::endl;
-    std::cout << "Build with SDL2 to enable the full application." << std::endl;
-    return 0;
+
+    // ==== Headless functional demo (no SDL2 required) ====
+
+    // 1. Build the mental map: either scanned from a real folder (argv[1],
+    //    Skyrim PC .nif) or the built-in mock scene when no argument is given.
+    MentalMap mental_map;
+
+    if (argc > 1) {
+        Scanner scanner;
+        SkyrimPCAdapter adapter;
+        scanner.setAdapter(&adapter);
+        scanner.scan(argv[1]);
+
+        ScanReport report = scanner.getReport();
+        std::cout << "Scan: " << report.entity_records << " entities, "
+                  << report.resource_records << " resources, "
+                  << report.collision_records << " collisions, "
+                  << report.stats.errors << " errors" << std::endl;
+
+        MentalMapBuilder builder(mental_map);
+        builder.buildFromRecords(scanner.getEntityRecords());
+
+        // TODO: records carry no world placement yet (bounds are placeholders).
+        //       Arrange them in a grid so the demo output is visible.
+        size_t i = 0;
+        for (EntityID eid : mental_map.getActiveEntities()) {
+            auto ent = mental_map.getEntity(eid);
+            if (!ent) continue;
+            Transform t = ent->get().transform;
+            t.position = Vec3((i % 7) * 2.5f, 0.0f, -(i / 7) * 2.5f);
+            mental_map.setTransform(eid, t);
+            ++i;
+        }
+    } else {
+        Region region0;
+        region0.id = 1;
+        region0.bounds = AABB({-500, -50, -500}, {500, 100, 500});
+        region0.load_state = RegionLoadState::LOADED;
+        mental_map.addRegion(region0);
+
+        auto addEntity = [&](EntityID id, Vec3 pos, Vec3 scale, Vec3 half_extents) {
+            MentalEntity e;
+            e.id = id;
+            e.resource_id = 1;
+            e.collision_id = id;
+            e.transform.position = pos;
+            e.transform.rotation_euler = {0, 0, 0};
+            e.transform.scale = scale;
+            e.state = EntityState::ACTIVE;
+            e.visibility = VisibilityState::UNCHECKED;
+            e.region_id = 1;
+            e.bounds.aabb = AABB(pos - half_extents, pos + half_extents);
+            mental_map.addEntity(std::move(e));
+        };
+
+        addEntity(2, {0, 0, 0}, {1, 1, 1}, {1, 1, 1});       // red cube center
+        addEntity(3, {5, 0, 0}, {2, 2, 2}, {2, 2, 2});       // green cube right
+        addEntity(4, {-5, 0, 0}, {1.5f, 1.5f, 1.5f}, {1.5f, 1.5f, 1.5f}); // blue cube left
+        addEntity(5, {0, 0, -8}, {3, 3, 3}, {3, 3, 3});      // yellow cube back
+        addEntity(6, {3, 2, -3}, {0.5f, 0.5f, 0.5f}, {0.5f, 0.5f, 0.5f}); // magenta small
+        addEntity(10, {0, -1, 0}, {50, 0.2f, 50}, {50, 0.2f, 50}); // ground plane
+    }
+
+    // 2. Camera
+    Camera camera;
+    camera.setPosition(Vec3(0.0f, 5.0f, 15.0f));
+    camera.lookAt(Vec3(0.0f, 0.0f, 0.0f));
+    camera.setFOV(70.0f);
+    camera.setAspectRatio(800.0f / 600.0f);
+    camera.setNearPlane(0.1f);
+    camera.setFarPlane(1000.0f);
+
+    // 3. Collision (auto-synced from the mental map)
+    CollisionSystem collision;
+    collision.syncFromMentalMap(mental_map);
+
+    // 4. Visibility
+    BasicVisibility visibility;
+    VisibleSet visible = visibility.compute(mental_map, camera, collision);
+    std::cout << "Visible: " << visible.total_visible << " of "
+              << visible.total_considered << " considered" << std::endl;
+
+    // 5. Render one frame
+    Painter painter;
+    painter.initialize(800, 600);
+
+    RenderSettings settings = painter.getSettings();
+    settings.width = 800;
+    settings.height = 600;
+
+    MockResourceProvider resources;
+
+    RenderFrameInput input;
+    input.camera = &camera;
+    input.visible_set = &visible;
+    input.resources = &resources;
+    input.settings = settings;
+
+    RenderFrameOutput output = painter.render(input);
+
+    for (const auto& err : output.errors) {
+        std::cerr << "Render error: " << err << std::endl;
+    }
+
+    // 6. Dump the framebuffer as a PPM image
+    std::string out_path = "output.ppm";
+    bool wrote = false;
+    if (output.framebuffer) {
+        std::ofstream ppm(out_path, std::ios::binary);
+        if (ppm.is_open()) {
+            ppm << "P6\n" << output.framebuffer->width() << " "
+                << output.framebuffer->height() << "\n255\n";
+            for (int y = 0; y < output.framebuffer->height(); ++y) {
+                for (int x = 0; x < output.framebuffer->width(); ++x) {
+                    RGBA c = output.framebuffer->getPixel(x, y);
+                    ppm.put(static_cast<char>(c.r));
+                    ppm.put(static_cast<char>(c.g));
+                    ppm.put(static_cast<char>(c.b));
+                }
+            }
+            wrote = true;
+        }
+    }
+
+    std::cout << "Draw calls: " << output.stats.draw_calls << std::endl;
+    std::cout << "Triangles submitted: " << output.stats.triangles_submitted << std::endl;
+    std::cout << "Triangles rasterized: " << output.stats.triangles_rasterized << std::endl;
+    std::cout << "Pixels written: " << output.stats.pixels_written << std::endl;
+    std::cout << "Frame time: " << output.stats.frame_time_ms << " ms" << std::endl;
+    std::cout << (wrote ? ("Wrote " + out_path) : "PPM write FAILED") << std::endl;
+
+    bool ok = wrote && output.errors.empty() &&
+              output.stats.triangles_rasterized > 0 &&
+              output.stats.pixels_written > 0;
+    std::cout << "Headless demo " << (ok ? "OK" : "FAILED") << std::endl;
+    return ok ? 0 : 2;
 #endif
 }

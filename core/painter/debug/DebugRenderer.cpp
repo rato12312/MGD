@@ -12,7 +12,7 @@ static Vec3 projectToScreen(const Vec3& pos, const Mat4& mvp, int sw, int sh) {
     float ndcY = clip.y * invW;
     float sx = (ndcX + 1.0f) * 0.5f * sw;
     float sy = (1.0f - ndcY) * 0.5f * sh;
-    float sz = (clip.z * invW + 1.0f) * 0.5f;
+    float sz = clip.z * invW; // NDC z in [0, 1] (D3D)
     return {sx, sy, sz};
 }
 
