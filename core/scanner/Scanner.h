@@ -42,9 +42,9 @@ class Scanner {
 
 public:
     struct Config {
-        ScanMode mode = ScanMode::FULL_ANALYSIS;
-        bool resume = false;
-        Config() = default;
+        ScanMode mode;
+        bool resume;
+        Config() : mode(ScanMode::FULL_ANALYSIS), resume(false) {}
     };
 
     void setCache(ICache* cache);
