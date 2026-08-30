@@ -101,8 +101,14 @@ set(MGD_CORE_SOURCES
     core/scanner/analyzers/MeshAnalyzer.cpp
     core/scanner/analyzers/TextureAnalyzer.cpp
     core/scanner/analyzers/MetadataAnalyzer.cpp
+    core/scanner/analyzers/BSAAnalyzer.cpp
+    core/scanner/analyzers/ESPAnalyzer.cpp
     core/scanner/adapters/SkyrimXbox360Adapter.cpp
     core/scanner/adapters/SkyrimPCAdapter.cpp
+
+    # Query — consulta por polígonos (CACHE -> REGIAO -> POLIGONOS -> AssetID -> ASSET -> MAPA MENTAL)
+    core/query/RegionPolygonCache.cpp
+    core/query/PolygonConsultant.cpp
 
     # Renderer (SDL2 parts)
     core/renderer/renderer.cpp
@@ -122,8 +128,10 @@ endif()
 if(SDL2_FOUND)
     add_executable(mgd_prototype src/main.cpp)
     target_link_libraries(mgd_prototype mgd_core)
+    add_executable(mgd_launcher src/mgd_launcher.cpp)
+    target_link_libraries(mgd_launcher mgd_core)
 else()
-    message(STATUS "SDL2 not found - mgd_prototype executable will not be built")
+    message(STATUS "SDL2 not found - mgd_prototype/mgd_launcher executables will not be built")
 endif()
 
 # ========== TESTS ==========
@@ -139,7 +147,12 @@ add_executable(mgd_tests
     tests/test_framebuffer.cpp
     tests/test_rasterizer.cpp
     tests/test_painter.cpp
+    tests/test_polygon_query.cpp
 )
 target_link_libraries(mgd_tests mgd_core)
 target_compile_definitions(mgd_tests PRIVATE MGD_TESTING)
 add_test(NAME mgd_unit_tests COMMAND mgd_tests)
+
+# ========== BENCHMARK — consultador por polígonos ==========
+add_executable(benchmark_polygon tools/benchmark_polygon.cpp)
+target_link_libraries(benchmark_polygon mgd_core)
