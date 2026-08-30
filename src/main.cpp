@@ -354,19 +354,6 @@ int main(int argc, char* argv[]) {
     for (const auto& err : output.errors) {
         std::cerr << "Render error: " << err << std::endl;
     }
-    // Debug headless: why pixels 0 with 78 tris rasterized?
-    {
-        auto vp = camera.getViewProjectionMatrix();
-        std::cerr << "DEBUG headless VP m[0]=" << vp.m[0] << " m[5]=" << vp.m[5] << " m[10]=" << vp.m[10] << " m[11]=" << vp.m[11] << " m[14]=" << vp.m[14] << " m[15]=" << vp.m[15] << "\n";
-        std::cerr << "DEBUG cam pos=(" << camera.getState().position.x << "," << camera.getState().position.y << "," << camera.getState().position.z << ") fwd=(" << camera.getForward().x << "," << camera.getForward().y << "," << camera.getForward().z << ")\n";
-        if (!visible.entities.empty()) {
-            auto &ve = visible.entities[0];
-            std::cerr << "DEBUG first visible id=" << ve.id << " pos=(" << ve.position.x << "," << ve.position.y << "," << ve.position.z << ") dist=" << ve.distance_to_camera << "\n";
-            Vec4 clip = vp.transformPoint(Vec4(ve.position, 1.0f));
-            std::cerr << "DEBUG first ent clip=(" << clip.x << "," << clip.y << "," << clip.z << "," << clip.w << ") ndc=(" << (clip.w!=0?clip.x/clip.w:0) << "," << (clip.w!=0?clip.y/clip.w:0) << "," << (clip.w!=0?clip.z/clip.w:0) << ")\n";
-        }
-        std::cerr << "DEBUG framebuffer " << output.framebuffer->width() << "x" << output.framebuffer->height() << " depth_clear=" << 1.0f << "\n";
-    }
 
     // 6. Dump the framebuffer as a PPM image
     std::string out_path = "output.ppm";

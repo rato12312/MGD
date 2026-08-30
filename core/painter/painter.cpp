@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <cmath>
 #include <chrono>
-#include <iostream>
 
 namespace mgd {
 
@@ -159,16 +158,6 @@ void Painter::rasterizeBatches(const std::vector<RenderBatch>& batches,
                     RenderVertex s0 = VertexProcessor::toScreen(clipResult.vertices[0], sw, sh);
                     RenderVertex s1 = VertexProcessor::toScreen(clipResult.vertices[ci], sw, sh);
                     RenderVertex s2 = VertexProcessor::toScreen(clipResult.vertices[ci + 1], sw, sh);
-                    // DEBUG headless: log first tri screen area
-                    {
-                        static int dbgCount = 0;
-                        if (dbgCount < 3) {
-                            Vec2 p0{s0.position.x, s0.position.y}, p1{s1.position.x, s1.position.y}, p2{s2.position.x, s2.position.y};
-                            float area = VertexProcessor::triangleArea2D(p0, p1, p2);
-                            std::cerr << "DEBUG painter tri " << dbgCount << " screen=(" << p0.x << "," << p0.y << ")-(" << p1.x << "," << p1.y << ")-(" << p2.x << "," << p2.y << ") area=" << area << " cull=" << (area<=0?"yes":"no") << " z=" << s0.position.z << "," << s1.position.z << "," << s2.position.z << "\n";
-                            dbgCount++;
-                        }
-                    }
                     uint32_t written = Rasterizer::rasterizeTriangle(
                         s0,
                         s1,
