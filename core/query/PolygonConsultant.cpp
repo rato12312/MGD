@@ -1,4 +1,5 @@
 #include "PolygonConsultant.h"
+#include <algorithm>
 
 namespace mgd {
 
@@ -82,6 +83,34 @@ size_t PolygonConsultant::feedMentalMapRegion(MentalMap& map, RegionID region) c
         if (feedMentalMap(map, p.polygon_id) != INVALID_ENTITY_ID) ++n;
     }
     return n;
+}
+
+std::vector<PolygonConsultant::ScoredPolygon> PolygonConsultant::queryScored(const Vec3& cameraPos, RegionID region, float minScreenArea) const {
+    std::vector<ScoredPolygon> out;
+    if (!cache_) return out;
+    const auto& polys = cache_->getPolygons(region);
+    out.reserve(polys.size());
+    for (auto& p : polys) {
+        float dist = p.distanceTo(cameraPos);
+        // screenArea estimado: área projetada ~ 1/(dist^2) * k (k=10000 para 800x600)
+        // Pedra gigante longe vira quadradinho — LOD natural, não artificial
+        float screenArea = 10000.0f / (dist * dist + 1.0f);
+        if (screenArea < minScreenArea) continue; // cull por área de tela, não por tamanho do asset
+        ScoredPolygon sp;
+        sp.poly = &p;
+        sp.distance = dist;
+        sp.screenArea = screenArea;
+        sp.flags = p.flags;
+        out.push_back(sp);
+    }
+    std::sort(out.begin(), out.end(), [](const ScoredPolygon& a, const ScoredPolygon& b){ return a.distance < b.distance; });
+    return out;
+}
+
+std::vector<PolygonConsultant::ScoredPolygon> PolygonConsultant::queryScoredByPosition(const Vec3& cameraPos, const Vec3& queryPos, float minScreenArea) const {
+    if (!cache_) return {};
+    RegionID region = ChunkManager::worldToRegionId(queryPos);
+    return queryScored(cameraPos, region, minScreenArea);
 }
 
 uint64_t PolygonConsultant::hits() const { return cache_ ? cache_->hits() : 0; }

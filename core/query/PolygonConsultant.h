@@ -47,14 +47,17 @@ public:
     EntityID feedMentalMap(MentalMap& map, PolygonID pid) const;
     size_t feedMentalMapRegion(MentalMap& map, RegionID region) const;
 
-    // Para LOD futuro: prepara estrutura para classificar por distância/visibilidade/área projetada
+    // LOD refinado: classifica por distância/área projetada (não artificial)
     struct ScoredPolygon {
         const Polygon* poly = nullptr;
         float distance = 0.0f;
-        float screenArea = 0.0f; // TODO: calcular quando houver câmera
+        float screenArea = 0.0f; // estimado via distance e bounds
         uint32_t flags = 0;
     };
-    // TODO: queryScored(pos, cameraPos, frustum) -> vector<ScoredPolygon> ordenado por distância
+    // Consulta com score para LOD: retorna polígonos da região ordenados por distância,
+    // já filtrando por screenArea mínima (pedra gigante longe = quadradinho barato)
+    std::vector<ScoredPolygon> queryScored(const Vec3& cameraPos, RegionID region, float minScreenArea = 1.0f) const;
+    std::vector<ScoredPolygon> queryScoredByPosition(const Vec3& cameraPos, const Vec3& queryPos, float minScreenArea = 1.0f) const;
 
     // Stats
     uint64_t hits() const;
