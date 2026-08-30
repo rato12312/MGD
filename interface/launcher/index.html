@@ -1,0 +1,169 @@
+<<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MGD — Mental Graphics Driver • Launcher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="bg-orb orb-1"></div>
+<div class="bg-orb orb-2"></div>
+<div class="bg-grid"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">◉</div>
+    <div>
+      <div class="brand-name">MGD</div>
+      <div class="brand-sub">MENTAL GRAPHICS DRIVER • v0.2.0 LE</div>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <div class="status-pill"><span class="dot dot-ok"></span> Cache por IDs • 64-bit FNV</div>
+    <div class="status-pill"><span class="dot dot-warn"></span> Chunks 4096</div>
+    <button class="icon-btn" title="Configurações">⚙</button>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="sidenav">
+    <div class="nav-label">BIBLIOTECA</div>
+    <button class="nav-item active" data-nav="library"><span>◼</span> Skyrim LE <em>3 DLCs</em></button>
+    <button class="nav-item" data-nav="chunks"><span>▦</span> Chunks</button>
+    <button class="nav-item" data-nav="cache"><span>⬡</span> Cache</button>
+    <div class="nav-label">SISTEMA</div>
+    <button class="nav-item" data-nav="camera"><span>◎</span> Câmera</button>
+    <button class="nav-item" data-nav="painter"><span>⬔</span> Painter</button>
+    <div class="nav-foot">
+      <div class="foot-title">MGD obra-prima</div>
+      <div class="foot-sub">Skyrim é só o detalhe.<br>MGD pinta a tela total.</div>
+    </div>
+  </nav>
+
+  <main class="main">
+    <!-- HERO: thesis — o jogo selecionado em escala, não stats genéricos -->
+    <section class="hero" id="hero">
+      <div class="hero-media">
+        <div class="hero-cover">
+          <div class="cover-art">
+            <div class="cover-title">SKYRIM</div>
+            <div class="cover-edition">LEGENDARY EDITION</div>
+            <div class="cover-dlcs"><span>Dawnguard</span><span>Hearthfire</span><span>Dragonborn</span></div>
+            <div class="mgd-eye" aria-hidden="true"><div class="eye-core"></div><div class="eye-ring"></div><div class="eye-ring outer"></div></div>
+          </div>
+          <div class="cover-meta">
+            <span class="badge">PC • 1.9.32.0.8</span>
+            <span class="badge muted">ESP / BSA / RAW</span>
+          </div>
+        </div>
+        <div class="hero-info">
+          <div class="eyebrow">CONSCIÊNCIA • CÂMERA + COLISÃO</div>
+          <h1>The Elder Scrolls V:<br><em>Skyrim</em> dentro do Skyrim</h1>
+          <p>A Mental Map abre o Skyrim pelos arquivos, distribui em chunks tipo Minecraft e só a câmera vê — cada asset na frente, guiado por colisão. O Painter pinta a tela total.</p>
+          <div class="hero-stats">
+            <div class="hstat"><strong id="stat-chunks">—</strong><span>chunks ativos</span></div>
+            <div class="hstat"><strong id="stat-entities">—</strong><span>entities por IDs</span></div>
+            <div class="hstat"><strong id="stat-cache">—</strong><span>cache hits</span></div>
+          </div>
+          <div class="hero-actions">
+            <label class="btn btn-primary" for="folder-input">＋ Adicionar Skyrim</label>
+            <input id="folder-input" type="file" webkitdirectory directory multiple hidden>
+            <button class="btn btn-ghost" id="btn-scan">◷ Scan</button>
+            <button class="btn btn-accent" id="btn-launch">▶ Rodar MGD</button>
+          </div>
+          <div class="res-menu">
+            <span class="res-label">Resolução</span>
+            <div class="res-options">
+              <button class="res-btn" data-res="800x600">800×600</button>
+              <button class="res-btn active" data-res="1280x720">1280×720</button>
+              <button class="res-btn" data-res="1920x1080">1920×1080</button>
+              <button class="res-btn" data-res="2560x1440">2560×1440</button>
+            </div>
+            <span class="res-hint mono" id="res-hint">1280×720 • 16:9 • 30 FPS</span>
+          </div>
+          <div class="path-line" id="path-line">Nenhuma pasta selecionada — aponte para <code>Skyrim Legendary Edition/</code> (com <code>Skyrim.esm</code> e <code>*.bsa</code>)</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CAROUSEL: PS5 horizontal snap -->
+    <section class="carousel-wrap">
+      <div class="section-head">
+        <h2>Biblioteca</h2>
+        <div class="carousel-nav"><button id="car-prev">‹</button><button id="car-next">›</button></div>
+      </div>
+      <div class="carousel" id="carousel">
+        <article class="game-card active" data-game="skyrim-le">
+          <div class="card-cover skyrim"></div>
+          <div class="card-body"><h3>Skyrim Legendary Edition</h3><p>Base + 3 DLCs • ESP/BSA</p><div class="card-tags"><span>LE</span><span>DLC3</span><span>PC</span></div></div>
+          <div class="card-progress"><div class="bar" style="width:72%"></div></div>
+        </article>
+        <article class="game-card" data-game="skyrim-se">
+          <div class="card-cover se"></div>
+          <div class="card-body"><h3>Skyrim Special Edition</h3><p>Detectado — não configurado</p><div class="card-tags"><span>SE</span></div></div>
+        </article>
+        <article class="game-card muted" data-game="empty">
+          <div class="card-cover empty">＋</div>
+          <div class="card-body"><h3>Adicionar jogo</h3><p>Aponta para a pasta do Skyrim</p></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- DETAILS GRID: chunks + cache + camera + painter -->
+    <section class="details">
+      <div class="panel" id="panel-chunks">
+        <div class="panel-head"><h3>▦ Chunks Automáticos</h3><span class="mono" id="chunks-label">4096 × 4096 • 0 chunks</span></div>
+        <p class="panel-desc">Cada chunk guarda seus assets. Quanto maior o jogo, mais chunks — base para puxar rápido por <code>RegionID</code>. Criação automática no primeiro entity.</p>
+        <div class="chunk-grid" id="chunk-grid"></div>
+        <div class="legend"><span class="leg"><i class="sw active"></i> ativo</span><span class="leg"><i class="sw"></i> vazio</span><span class="leg"><i class="sw sibling"></i> sibling</span></div>
+      </div>
+
+      <div class="panel" id="panel-cache">
+        <div class="panel-head"><h3>⬡ Cache por IDs</h3><span class="mono">FNV-1a 64 • 64KB stream</span></div>
+        <p class="panel-desc">Não copia assets. Guarda IDs na <code>cache/</code> como índice de chamada rápida. BSA 2GB com hash completo, key 32-bit validada com hash 64.</p>
+        <div class="kv"><span>IDs</span><strong id="kv-ids">—</strong></div>
+        <div class="kv"><span>Arquivos</span><strong id="kv-files">—</strong></div>
+        <div class="kv"><span>Último scan</span><strong id="kv-scan">—</strong></div>
+        <div class="progress-wrap"><div class="progress-bar" id="scan-bar"></div></div>
+        <div class="log" id="scan-log">Aguardando scan…</div>
+      </div>
+
+      <div class="panel" id="panel-camera">
+        <div class="panel-head"><h3>◎ Câmera — Consciência</h3><span class="mono">Frustum culling + Raycast</span></div>
+        <p class="panel-desc">Vê o Skyrim por dentro do próprio Skyrim. Sabe o que está na frente, guiada por colisão — deduz com os arquivos do jogo, não atravessa paredes.</p>
+        <div class="kv"><span>Posição</span><strong class="mono" id="cam-pos">0, 5, 15</strong></div>
+        <div class="kv"><span>Visíveis</span><strong id="cam-vis">— / —</strong></div>
+        <div class="cam-preview"><div class="cam-frustum"><div class="cam-dot"></div><div class="cam-cone"></div></div><span>só o que a câmera vê é renderizado</span></div>
+      </div>
+
+      <div class="panel highlight" id="panel-painter">
+        <div class="panel-head"><h3>⬔ Painter — Mais Importante</h3><span class="mono">Pinta a tela total</span></div>
+        <p class="panel-desc">Último da cadeia. Preenche skybox, rasteriza triângulos, depth test — cobre cada pixel. MGD distribui, câmera vê, <em>painter pinta</em>.</p>
+        <div class="painter-stats">
+          <div><span>Draw calls</span><strong id="p-draw">—</strong></div>
+          <div><span>Tris</span><strong id="p-tris">—</strong></div>
+          <div><span>Pixels</span><strong id="p-pix">—</strong></div>
+        </div>
+        <div class="ppm-preview" id="ppm-preview">output.ppm — aguardando headless demo</div>
+      </div>
+    </section>
+
+    <footer class="foot">MGD obra-prima • Skyrim é o input, MGD é o motor • Legendary Edition — Skyrim.esm → Update.esm → Dawnguard.esm → Hearthfires.esm → Dragonborn.esm • <span class="mono">mgd_app.exe / mgd_tests.exe via Actions</span></footer>
+  </main>
+</div>
+
+<div class="modal" id="launch-modal" hidden>
+  <div class="modal-card">
+    <h3>▶ MGD rodando</h3>
+    <p>Skyrim enviado para o MGD. Mental Map → Chunks → Câmera guiada por colisão → Painter pintando…</p>
+    <div class="modal-bar"><div class="modal-fill" id="modal-fill"></div></div>
+    <button class="btn btn-ghost" id="modal-close">Fechar</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
