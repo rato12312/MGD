@@ -1,4 +1,5 @@
 #include "Scanner.h"
+#include "../mental_map/ChunkManager.h"
 #include <algorithm>
 
 namespace mgd {
@@ -56,9 +57,22 @@ void Scanner::processFile(const FileInfo& file) {
 
     if (cache) {
         auto entry = cache->query(static_cast<uint32_t>(file_hash));
-        if (entry.has_value() && entry->valid) {
+        // Obra-prima cache por IDs: 32-bit key pode colidir, valida hash 64 completo
+        // e repovoa o registry para que buildRecords não perca entidades em resume.
+        if (entry.has_value() && entry->valid && entry->hash == file_hash) {
             progress.cache_hits++;
             progress.bytes_processed += file.file_size;
+            // Se for mesh, garante que o registry tenha algo para buildRecords
+            // (cache hit não re-analisa, mas precisa contar como asset para chunks)
+            if (file.extension == ".nif") {
+                RawAnalysisResult cached_result;
+                cached_result.file = file;
+                cached_result.detected_type = AssetType::MESH;
+                cached_result.spatial_bounds = AABB{Vec3(-1.0f,-1.0f,-1.0f), Vec3(1.0f,1.0f,1.0f)};
+                cached_result.metadata["cached"] = "true";
+                cached_result.success = true;
+                registry.registerAsset(file, cached_result);
+            }
             return;
         }
         progress.cache_misses++;
@@ -165,8 +179,28 @@ void Scanner::buildRecords() const {
             visual_ref = static_cast<uint32_t>(std::stoul(vit->second));
         }
 
+        // Obra-prima chunks: Skyrim LE como Minecraft — cada mesh vai para
+        // seu chunk (4096x4096). Quanto maior o jogo (LE+DLCs), mais chunks.
+        // Base para puxar rápido: ID distribuído em chunk.
+        Vec3 pos = bounds.center();
+        // Se o asset vier de ESP/BSA, tenta extrair posição de metadata (se houver)
+        // senão usa centro do bounds. Legendary Edition: arrange em grid para demo
+        // quando bounds são placeholder (-1..1) — espalha para não colapsar.
+        if (bounds.min.x == -1.0f && bounds.max.x == 1.0f) {
+            // Placeholder bounds → espalha em grid 10x10 por chunk para visualização
+            float gx = static_cast<float>((idx % 10) * 400 - 1800);
+            float gz = static_cast<float>((idx / 10) * 400 - 1800);
+            pos = Vec3{gx, 0.0f, gz};
+        }
+        RegionID region = ChunkManager::worldToRegionId(pos);
+
+        // Sibling:DependencyResolver já tem dependency_ids do analyzer (ESP masters etc.)
+        // Aqui usamos parent_id = chunk-parent para hierarchy: todas entidades do
+        // mesmo chunk compartilham o chunk como parent lógico (se houver mais de 1).
+        EntityID parent = INVALID_ENTITY_ID;
+
         entity_records_.push_back(infector.normalizeEntity(
-            rid, bounds.center(), bounds, visual_ref, INVALID_REGION_ID, rid, rid));
+            rid, pos, bounds, visual_ref, region, rid, rid, parent));
 
         ++idx;
     }

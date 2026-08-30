@@ -3,10 +3,11 @@
 #include "../texture/TextureSampler.h"
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 namespace mgd {
 
-void Rasterizer::rasterizeTriangle(
+uint32_t Rasterizer::rasterizeTriangle(
     const RenderVertex& v0, const RenderVertex& v1, const RenderVertex& v2,
     Framebuffer& fb,
     DepthBuffer& db,
@@ -19,14 +20,15 @@ void Rasterizer::rasterizeTriangle(
     Vec2 p1 = {v1.position.x, v1.position.y};
     Vec2 p2 = {v2.position.x, v2.position.y};
 
+    uint32_t written = 0;
     float area = VertexProcessor::triangleArea2D(p0, p1, p2);
 
     if (backface_culling && area <= 0.0f) {
-        return;
+        return written;
     }
 
     if (std::abs(area) < 1e-10f) {
-        return;
+        return written;
     }
 
     float minX = std::min({p0.x, p1.x, p2.x});
@@ -41,6 +43,10 @@ void Rasterizer::rasterizeTriangle(
 
     float invArea = 1.0f / area;
 
+    static int dbgTri = 0;
+    bool isFirstTri = (dbgTri < 4);
+    dbgTri++;
+    int dbgPixels = 0, dbgTested = 0;
     for (int y = startY; y <= endY; ++y) {
         for (int x = startX; x <= endX; ++x) {
             Vec2 pixel = {static_cast<float>(x) + 0.5f, static_cast<float>(y) + 0.5f};
@@ -56,7 +62,19 @@ void Rasterizer::rasterizeTriangle(
                 sameSign = (e0 > 0.0f) && (e1 > 0.0f) && (e2 > 0.0f);
             }
 
+            if (isFirstTri && dbgTested < 3) {
+                std::cerr << "DEBUG raster tri0 pixel(" << x << "," << y << ") e0=" << e0 << " e1=" << e1 << " e2=" << e2 << " same=" << sameSign << " area=" << area << "\n";
+                dbgTested++;
+            }
             if (!sameSign) continue;
+            if (isFirstTri && dbgPixels < 2) {
+                float lambda0 = e1 * (1.0f/area);
+                float lambda1 = e2 * (1.0f/area);
+                float lambda2 = e0 * (1.0f/area);
+                float zDbg = lambda0 * v0.position.z + lambda1 * v1.position.z + lambda2 * v2.position.z;
+                std::cerr << "DEBUG raster tri0 inside pixel(" << x << "," << y << ") z=" << zDbg << " depth_at=" << (db.inBounds(x,y)? db.get(x,y): -1) << " depth_test=" << (depth_test? db.test(x,y,zDbg):1) << " tex=" << (tex?"yes":"no") << " mat=" << mat.id << "\n";
+            }
+            if (isFirstTri) dbgPixels++;
 
             // Edge functions: e0 is the negated signed area of (p0,p1,p) (weight of v2),
             // e1 of (p1,p2,p) (weight of v0), e2 of (p2,p0,p) (weight of v1).
@@ -103,8 +121,11 @@ void Rasterizer::rasterizeTriangle(
                 db.write(x, y, z);
             }
             fb.setPixel(x, y, finalColor);
+            written++;
         }
     }
+    if (isFirstTri) std::cerr << "DEBUG raster tri0 done tested=" << dbgTested << " inside=" << dbgPixels << " written=" << written << " bbox=" << startX << "," << startY << "-" << endX << "," << endY << " fb=" << fb.width() << "x" << fb.height() << "\n";
+    return written;
 }
 
 } // namespace mgd

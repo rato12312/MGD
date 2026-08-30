@@ -13,6 +13,8 @@ using MaterialID = uint32_t;
 using CollisionID = uint32_t;
 using RegionID = uint32_t;
 using AnimationID = uint32_t;
+using PolygonID = uint32_t;
+using AssetID = ResourceID;
 
 constexpr EntityID INVALID_ENTITY_ID = 0;
 constexpr MeshID INVALID_MESH_ID = 0;
@@ -20,6 +22,8 @@ constexpr TextureID INVALID_TEXTURE_ID = 0;
 constexpr MaterialID INVALID_MATERIAL_ID = 0;
 constexpr CollisionID INVALID_COLLISION_ID = 0;
 constexpr RegionID INVALID_REGION_ID = 0;
+constexpr PolygonID INVALID_POLYGON_ID = 0;
+constexpr AssetID INVALID_ASSET_ID = 0;
 
 enum class EntityState : uint8_t {
     ACTIVE = 0,

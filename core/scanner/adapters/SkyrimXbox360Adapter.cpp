@@ -2,6 +2,8 @@
 #include "../analyzers/MeshAnalyzer.h"
 #include "../analyzers/TextureAnalyzer.h"
 #include "../analyzers/MetadataAnalyzer.h"
+#include "../analyzers/BSAAnalyzer.h"
+#include "../analyzers/ESPAnalyzer.h"
 
 namespace mgd {
 
@@ -33,6 +35,12 @@ std::unique_ptr<IAssetAnalyzer> SkyrimXbox360Adapter::getAnalyzer(const FileInfo
     }
     if (file.extension == ".dds") {
         return std::make_unique<TextureAnalyzer>();
+    }
+    if (file.extension == ".bsa") {
+        return std::make_unique<BSAAnalyzer>();
+    }
+    if (file.extension == ".esp" || file.extension == ".esm" || file.extension == ".esl") {
+        return std::make_unique<ESPAnalyzer>();
     }
     return std::make_unique<MetadataAnalyzer>();
 }

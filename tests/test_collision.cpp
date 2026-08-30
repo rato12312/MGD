@@ -58,10 +58,10 @@ bool run_collision_tests() {
     ASSERT_NEAR(aabb1Moved.min.x, 9.0f, 0.001f);
     ASSERT_NEAR(aabb1Moved.max.x, 11.0f, 0.001f);
 
-    std::vector<CollisionID> nearOrigin = cs.queryAABB(AABB(Vec3(-2, -2, -2), Vec3(2, 2, 2)));
-    ASSERT_MSG(nearOrigin.size() >= 1, "should find at least 1 shape near origin");
-    bool found1 = std::find(nearOrigin.begin(), nearOrigin.end(), static_cast<CollisionID>(1)) != nearOrigin.end();
-    ASSERT_MSG(found1, "shape 1 should be found near origin");
+    std::vector<CollisionID> nearX10 = cs.queryAABB(AABB(Vec3(8, -2, -2), Vec3(12, 2, 2)));
+    ASSERT_MSG(nearX10.size() >= 1, "should find shape 1 near x=10 after move");
+    bool found1 = std::find(nearX10.begin(), nearX10.end(), static_cast<CollisionID>(1)) != nearX10.end();
+    ASSERT_MSG(found1, "shape 1 should be found near x=10 after move");
 
     std::vector<CollisionID> nearFive = cs.queryAABB(AABB(Vec3(3, -2, -2), Vec3(7, 2, 2)));
     bool found2 = std::find(nearFive.begin(), nearFive.end(), static_cast<CollisionID>(2)) != nearFive.end();

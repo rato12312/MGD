@@ -10,7 +10,7 @@ struct Plane {
     float d = 0.0f;
 
     Plane() = default;
-    Plane(const Vec3& n, float d_) : normal(n.normalized()), d(d_) {}
+    Plane(const Vec3& n, float d_) : normal(n), d(d_) {}
     Plane(const Vec3& a, const Vec3& b, const Vec3& c) {
         normal = (b - a).cross(c - a).normalized();
         d = -normal.dot(a);

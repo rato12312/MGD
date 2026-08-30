@@ -10,7 +10,7 @@ namespace mgd {
 
 class Rasterizer {
 public:
-    static void rasterizeTriangle(
+    static uint32_t rasterizeTriangle(
         const RenderVertex& v0, const RenderVertex& v1, const RenderVertex& v2,
         Framebuffer& fb,
         DepthBuffer& db,

@@ -42,11 +42,13 @@ void Camera::recalcFrustum() const {
 void Camera::setPosition(const Vec3& pos) {
     state.position = pos;
     dirty_view = true;
+    dirty_frustum = true;
 }
 
 void Camera::setOrientation(const Vec3& pitch_yaw_roll) {
     state.orientation = pitch_yaw_roll;
     dirty_view = true;
+    dirty_frustum = true;
 }
 
 void Camera::lookAt(const Vec3& target) {
@@ -55,26 +57,31 @@ void Camera::lookAt(const Vec3& target) {
     state.orientation.y = std::atan2(dir.x, dir.z);
     state.orientation.z = 0.0f;
     dirty_view = true;
+    dirty_frustum = true;
 }
 
 void Camera::setFOV(float degrees) {
     state.fov = degrees;
     dirty_proj = true;
+    dirty_frustum = true;
 }
 
 void Camera::setAspectRatio(float w_h) {
     state.aspect_ratio = w_h;
     dirty_proj = true;
+    dirty_frustum = true;
 }
 
 void Camera::setNearPlane(float n) {
     state.near_plane = n;
     dirty_proj = true;
+    dirty_frustum = true;
 }
 
 void Camera::setFarPlane(float f) {
     state.far_plane = f;
     dirty_proj = true;
+    dirty_frustum = true;
 }
 
 void Camera::setViewDistance(float d) {
@@ -89,6 +96,7 @@ void Camera::moveForward(float amount) {
     Vec3 fwd = getForward();
     state.position += fwd * amount;
     dirty_view = true;
+    dirty_frustum = true;
 }
 
 void Camera::moveBackward(float amount) {
@@ -99,6 +107,7 @@ void Camera::moveRight(float amount) {
     Vec3 right = getRight();
     state.position += right * amount;
     dirty_view = true;
+    dirty_frustum = true;
 }
 
 void Camera::moveLeft(float amount) {
@@ -108,6 +117,7 @@ void Camera::moveLeft(float amount) {
 void Camera::moveUp(float amount) {
     state.position += WORLD_UP * amount;
     dirty_view = true;
+    dirty_frustum = true;
 }
 
 void Camera::moveDown(float amount) {
@@ -117,6 +127,7 @@ void Camera::moveDown(float amount) {
 void Camera::rotateYaw(float radians) {
     state.orientation.y += radians;
     dirty_view = true;
+    dirty_frustum = true;
 }
 
 void Camera::rotatePitch(float radians) {
@@ -124,11 +135,13 @@ void Camera::rotatePitch(float radians) {
     if (state.orientation.x > PITCH_LIMIT) state.orientation.x = PITCH_LIMIT;
     if (state.orientation.x < -PITCH_LIMIT) state.orientation.x = -PITCH_LIMIT;
     dirty_view = true;
+    dirty_frustum = true;
 }
 
 void Camera::rotateRoll(float radians) {
     state.orientation.z += radians;
     dirty_view = true;
+    dirty_frustum = true;
 }
 
 Vec3 Camera::getForward() const {
@@ -166,12 +179,12 @@ const Mat4& Camera::getProjectionMatrix() const {
 }
 
 const Mat4& Camera::getViewProjectionMatrix() const {
-    if (dirty_frustum) recalcFrustum();
+    if (dirty_frustum || dirty_view || dirty_proj) recalcFrustum();
     return cached_vp;
 }
 
 const Frustum& Camera::getFrustum() const {
-    if (dirty_frustum) recalcFrustum();
+    if (dirty_frustum || dirty_view || dirty_proj) recalcFrustum();
     return cached_frustum;
 }
 
