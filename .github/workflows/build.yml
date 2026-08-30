@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install dependencies
         run: |
@@ -26,5 +26,64 @@ jobs:
       - name: Run tests
         run: ./build/mgd_tests
 
+      - name: Run polygon benchmark
+        run: |
+          g++ -std=c++17 -Wall -Wextra -I. $(find core -name '*.cpp' | tr '\n' ' ') tools/benchmark_polygon.cpp -o build/benchmark_polygon
+          ./build/benchmark_polygon
+
       - name: Run headless demo
         run: ./build/mgd_app
+
+      - name: Upload headless demo + PPM
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: mgd-headless-linux
+          path: |
+            build/mgd_app
+            build/mgd_tests
+            output.ppm
+
+  build-windows-exe:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup MinGW
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: mingw-w64-x86_64-gcc
+
+      - name: Build EXE (MGD obra-prima)
+        shell: msys2 {0}
+        run: |
+          g++ --version
+          mkdir -p build
+          CORE_SOURCES=$(find core -name '*.cpp' | sort | tr '\n' ' ')
+          TEST_SOURCES=$(find tests -name '*.cpp' | sort | tr '\n' ' ')
+          g++ -std=c++17 -Wall -Wextra -I. -DMGD_TESTING $CORE_SOURCES $TEST_SOURCES -o build/mgd_tests.exe
+          g++ -std=c++17 -Wall -Wextra -I. $CORE_SOURCES src/main.cpp -o build/mgd_app.exe
+          g++ -std=c++17 -Wall -Wextra -I. $CORE_SOURCES src/mgd_launcher.cpp -o build/mgd_launcher.exe || echo "launcher build skipped (no SDL2)"
+          ls -lh build/
+
+      - name: Run tests (Windows)
+        shell: msys2 {0}
+        run: ./build/mgd_tests.exe
+
+      - name: Run headless demo (Windows)
+        shell: msys2 {0}
+        run: ./build/mgd_app.exe
+
+      - name: Upload EXE + Launcher UI
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: mgd-exe-windows
+          path: |
+            build/mgd_tests.exe
+            build/mgd_app.exe
+            build/mgd_launcher.exe
+            interface/launcher/
+            output.ppm
