@@ -148,6 +148,7 @@ add_executable(mgd_tests
     tests/test_rasterizer.cpp
     tests/test_painter.cpp
     tests/test_polygon_query.cpp
+    tests/test_dna_pipeline.cpp
 )
 target_link_libraries(mgd_tests mgd_core)
 target_compile_definitions(mgd_tests PRIVATE MGD_TESTING)

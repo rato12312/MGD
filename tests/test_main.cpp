@@ -12,6 +12,7 @@ bool run_framebuffer_tests();
 bool run_rasterizer_tests();
 bool run_painter_tests();
 bool run_polygon_query_tests();
+bool run_dna_pipeline_tests();
 
 struct TestResult {
     std::string name;
@@ -30,6 +31,7 @@ int main() {
     results.push_back({"Rasterizer", run_rasterizer_tests()});
     results.push_back({"Painter", run_painter_tests()});
     results.push_back({"PolygonQuery", run_polygon_query_tests()});
+    results.push_back({"DnaPipeline", run_dna_pipeline_tests()});
 
     int passed = 0, failed = 0;
     for (auto& r : results) {

@@ -5,7 +5,15 @@
 #include "../core/query/Polygon.h"
 #include "../core/query/RegionPolygonCache.h"
 #include "../core/query/PolygonConsultant.h"
+#include "../core/query/dna/Dna.h"
+#include "../core/query/dna/XyzIndex.h"
+#include "../core/query/dna/ColorCode.h"
+#include "../core/query/dna/PixelMap.h"
+#include "../core/query/dna/PixelCache.h"
+#include "../core/query/dna/ChangeDetector.h"
+#include "../core/query/dna/DnaPipeline.h"
 #include "../core/scanner/AssetRegistry.h"
+#include <algorithm>
 
 using namespace mgd;
 using Clock = std::chrono::high_resolution_clock;
@@ -93,6 +101,107 @@ int main() {
         auto end = Clock::now();
         double ms = std::chrono::duration<double, std::milli>(end-start).count();
         std::cout << "  queryByPosition 100k: " << ms << " ms hits=" << cache.hits() << " misses=" << cache.misses() << " sink=" << s << "\n";
+    }
+
+    // ===== Etapas incrementais: DNA + índices + mapa de pixels + cores + cache + painter =====
+    // Test scene: 2000 polígonos estáticos + 50 móveis, framebuffer 96x54.
+    std::cout << "=== DNA pipeline stages ===\n";
+    {
+        using namespace dna;
+        const int FBW = 96, FBH = 54;
+        std::vector<Polygon> scene;
+        scene.reserve(2050);
+        for (uint32_t i = 1; i <= 2000; ++i) {
+            Polygon p;
+            p.position = Vec3(static_cast<float>((i * 37) % 100), 0.0f, static_cast<float>((i * 53) % 100));
+            p.polygon_id = 5000 + i;
+            p.asset_id = 1 + (i % 10);
+            p.flags = PolygonFlag::VISIBLE | PolygonFlag::STATIC;
+            scene.push_back(p);
+        }
+        for (uint32_t i = 1; i <= 50; ++i) {
+            Polygon p;
+            p.position = Vec3(static_cast<float>(i), 0.0f, 0.0f);
+            p.polygon_id = 9000 + i;
+            p.asset_id = 2;
+            p.flags = PolygonFlag::VISIBLE;
+            scene.push_back(p);
+        }
+
+        auto t0 = Clock::now();
+        XyzIndex xyz(0.25f);
+        std::vector<DnaPolygon> dnas;
+        dnas.reserve(scene.size());
+        for (auto& p : scene) {
+            DnaPolygon d;
+            d.polygon_id = p.polygon_id;
+            d.asset_id = p.asset_id;
+            d.xyz_id = xyz.intern(p.position);
+            d.geo_code = static_cast<uint16_t>(p.polygon_id % 8u);
+            d.color_code = ColorCode::encode(10, static_cast<int>(p.polygon_id % 5) - 2);
+            d.flags = p.flags;
+            dnas.push_back(d);
+        }
+        auto t1 = Clock::now();
+        PixelMap pmap;
+        pmap.buildStatic(dnas, xyz, FBW, FBH, 4, 4);
+        auto t2 = Clock::now();
+        // Sistema de cores: decode de 10k códigos via LUT
+        volatile uint32_t colorSink = 0;
+        for (int i = 0; i < 10000; ++i) {
+            RGBA c = ColorCode::decode(ColorCode::encode(10, (i % 7) - 3));
+            colorSink += c.r + c.g + c.b;
+        }
+        auto t3 = Clock::now();
+        auto ms = [](auto a, auto b){ return std::chrono::duration<double,std::milli>(b-a).count(); };
+        std::cout << "  DNA + indices (" << dnas.size() << " polys, " << xyz.size() << " xyz únicos): "
+                  << ms(t0,t1) << " ms\n";
+        std::cout << "  Mapa de pixels (" << pmap.polygonCount() << " polys): " << ms(t1,t2) << " ms\n";
+        std::cout << "  Sistema de cores (10k LUT): " << ms(t2,t3) << " ms sink=" << colorSink << "\n";
+
+        // Cache incremental: frame cheio vs frame estático
+        IncrementalPixelCache pcache(FBW, FBH);
+        for (auto& d : dnas) for (auto& s : pmap.get(d.polygon_id)) pcache.setPixelCode(s.pixel_index, s.color_code);
+        Framebuffer fb(FBW, FBH);
+        fb.clear(RGBA(0,0,0,255));
+        auto t4 = Clock::now();
+        uint32_t wFull = pcache.flush(fb);
+        auto t5 = Clock::now();
+        for (auto& d : dnas) for (auto& s : pmap.get(d.polygon_id)) pcache.setPixelCode(s.pixel_index, s.color_code);
+        uint32_t wStatic = pcache.flush(fb);
+        auto t6 = Clock::now();
+        std::cout << "  Cache incremental cheio: " << ms(t4,t5) << " ms written=" << wFull << "\n";
+        std::cout << "  Cache incremental estático: " << ms(t5,t6) << " ms written=" << wStatic << "\n";
+
+        // Painter (test scene): 120 frames, 50 móveis, resto estático — FPS médio + 1% low
+        DnaPipeline pipe(FBW, FBH);
+        pipe.buildFromPolygons(scene, 10);
+        const int FRAMES = 120;
+        std::vector<double> frameMs;
+        frameMs.reserve(FRAMES);
+        std::vector<PolygonID> moving;
+        for (uint32_t i = 1; i <= 50; ++i) moving.push_back(9000 + i);
+        // warmup: primeiro frame calcula tudo
+        pipe.renderFrame({});
+        for (int f = 0; f < FRAMES; ++f) {
+            auto fs = Clock::now();
+            // só os 50 móveis mudam por frame (mundo/objeto parados)
+            pipe.renderFrame(moving);
+            auto fe = Clock::now();
+            frameMs.push_back(ms(fs, fe));
+        }
+        std::sort(frameMs.begin(), frameMs.end());
+        double sum = 0; for (double v : frameMs) sum += v;
+        double avg = sum / FRAMES;
+        size_t low1 = static_cast<size_t>(FRAMES * 0.01);
+        if (low1 < 1) low1 = 1;
+        double worst = 0; for (size_t i = FRAMES - low1; i < frameMs.size(); ++i) worst += frameMs[i];
+        worst /= low1;
+        double fps = 1000.0 / avg;
+        double fpsLow = 1000.0 / worst;
+        std::cout << "  Test scene (" << scene.size() << " polys, 50 móveis, " << FBW << "x" << FBH << ", " << FRAMES << " frames):\n";
+        std::cout << "    frame médio: " << avg << " ms | FPS médio: " << fps << "\n";
+        std::cout << "    1% low: " << worst << " ms | FPS 1% low: " << fpsLow << "\n";
     }
 
     return 0;
