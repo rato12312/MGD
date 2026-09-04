@@ -151,6 +151,7 @@ add_executable(mgd_tests
     tests/test_dna_pipeline.cpp
     tests/test_handoff_mock.cpp
     tests/test_shader_cache.cpp
+    tests/test_pipeline_full.cpp
 )
 target_link_libraries(mgd_tests mgd_core)
 target_compile_definitions(mgd_tests PRIVATE MGD_TESTING)

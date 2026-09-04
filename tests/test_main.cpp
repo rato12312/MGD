@@ -15,6 +15,7 @@ bool run_polygon_query_tests();
 bool run_dna_pipeline_tests();
 bool run_handoff_mock_tests();
 bool run_shader_cache_tests();
+bool run_pipeline_full_tests();
 
 struct TestResult {
     std::string name;
@@ -36,6 +37,7 @@ int main() {
     results.push_back({"DnaPipeline", run_dna_pipeline_tests()});
     results.push_back({"HandoffMock", run_handoff_mock_tests()});
     results.push_back({"ShaderCache", run_shader_cache_tests()});
+    results.push_back({"PipelineFull", run_pipeline_full_tests()});
 
     int passed = 0, failed = 0;
     for (auto& r : results) {
