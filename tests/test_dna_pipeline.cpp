@@ -79,8 +79,9 @@ bool run_dna_pipeline_tests() {
         cd.touchPolygon(1);
         uint64_t pv = cd.polygonVersion(1);
         ASSERT_MSG(!cd.polygonChanged(1, cd.worldVersion(), pv), "reuse when unchanged");
+        uint64_t wv = cd.worldVersion(); // versão vista antes da mudança
         cd.touchWorld();
-        ASSERT_MSG(cd.polygonChanged(1, cd.worldVersion(), pv), "world change forces recalc");
+        ASSERT_MSG(cd.polygonChanged(1, wv, pv), "world change forces recalc");
     }
 
     // 6. Pipeline completo: frame 1 calcula tudo, frame 2 estático reutiliza
