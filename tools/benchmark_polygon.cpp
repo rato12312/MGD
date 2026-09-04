@@ -1,5 +1,6 @@
 #include <iostream>
 #include <chrono>
+#include <cstdio>
 #include <vector>
 #include <random>
 #include "../core/query/Polygon.h"
@@ -202,6 +203,116 @@ int main() {
         std::cout << "  Test scene (" << scene.size() << " polys, 50 móveis, " << FBW << "x" << FBH << ", " << FRAMES << " frames):\n";
         std::cout << "    frame médio: " << avg << " ms | FPS médio: " << fps << "\n";
         std::cout << "    1% low: " << worst << " ms | FPS 1% low: " << fpsLow << "\n";
+    }
+
+    // ===== TESTE 0..8: baseline tradicional vs cada camada ligada =====
+    // TESTE 0 = MGD atual (recalcula e reescreve tudo por frame, sem DNA/cache).
+    // TESTES 1..8 ligam uma camada por vez sobre a mesma cena.
+    std::cout << "=== TESTE 0..8 (mesma cena 2050 polys, 96x54, 120 frames) ===\n";
+    {
+        using namespace dna;
+        const int FBW = 96, FBH = 54, FRAMES = 120;
+        std::vector<Polygon> scene;
+        for (uint32_t i = 1; i <= 2000; ++i) {
+            Polygon p;
+            p.position = Vec3(static_cast<float>((i * 37) % 100), 0.0f, static_cast<float>((i * 53) % 100));
+            p.polygon_id = 5000 + i; p.asset_id = 1 + (i % 10); p.flags = PolygonFlag::VISIBLE;
+            scene.push_back(p);
+        }
+        for (uint32_t i = 1; i <= 50; ++i) {
+            Polygon p;
+            p.position = Vec3(static_cast<float>(i), 0.0f, 0.0f);
+            p.polygon_id = 9000 + i; p.asset_id = 2; p.flags = PolygonFlag::VISIBLE;
+            scene.push_back(p);
+        }
+        auto ms = [](auto a, auto b){ return std::chrono::duration<double,std::milli>(b-a).count(); };
+
+        // TESTE 0: tradicional — todo frame recalcula cor por pixel e reescreve tudo
+        double t0;
+        {
+            Framebuffer fb(FBW, FBH);
+            auto s = Clock::now();
+            for (int f = 0; f < FRAMES; ++f) {
+                fb.clear(RGBA(0,0,0,255));
+                for (auto& p : scene) {
+                    int cx = static_cast<int>(p.position.x * 0.5f + 50.0f) % FBW;
+                    if (cx < 0) cx += FBW;
+                    int cy = static_cast<int>(p.position.z * 0.5f + 50.0f) % FBH;
+                    if (cy < 0) cy += FBH;
+                    RGBA c(static_cast<uint8_t>((p.polygon_id * 67u) % 256u),
+                           static_cast<uint8_t>((p.polygon_id * 131u) % 256u),
+                           static_cast<uint8_t>((p.polygon_id * 197u) % 256u), 255);
+                    for (int oy = 0; oy < 4; ++oy) for (int ox = 0; ox < 4; ++ox)
+                        fb.setPixel((cx+ox)%FBW, (cy+oy)%FBH, c);
+                }
+            }
+            t0 = ms(s, Clock::now()) / FRAMES;
+        }
+        // TESTES 1+2: DNA + índices (custo único de construção)
+        XyzIndex xyz(0.25f);
+        std::vector<DnaPolygon> dnas; dnas.reserve(scene.size());
+        auto s1 = Clock::now();
+        for (auto& p : scene) {
+            DnaPolygon d;
+            d.polygon_id = p.polygon_id; d.asset_id = p.asset_id;
+            d.xyz_id = xyz.intern(p.position);
+            d.geo_code = static_cast<uint16_t>(p.polygon_id % 8u);
+            d.color_code = ColorCode::encode(10, static_cast<int>(p.polygon_id % 5) - 2);
+            d.flags = p.flags;
+            dnas.push_back(d);
+        }
+        double t12 = ms(s1, Clock::now());
+        // TESTE 3: mapa de pixels (custo único)
+        PixelMap pmap;
+        auto s3 = Clock::now();
+        pmap.buildStatic(dnas, xyz, FBW, FBH, 4, 4);
+        double t3 = ms(s3, Clock::now());
+        // TESTE 4: cores via LUT 10k
+        auto s4 = Clock::now();
+        volatile uint32_t csink = 0;
+        for (int i = 0; i < 10000; ++i) { RGBA c = ColorCode::decode(ColorCode::encode(10, (i%7)-3)); csink += c.r; }
+        double t4 = ms(s4, Clock::now());
+        (void)csink;
+        // TESTE 5: pixel cache cheio
+        IncrementalPixelCache pc(FBW, FBH);
+        Framebuffer fb2(FBW, FBH); fb2.clear(RGBA(0,0,0,255));
+        for (auto& d : dnas) for (auto& sp : pmap.get(d.polygon_id)) pc.setPixelCode(sp.pixel_index, sp.color_code);
+        auto s5 = Clock::now();
+        pc.flush(fb2);
+        double t5 = ms(s5, Clock::now());
+        // TESTE 6: framebuffer incremental estático
+        for (auto& d : dnas) for (auto& sp : pmap.get(d.polygon_id)) pc.setPixelCode(sp.pixel_index, sp.color_code);
+        auto s6 = Clock::now();
+        uint32_t w6 = pc.flush(fb2);
+        double t6 = ms(s6, Clock::now());
+        // TESTES 7+8: detecção de mudanças + pipeline completo (50 móveis, 120 frames)
+        DnaPipeline pipe(FBW, FBH);
+        pipe.buildFromPolygons(scene, 10);
+        pipe.renderFrame({});
+        std::vector<PolygonID> moving;
+        for (uint32_t i = 1; i <= 50; ++i) moving.push_back(9000 + i);
+        std::vector<double> fms; fms.reserve(FRAMES);
+        for (int f = 0; f < FRAMES; ++f) {
+            auto fs = Clock::now();
+            pipe.renderFrame(moving);
+            fms.push_back(ms(fs, Clock::now()));
+        }
+        std::sort(fms.begin(), fms.end());
+        double sum = 0; for (double v : fms) sum += v;
+        double t78 = sum / FRAMES;
+        double low = fms.back();
+
+        std::cout << "  Versão              | ms/frame | FPS médio | 1% low\n";
+        auto row = [](const char* n, double m){ printf("  %-19s | %8.4f | %9.1f | %8.4f\n", n, m, 1000.0/m, m); };
+        // 1% low só medido no pipeline completo; demais usam o próprio valor
+        row("TESTE 0 atual", t0);
+        printf("  TESTE 1+2 DNA+XYZ    | (construção única: %.4f ms)\n", t12);
+        printf("  TESTE 3 pixel map    | (construção única: %.4f ms)\n", t3);
+        printf("  TESTE 4 cores LUT    | (10k: %.4f ms)\n", t4);
+        printf("  TESTE 5 pixel cache  | (flush cheio: %.4f ms)\n", t5);
+        printf("  TESTE 6 incremental  | %8.4f | %9.1f | (reescreve só %u)\n", t6, 1000.0/t6, w6);
+        row("TESTE 7+8 completo", t78);
+        printf("  1%% low pipeline     | %8.4f | %9.1f\n", low, 1000.0/low);
     }
 
     return 0;
