@@ -2,6 +2,8 @@
 
 #include "../../common/Types.h"
 #include <cstdint>
+#include <fstream>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -78,14 +80,77 @@ public:
         return removed;
     }
 
-    void clear() { entries_.clear(); hits_ = misses_ = 0; }
+    void clear() { entries_.clear(); order_.clear(); hits_ = misses_ = 0; }
     size_t size() const { return entries_.size(); }
     uint64_t hits() const { return hits_; }
     uint64_t misses() const { return misses_; }
     void resetStats() { hits_ = misses_ = 0; }
 
-    // TODO: persistência em cache/shader/ (perm, como FileCache) e
-    // geração real de pipeline_code no backend GPU (hoje: MGD software).
+    // Pré-compilação no loading: resolve todos os pipelines conhecidos antes
+    // do primeiro frame, para nunca compilar no meio do jogo (anti-stutter).
+    // resolve(key) deve ser fornecido pelo backend (ou mock nos testes).
+    template <typename Resolver>
+    size_t warmup(const std::vector<ShaderKey>& keys, Resolver&& resolve) {
+        size_t compiled = 0;
+        for (const auto& k : keys) {
+            if (lookup(k)) continue; // hit: já pronto
+            auto [code, hash] = resolve(k);
+            store(k, code, hash);
+            compiled++;
+        }
+        return compiled;
+    }
+
+    // Persistência perm (como FileCache): o cache sobrevive entre sessões,
+    // então a segunda abertura do jogo não recompila nada.
+    bool save(const std::string& path) const {
+        std::ofstream out(path, std::ios::binary | std::ios::trunc);
+        if (!out.is_open()) return false;
+        const uint32_t magic = 0x4D475353u; // "MGSS"
+        const uint32_t version = 1;
+        out.write(reinterpret_cast<const char*>(&magic), 4);
+        out.write(reinterpret_cast<const char*>(&version), 4);
+        uint32_t n = static_cast<uint32_t>(order_.size());
+        out.write(reinterpret_cast<const char*>(&n), 4);
+        for (const auto& k : order_) {
+            auto it = entries_.find(k);
+            if (it == entries_.end() || !it->second.valid) continue;
+            out.write(reinterpret_cast<const char*>(&k.asset_id), 4);
+            out.write(reinterpret_cast<const char*>(&k.polygon_id), 4);
+            out.write(reinterpret_cast<const char*>(&k.material_flags), 4);
+            out.write(reinterpret_cast<const char*>(&it->second.pipeline_code), 4);
+            out.write(reinterpret_cast<const char*>(&it->second.hash), 8);
+        }
+        return static_cast<bool>(out);
+    }
+
+    bool load(const std::string& path) {
+        std::ifstream in(path, std::ios::binary);
+        if (!in.is_open()) return false;
+        uint32_t magic = 0, version = 0, n = 0;
+        in.read(reinterpret_cast<char*>(&magic), 4);
+        in.read(reinterpret_cast<char*>(&version), 4);
+        if (!in || magic != 0x4D475353u || version != 1) return false;
+        in.read(reinterpret_cast<char*>(&n), 4);
+        if (!in || n > 1000000u) return false;
+        clear();
+        for (uint32_t i = 0; i < n; ++i) {
+            ShaderKey k;
+            ShaderEntry e;
+            in.read(reinterpret_cast<char*>(&k.asset_id), 4);
+            in.read(reinterpret_cast<char*>(&k.polygon_id), 4);
+            in.read(reinterpret_cast<char*>(&k.material_flags), 4);
+            in.read(reinterpret_cast<char*>(&e.pipeline_code), 4);
+            in.read(reinterpret_cast<char*>(&e.hash), 8);
+            if (!in) { clear(); return false; }
+            e.valid = true;
+            entries_[k] = e;
+            order_.push_back(k);
+        }
+        return true;
+    }
+
+    // TODO: geração real de pipeline_code no backend GPU (hoje: MGD software).
     // TODO: LRU por frame quando ligar no renderer real (hoje: FIFO).
 
 private:
@@ -100,7 +165,7 @@ private:
 
     size_t capacity_;
     std::unordered_map<ShaderKey, ShaderEntry, ShaderKeyHash> entries_;
-    std::vector<ShaderKey> order_; // TODO: manter em store() para FIFO real
+    std::vector<ShaderKey> order_; // FIFO: ordem de inserção
     mutable uint64_t hits_ = 0;
     mutable uint64_t misses_ = 0;
 };

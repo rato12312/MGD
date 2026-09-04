@@ -1,5 +1,8 @@
+#include <cstdio>
 #include <iostream>
 #include <string>
+#include <utility>
+#include <vector>
 
 #define ASSERT_MSG(cond, msg) do { if (!(cond)) { std::cerr << "FAIL: " << msg << " (" << __FILE__ << ":" << __LINE__ << ")\n"; return false; } } while(0)
 
@@ -69,6 +72,42 @@ bool run_shader_cache_tests() {
         cache.lookup(k); // hit
         ASSERT_MSG(cache.misses() == 1, "one miss");
         ASSERT_MSG(cache.hits() == 2, "two hits");
+    }
+
+    // 6. Warmup no loading: pré-compila tudo antes do primeiro frame
+    {
+        ShaderCache cache(16);
+        std::vector<ShaderKey> keys = {ShaderKey{1, 1, 0}, ShaderKey{2, 2, 0}, ShaderKey{3, 3, 0}};
+        size_t compiled = cache.warmup(keys, [](const ShaderKey& k) {
+            return std::make_pair(k.asset_id * 1000u + k.polygon_id, 0xFFull);
+        });
+        ASSERT_MSG(compiled == 3, "warmup compiles all misses");
+        size_t compiled2 = cache.warmup(keys, [](const ShaderKey& k) {
+            return std::make_pair(0u, 0ull);
+        });
+        ASSERT_MSG(compiled2 == 0, "warmup reuses hits, zero recompiles");
+        ASSERT_MSG(cache.lookup(keys[0])->pipeline_code == 1001, "warmed pipeline kept");
+    }
+
+    // 7. Persistência perm: segunda abertura não recompila nada
+    {
+        const std::string path = "shader_cache_test.bin";
+        {
+            ShaderCache cache(16);
+            cache.store(ShaderKey{82, 102, 0}, 1001, 0xABCD);
+            cache.store(ShaderKey{83, 103, 1}, 1002, 0xEF01);
+            ASSERT_MSG(cache.save(path), "save works");
+        }
+        {
+            ShaderCache cache(16);
+            ASSERT_MSG(cache.load(path), "load works");
+            ASSERT_MSG(cache.size() == 2, "two entries restored");
+            const ShaderEntry* e = cache.lookup(ShaderKey{82, 102, 0});
+            ASSERT_MSG(e && e->pipeline_code == 1001 && e->hash == 0xABCD, "entry restored intact");
+            ASSERT_MSG(cache.lookup(ShaderKey{99, 99, 9}) == nullptr, "unknown still miss");
+        }
+        std::remove(path.c_str());
+        ASSERT_MSG(!ShaderCache().load("no_such_file_xyz.bin"), "missing file -> false");
     }
 
     std::cout << "  Shader cache tests passed!" << std::endl;
