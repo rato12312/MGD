@@ -113,6 +113,37 @@ bool run_seed_provider_tests() {
         ASSERT_MSG(stats2.shaders_reused >= 1, "reuse counted");
     }
 
+    // 8. Shader pelo polígono/posição: só o que está no raio pensado aquece
+    {
+        RegionPolygonCache cache2;
+        mgd::shader::ShaderCache shaders2(64);
+        SeedProvider sp2(5ull);
+        WorldState s2 = makeState();
+        RegionID r2 = ChunkManager::worldToRegionId(s2.player_pos);
+        s2.current_region = r2;
+        Polygon nearPoly;
+        nearPoly.position = s2.player_pos;
+        nearPoly.polygon_id = 881;
+        nearPoly.asset_id = 55;
+        nearPoly.flags = PolygonFlag::VISIBLE;
+        Polygon farPoly;
+        farPoly.position = Vec3(s2.player_pos.x + 100000.0f, 0.0f, s2.player_pos.z);
+        farPoly.polygon_id = 882;
+        farPoly.asset_id = 55;
+        farPoly.flags = PolygonFlag::VISIBLE;
+        ASSERT_MSG(cache2.insert(r2, nearPoly), "insert near");
+        ASSERT_MSG(cache2.insert(r2, farPoly), "insert far");
+        auto stats = SeedShaderDirector::warmPredictedPositions(
+            sp2, s2, PlayerAction::MoveForward, cache2, shaders2,
+            [](const mgd::shader::ShaderKey& k) {
+                return std::make_pair(k.asset_id * 1000u + k.polygon_id, 0xFFull);
+            },
+            4096.0f);
+        ASSERT_MSG(stats.shaders_warmed == 1, "only in-radius polygon warmed");
+        ASSERT_MSG(shaders2.lookup(mgd::shader::ShaderKey{55, 881, 0}) != nullptr, "near ready");
+        ASSERT_MSG(shaders2.lookup(mgd::shader::ShaderKey{55, 882, 0}) == nullptr, "far untouched");
+    }
+
     std::cout << "  Seed provider tests passed!" << std::endl;
     return true;
 }

@@ -46,6 +46,38 @@ public:
         }
         return stats;
     }
+
+    // Novo: shader calcula o POLÍGONO para onde vai, não o asset.
+    // Na hora que o Seed pensa em ir para a posição X, os polígonos num
+    // raio dela já são selecionados e seus shaders aquecidos. O resto
+    // nem é tocado.
+    template <typename Resolver>
+    static SeedShaderStats warmPredictedPositions(SeedProvider& provider,
+                                                  const WorldState& state,
+                                                  PlayerAction action,
+                                                  RegionPolygonCache& cache,
+                                                  shader::ShaderCache& shaders,
+                                                  Resolver&& resolve,
+                                                  float radius = 4096.0f) {
+        SeedShaderStats stats;
+        auto preds = provider.predict(state, action);
+        float r2 = radius * radius;
+        for (const auto& p : preds) {
+            if (p.probability < provider.threshold()) continue;
+            stats.regions_predicted++;
+            const auto& polys = cache.getPolygons(p.region);
+            for (const auto& poly : polys) {
+                Vec3 d = poly.position - state.player_pos;
+                if (d.lengthSq() > r2) continue; // fora do alcance pensado
+                shader::ShaderKey key{poly.asset_id, poly.polygon_id, 0};
+                if (shaders.lookup(key)) { stats.shaders_reused++; continue; }
+                auto [code, hash] = resolve(key);
+                shaders.store(key, code, hash);
+                stats.shaders_warmed++;
+            }
+        }
+        return stats;
+    }
 };
 
 } // namespace seed
