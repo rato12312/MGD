@@ -1,9 +1,13 @@
 #include <iostream>
 #include <string>
+#include <utility>
 
 #define ASSERT_MSG(cond, msg) do { if (!(cond)) { std::cerr << "FAIL: " << msg << " (" << __FILE__ << ":" << __LINE__ << ")\n"; return false; } } while(0)
 
 #include "core/query/seed/SeedProvider.h"
+#include "core/query/seed/SeedShaderDirector.h"
+#include "core/query/RegionPolygonCache.h"
+#include "core/painter/shader/ShaderCache.h"
 
 using namespace mgd;
 using namespace mgd::seed;
@@ -76,6 +80,37 @@ bool run_seed_provider_tests() {
             ASSERT_MSG(p.probability >= 0.5f, "kept above threshold");
         }
         ASSERT_MSG(!preds.empty(), "current region always kept");
+    }
+
+    // 7. Diretor Seed -> Shader: só o previsto é compilado, resto reutiliza
+    {
+        RegionPolygonCache cache;
+        mgd::shader::ShaderCache shaders(64);
+        SeedProvider sp(5ull);
+        WorldState s = makeState();
+        // polígono dentro da região atual (posição do jogador)
+        Polygon p;
+        p.position = s.player_pos;
+        p.polygon_id = 777;
+        p.asset_id = 55;
+        p.flags = PolygonFlag::VISIBLE;
+        RegionID r = ChunkManager::worldToRegionId(s.player_pos);
+        s.current_region = r;
+        ASSERT_MSG(cache.insert(r, p), "insert predicted polygon");
+        auto stats = SeedShaderDirector::warmPredicted(sp, s, PlayerAction::MoveForward,
+                                                       cache, shaders,
+                                                       [](const mgd::shader::ShaderKey& k) {
+                                                           return std::make_pair(k.asset_id * 1000u + k.polygon_id, 0xFFull);
+                                                       });
+        ASSERT_MSG(stats.regions_predicted >= 1, "predicted regions");
+        ASSERT_MSG(stats.shaders_warmed == 1, "warmed only predicted");
+        auto stats2 = SeedShaderDirector::warmPredicted(sp, s, PlayerAction::MoveForward,
+                                                        cache, shaders,
+                                                        [](const mgd::shader::ShaderKey& k) {
+                                                            return std::make_pair(0u, 0ull);
+                                                        });
+        ASSERT_MSG(stats2.shaders_warmed == 0, "second pass reuses all");
+        ASSERT_MSG(stats2.shaders_reused >= 1, "reuse counted");
     }
 
     std::cout << "  Seed provider tests passed!" << std::endl;
