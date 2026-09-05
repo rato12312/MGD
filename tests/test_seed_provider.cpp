@@ -6,6 +6,7 @@
 
 #include "core/query/seed/SeedProvider.h"
 #include "core/query/seed/SeedShaderDirector.h"
+#include "core/query/seed/CameraPredictor.h"
 #include "core/query/RegionPolygonCache.h"
 #include "core/painter/shader/ShaderCache.h"
 
@@ -172,6 +173,24 @@ bool run_seed_provider_tests() {
         ASSERT_MSG(stats.shaders_warmed == 2, "only visible warmed");
         ASSERT_MSG(shaders3.lookup(mgd::shader::ShaderKey{55, 900, 0}) != nullptr, "visible ready");
         ASSERT_MSG(shaders3.lookup(mgd::shader::ShaderKey{55, 902, 0}) == nullptr, "occluded untouched");
+    }
+
+    // 10. Preditor de câmera: parado repete, em movimento extrapola
+    {
+        CameraPredictor cp;
+        CameraPose p0 = cp.predictNext();
+        (void)p0;
+        cp.observe(Vec3(0, 0, 0), Vec3(0, 0, 1));
+        CameraPose p1 = cp.predictNext();
+        ASSERT_MSG(p1.position == Vec3(0, 0, 0), "single observe repeats");
+        ASSERT_MSG(cp.confidence() == 1.0f, "full confidence when static");
+        cp.observe(Vec3(0, 0, 2), Vec3(0, 0, 1));
+        CameraPose p2 = cp.predictNext();
+        ASSERT_MSG(p2.position == Vec3(0, 0, 4), "extrapolates motion");
+        ASSERT_MSG(cp.confidence() < 1.0f, "confidence drops when moving");
+        cp.reset();
+        CameraPose p3 = cp.predictNext();
+        ASSERT_MSG(p3.position == Vec3(0, 0, 0), "reset clears");
     }
 
     std::cout << "  Seed provider tests passed!" << std::endl;
