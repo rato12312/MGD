@@ -1,0 +1,14 @@
+cmake_minimum_required(VERSION 3.16)
+project(mgd_port_odyssey VERSION 0.1.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+file(GLOB_RECURSE PORT_SOURCES "src/mgd/*.cpp")
+
+add_library(mgd_port STATIC ${PORT_SOURCES})
+target_include_directories(mgd_port PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+add_executable(mgd_port_check tools/check.cpp)
+target_link_libraries(mgd_port_check PRIVATE mgd_port)
