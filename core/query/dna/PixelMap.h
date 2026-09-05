@@ -2,7 +2,9 @@
 
 #include "Dna.h"
 #include "ColorCode.h"
+#include "XyzIndex.h"
 #include "../../common/Types.h"
+#include "../../common/Vec3.h"
 #include <array>
 #include <cstdint>
 #include <unordered_map>
