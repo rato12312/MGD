@@ -3,6 +3,7 @@
 #include "Dna.h"
 #include "ColorCode.h"
 #include "../../common/Types.h"
+#include <array>
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
@@ -87,7 +88,7 @@ public:
     void clear() { map_.clear(); lod_map_.clear(); fb_w_ = fb_h_ = 0; }
 
 private:
-    using LodSpans = std::vector<PixelSpan>[LOD_COUNT];
+    using LodSpans = std::array<std::vector<PixelSpan>, LOD_COUNT>;
     std::unordered_map<PolygonID, std::vector<PixelSpan>> map_;
     std::unordered_map<PolygonID, LodSpans> lod_map_;
     int fb_w_ = 0, fb_h_ = 0;
