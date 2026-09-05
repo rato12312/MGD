@@ -1,206 +1,123 @@
 # MGD Engine - Mental Graphics Driver
 
-An alternative rendering architecture that maintains a logical world representation ("Mental Map") and uses a "Painter" to produce pixels directly, bypassing traditional 3D pipelines.
+Uma arquitetura de renderização alternativa que mantém uma representação lógica do mundo ("Mapa Mental") e usa um "Pintor" para produzir pixels diretamente, sem o pipeline 3D tradicional.
 
-## Architecture
+Filosofia: o jogo simula e entrega estado; o MGD identifica, referencia, verifica mudanças e reutiliza o máximo possível — descobre uma vez, usa sempre.
+
+## Arquitetura
 
 ```
-Mental Map
+Jogo / Emulador (estado e simulação)
     ↓
-Camera
+Mapa Mental (chunks, regiões, entidades)
     ↓
-Visibility/State
+Câmera (consciência, guiada por colisão)
     ↓
-Painter
+Visibilidade (só o que a câmera vê)
     ↓
-Framebuffer (RGBA)
+Consultador por polígonos (Região → PolygonID → AssetID)
     ↓
-SDL2
+DNA (identidade compacta + índices + LOD)
     ↓
-Screen
+Mapa de pixels + Código de cor (LUT)
+    ↓
+Cache incremental (só o que mudou)
+    ↓
+Pintor → Framebuffer (RGBA) → Tela
 ```
 
-## Core Concepts
+## Conceitos principais
 
-### Mental Map
-A logical representation of the world containing entities with:
-- Unique ID
-- 3D Position (X, Y, Z)
-- State (Active, Inactive, Hidden)
-- Visual Reference (Background, Ground, Cube, Sphere, Player, Custom)
-- Visibility flag
-- Full RGBA Color (0-255 per channel)
+### Mapa Mental
+Representação lógica do mundo com entidades contendo:
+- ID único
+- Posição 3D (X, Y, Z)
+- Estado (Active, Inactive, Hidden)
+- Referência visual e cor RGBA completa (0-255 por canal)
+- Região/chunk (partição espacial automática estilo Minecraft)
 
-### Camera
-2D orthographic camera with:
-- Position and target
-- Zoom and rotation
-- Viewport dimensions
-- World↔Screen coordinate conversion
-- View frustum culling
+### Câmera
+- Posição, orientação, FOV, near/far
+- Conversão mundo↔tela e frustum culling
+- Guiada por colisão (não atravessa paredes)
 
-### Painter
-Converts Mental Map entities to pixels:
-- Full RGBA framebuffer (no palette limitation)
-- Background and ground rendering
-- Entity rendering by visual reference (cube, sphere, player)
-- Alpha blending support
-- Depth-based scaling
+### Consultador por polígonos
+- `Região → polígonos → PolygonID → AssetID → asset`, sem varredura global
+- `0 = polígono`, `1 = linha` (BitSpace), cada asset com IDs próprios
 
-### Renderer
-SDL2-based window and presentation:
-- Hardware-accelerated texture streaming
-- VSync support
-- Configurable FPS target
-- Callback-based update/render/input
+### DNA / Seed Provider
+- DNA compacto por polígono (posição via índice XYZ, cor, LOD, pixel map)
+- Seed prevê regiões prováveis e aquece shaders só do que vai aparecer
+- Detecção de mudanças mundo → objeto → polígono
 
-## Project Structure
+### Pintor
+- Framebuffer RGBA completo, skybox, rasterização com depth test
+- Cache de shaders por `AssetID + PolygonID + LOD`, com warmup e persistência
+- Framebuffer incremental: só reescreve o pixel alterado
+
+## Estrutura do projeto
 
 ```
 MGD/
-├── core/                  # C++ Core
-│   ├── mental_map/        # Entity, MentalMap
-│   ├── camera/            # Camera
-│   ├── painter/           # Painter, Framebuffer
+├── core/                  # Núcleo C++
+│   ├── mental_map/        # Entity, MentalMap, ChunkManager, Region
+│   ├── camera/            # Camera + CameraController
+│   ├── collision/         # CollisionSystem, GridIndex, Raycast
+│   ├── visibility/        # BasicVisibility
+│   ├── query/             # RegionPolygonCache, PolygonConsultant, dna/, seed/
+│   ├── painter/           # Painter, Framebuffer, Rasterizer, shader/
+│   ├── scanner/           # Scanner Skyrim LE (BSA/ESP), cache por IDs
+│   ├── bridge/            # Handoff Eden -> MGD (contrato)
 │   └── renderer/          # Renderer (SDL2)
-├── interface/             # Python interface
-├── tests/                 # Unit tests
-├── src/                   # Main executable
-├── assets/                # Game assets (future)
-├── cache/                 # Runtime cache (future)
-├── docs/                  # Documentation (future)
-├── tools/                 # Development tools (future)
+├── interface/launcher/    # Launcher web estilo GameHub
+├── docs/                  # Tutoriais PT/EN (TUTORIAL_PT.md, TUTORIAL_EN.md)
+├── tools/                 # benchmark_polygon
+├── tests/                 # 16 suítes de teste
+├── src/                   # main (headless), mgd_launcher
 ├── CMakeLists.txt
 └── README.md
 ```
 
-## Dependencies
+## Dependências
 
-- **C++17** compatible compiler (MSVC, GCC, Clang)
+- Compilador **C++17** (MSVC, GCC, Clang)
 - **CMake** 3.16+
-- **SDL2** development libraries
+- **SDL2** (opcional, só para o launcher/janela)
 
-### Installing SDL2
-
-**Windows (vcpkg):**
-```powershell
-vcpkg install sdl2:x64-windows
-```
-
-**Windows (manual):**
-1. Download SDL2 development libraries from https://github.com/libsdl-org/SDL/releases
-2. Extract to `C:\SDL2`
-3. Add `C:\SDL2\lib` to library path, `C:\SDL2\include` to include path
-
-**Linux (Ubuntu/Debian):**
-```bash
-sudo apt-get install libsdl2-dev
-```
-
-**Linux (Fedora):**
-```bash
-sudo dnf install SDL2-devel
-```
-
-**macOS (Homebrew):**
-```bash
-brew install sdl2
-```
-
-## Building
+## Compilando
 
 ```bash
-mkdir build
-cd build
-cmake ..
-cmake --build . --config Release
+chmod +x build.sh && ./build.sh
+./build/mgd_tests     # 16 suítes
+./build/mgd_app        # demo headless -> output.ppm
 ```
 
-### Build Options
-
-- `-DCMAKE_BUILD_TYPE=Release` (default) - Optimized build
-- `-DCMAKE_BUILD_TYPE=Debug` - Debug symbols, no optimization
-- `-DCMAKE_INSTALL_PREFIX=<path>` - Custom install location
-
-## Running
+Ou via CMake:
 
 ```bash
-# From build directory
-./mgd_prototype
-
-# Or using Python launcher
-python interface/launch_mgd.py
+mkdir build && cd build
+cmake .. && cmake --build . --config Release
 ```
 
-## Controls
-
-| Key | Action |
-|-----|--------|
-| WASD / Arrow Keys | Move player entity |
-| Q / E | Move player up/down (Z axis) |
-| + / - | Zoom camera in/out |
-| R / F | Rotate camera |
-| ESC | Quit |
-
-## Test Scene
-
-The prototype includes a test scene with:
-- **Background** - Dark blue sky
-- **Ground** - Gradient floor with grid lines
-- **5 Cubes** - Blue cubes at different X positions
-- **3 Spheres** - Red/orange spheres at different positions
-- **Player** - Yellow square entity (controllable)
-
-## Running Tests
+## Benchmark do consultador
 
 ```bash
-# From build directory
-ctest --output-on-failure
-
-# Or run test executable directly
-./mgd_tests
+g++ -std=c++17 -Wall -Wextra -I. $(find core -name '*.cpp' | tr '\n' ' ') tools/benchmark_polygon.cpp -o build/benchmark_polygon
+./build/benchmark_polygon
 ```
 
-## Python Interface
+Mede 1k/10k/100k/1M de consultas mais a tabela TESTE 0..8 (baseline tradicional vs pipeline completo, com FPS médio e 1% low).
 
-```python
-from interface.mgd_interface import MGDInterface
+## Launcher
 
-mgd = MGDInterface()
-mgd.launch(width=800, height=600)
+- Web: abra `interface/launcher/index.html` no navegador (importa a pasta do jogo, scan, resolução, chunks, cache).
+- Nativo: `src/mgd_launcher.cpp` (SDL2) gera `mgd_launcher.exe` no CI.
+- Exes Windows saem no GitHub Actions (`mgd-exe-windows`).
 
-# Monitor state (requires IPC implementation)
-state = mgd.get_state()
-print(f"Entities: {len(state.entities)}")
-print(f"FPS: {state.fps}")
+## Integração com emuladores
 
-mgd.shutdown()
-```
+O diretório `core/bridge/` define o contrato `Eden -> MGD` (`HandoffFrame` com câmera, regiões e polígonos visíveis). O jogo simula e mostra as UIs; o MGD faz o 3D. Detalhes em `docs/`.
 
-## Design Decisions
+## Licença
 
-1. **No traditional 3D pipeline** - No vertex shaders, no triangle rasterization. The Painter draws directly to RGBA pixels.
-
-2. **Full RGBA color** - Each channel 0-255, no palette limitations. Colors stored directly in entities.
-
-3. **Modular C++ core** - Clean separation of MentalMap, Camera, Painter, Renderer for future game-specific adapters.
-
-4. **Python for control** - High-level logic, scripting, and tooling in Python; performance-critical rendering in C++.
-
-5. **Entity-component approach** - Entities are simple data containers; behavior added via systems (future).
-
-6. **Immediate mode painting** - Painter processes visible entities each frame; no retained display lists.
-
-## Future Work
-
-- [ ] Skyrim integration adapter
-- [ ] Spatial partitioning (quadtree/octree) for MentalMap
-- [ ] Asynchronous asset loading
-- [ ] Python IPC for real-time state monitoring
-- [ ] Shader-based Painter backend (optional)
-- [ ] Level-of-detail system
-- [ ] Entity serialization/save system
-
-## License
-
-MIT License - See LICENSE file for details.
+MIT License - veja o arquivo LICENSE para detalhes.
