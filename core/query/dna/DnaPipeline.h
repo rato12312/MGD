@@ -54,6 +54,15 @@ public:
     // Render de um frame com detecção de mudanças + cache incremental.
     // changeMask: polygon_ids que mudaram neste frame (mundo/objeto já tratado fora).
     DnaFrameStats renderFrame(const std::vector<PolygonID>& changedPolys) {
+        // Sem câmera: LOD médio para todos (comportamento anterior preservado).
+        return renderFrameLod(changedPolys, Vec3{}, false);
+    }
+
+    // Com câmera: a distância seleciona a representação preparada (LOD 0/1/2),
+    // sem reconstruir nada — perto usa detalhe, longe usa compacto.
+    DnaFrameStats renderFrameLod(const std::vector<PolygonID>& changedPolys,
+                                 const Vec3& cameraPos, bool useLod,
+                                 float nearDist = 20.0f, float farDist = 60.0f) {
         DnaFrameStats stats;
         for (PolygonID pid : changedPolys) detector_.touchPolygon(pid);
         for (const auto& d : dnas_) {
@@ -61,8 +70,17 @@ public:
             if (!changed) { stats.reused_polys++; continue; }
             stats.rebuilt_polys++;
             last_poly_ver_[d.polygon_id] = detector_.polygonVersion(d.polygon_id);
-            for (const auto& span : pixel_map_.get(d.polygon_id)) {
-                cache_.setPixelCode(span.pixel_index, span.color_code);
+            if (useLod) {
+                Vec3 p = xyz_.decode(d.xyz_id);
+                float dist = p.distanceTo(cameraPos);
+                int lod = PixelMap::selectLod(dist, nearDist, farDist);
+                for (const auto& span : pixel_map_.getLod(d.polygon_id, lod)) {
+                    cache_.setPixelCode(span.pixel_index, span.color_code);
+                }
+            } else {
+                for (const auto& span : pixel_map_.get(d.polygon_id)) {
+                    cache_.setPixelCode(span.pixel_index, span.color_code);
+                }
             }
         }
         last_world_ver_ = detector_.worldVersion();

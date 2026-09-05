@@ -110,6 +110,45 @@ bool run_dna_pipeline_tests() {
         ASSERT_MSG(s3.pixels_written > 0, "changed pixels written");
     }
 
+    // 7. LOD: longe usa representação compacta, perto detalhada, sem reconstruir
+    {
+        ASSERT_MSG(PixelMap::selectLod(100.0f) == 0, "far -> LOD 0");
+        ASSERT_MSG(PixelMap::selectLod(40.0f) == 1, "mid -> LOD 1");
+        ASSERT_MSG(PixelMap::selectLod(5.0f) == 2, "near -> LOD 2");
+        XyzIndex xyz;
+        std::vector<DnaPolygon> dnas;
+        DnaPolygon d; d.polygon_id = 42; d.asset_id = 1;
+        d.xyz_id = xyz.intern(Vec3(0, 0, 0));
+        d.color_code = ColorCode::encode(10, 0);
+        dnas.push_back(d);
+        PixelMap pm;
+        pm.buildStatic(dnas, xyz, 64, 64, 4, 4);
+        ASSERT_MSG(pm.getLod(42, 0).size() == 4, "LOD 0 compacto 2x2");
+        ASSERT_MSG(pm.getLod(42, 1).size() == 16, "LOD 1 medio 4x4");
+        ASSERT_MSG(pm.getLod(42, 2).size() == 64, "LOD 2 detalhado 8x8");
+        ASSERT_MSG(pm.getLod(999, 0).empty(), "unknown lod empty");
+    }
+
+    // 8. Pipeline com câmera: perto pinta mais pixels que longe
+    {
+        std::vector<Polygon> polys;
+        for (uint32_t i = 1; i <= 10; ++i) {
+            Polygon p;
+            p.position = Vec3(static_cast<float>(i * 10), 0.0f, 0.0f);
+            p.polygon_id = 3000 + i;
+            p.asset_id = 9;
+            p.flags = PolygonFlag::VISIBLE;
+            polys.push_back(p);
+        }
+        DnaPipeline nearPipe(64, 64), farPipe(64, 64);
+        nearPipe.buildFromPolygons(polys, 10);
+        farPipe.buildFromPolygons(polys, 10);
+        DnaFrameStats sn = nearPipe.renderFrameLod({}, Vec3(0, 0, 0), true, 200.0f, 500.0f);
+        DnaFrameStats sf = farPipe.renderFrameLod({}, Vec3(10000, 0, 10000), true, 200.0f, 500.0f);
+        ASSERT_MSG(sn.pixels_written > 0 && sf.pixels_written > 0, "both paint");
+        ASSERT_MSG(sn.pixels_written > sf.pixels_written, "near paints more than far");
+    }
+
     std::cout << "  DNA pipeline tests passed!" << std::endl;
     return true;
 }
