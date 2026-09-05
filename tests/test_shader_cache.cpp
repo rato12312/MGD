@@ -7,6 +7,7 @@
 #define ASSERT_MSG(cond, msg) do { if (!(cond)) { std::cerr << "FAIL: " << msg << " (" << __FILE__ << ":" << __LINE__ << ")\n"; return false; } } while(0)
 
 #include "core/painter/shader/ShaderCache.h"
+#include "core/painter/shader/FrameGovernor.h"
 
 using namespace mgd;
 using namespace mgd::shader;
@@ -108,6 +109,29 @@ bool run_shader_cache_tests() {
         }
         std::remove(path.c_str());
         ASSERT_MSG(!ShaderCache().load("no_such_file_xyz.bin"), "missing file -> false");
+    }
+
+    // 8. Shader LOD: mesmo polígono tem entradas distintas por nível
+    {
+        ShaderCache cache(16);
+        ShaderKey full{82, 102, 0, 2};
+        ShaderKey simple{82, 102, 0, 0};
+        cache.store(full, 2002, 1);
+        cache.store(simple, 2000, 1);
+        ASSERT_MSG(cache.lookup(full)->pipeline_code == 2002, "full kept");
+        ASSERT_MSG(cache.lookup(simple)->pipeline_code == 2000, "simple kept");
+        ASSERT_MSG(cache.size() == 2, "two LOD entries");
+    }
+
+    // 9. Governador: frame lento baixa escala, frame rápido sobe
+    {
+        FrameGovernor gov(30.0f); // alvo 33.3ms
+        ASSERT_MSG(gov.scale() == 1.0f, "starts full");
+        for (int i = 0; i < 40; ++i) gov.update(60.0f); // lento
+        ASSERT_MSG(gov.scale() < 1.0f, "slow frame lowers scale");
+        ASSERT_MSG(gov.scale() >= 0.5f, "floor at 0.5");
+        for (int i = 0; i < 200; ++i) gov.update(5.0f); // rápido
+        ASSERT_MSG(gov.scale() == 1.0f, "fast frame restores full");
     }
 
     std::cout << "  Shader cache tests passed!" << std::endl;

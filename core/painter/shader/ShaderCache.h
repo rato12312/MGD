@@ -18,10 +18,11 @@ struct ShaderKey {
     AssetID asset_id = INVALID_ASSET_ID;
     PolygonID polygon_id = INVALID_POLYGON_ID;
     uint32_t material_flags = 0;
+    uint8_t lod = 0; // nível de shader: 0 simples (longe), 2 full (perto)
 
     bool operator==(const ShaderKey& o) const {
         return asset_id == o.asset_id && polygon_id == o.polygon_id &&
-               material_flags == o.material_flags;
+               material_flags == o.material_flags && lod == o.lod;
     }
 };
 
@@ -30,6 +31,7 @@ struct ShaderKeyHash {
         size_t h = static_cast<size_t>(k.asset_id) * 73856093u;
         h ^= static_cast<size_t>(k.polygon_id) * 19349663u;
         h ^= static_cast<size_t>(k.material_flags) * 83492791u;
+        h ^= static_cast<size_t>(k.lod) * 2246822519u;
         return h;
     }
 };

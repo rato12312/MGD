@@ -2,6 +2,7 @@
 
 #include "SeedProvider.h"
 #include "../RegionPolygonCache.h"
+#include "../dna/PixelMap.h"
 #include "../../painter/shader/ShaderCache.h"
 #include <cstdint>
 #include <vector>
@@ -79,7 +80,7 @@ public:
     // Novo: shader calcula o POLÍGONO para onde vai, não o asset.
     // Na hora que o Seed pensa em ir para a posição X, os polígonos num
     // raio dela já são selecionados e seus shaders aquecidos. O resto
-    // nem é tocado.
+    // nem é tocado. O LOD vem da distância (shader simples longe, full perto).
     template <typename Resolver>
     static SeedShaderStats warmPredictedPositions(SeedProvider& provider,
                                                   const WorldState& state,
@@ -87,7 +88,8 @@ public:
                                                   RegionPolygonCache& cache,
                                                   shader::ShaderCache& shaders,
                                                   Resolver&& resolve,
-                                                  float radius = 4096.0f) {
+                                                  float radius = 4096.0f,
+                                                  float lodNear = 20.0f, float lodFar = 60.0f) {
         SeedShaderStats stats;
         auto preds = provider.predict(state, action);
         float r2 = radius * radius;
@@ -98,7 +100,9 @@ public:
             for (const auto& poly : polys) {
                 Vec3 d = poly.position - state.player_pos;
                 if (d.lengthSq() > r2) continue; // fora do alcance pensado
-                shader::ShaderKey key{poly.asset_id, poly.polygon_id, 0};
+                float dist = d.length();
+                uint8_t lod = static_cast<uint8_t>(dna::PixelMap::selectLod(dist, lodNear, lodFar));
+                shader::ShaderKey key{poly.asset_id, poly.polygon_id, 0, lod};
                 if (shaders.lookup(key)) { stats.shaders_reused++; continue; }
                 auto [code, hash] = resolve(key);
                 shaders.store(key, code, hash);

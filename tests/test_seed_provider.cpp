@@ -140,8 +140,11 @@ bool run_seed_provider_tests() {
             },
             4096.0f);
         ASSERT_MSG(stats.shaders_warmed == 1, "only in-radius polygon warmed");
-        ASSERT_MSG(shaders2.lookup(mgd::shader::ShaderKey{55, 881, 0}) != nullptr, "near ready");
+        // perto (dist 0) aquece no LOD 2 (full); longe nem é tocado
+        ASSERT_MSG(shaders2.lookup(mgd::shader::ShaderKey{55, 881, 2}) != nullptr, "near ready at LOD 2");
+        ASSERT_MSG(shaders2.lookup(mgd::shader::ShaderKey{55, 881, 0}) == nullptr, "no LOD 0 entry for near");
         ASSERT_MSG(shaders2.lookup(mgd::shader::ShaderKey{55, 882, 0}) == nullptr, "far untouched");
+        ASSERT_MSG(shaders2.lookup(mgd::shader::ShaderKey{55, 882, 2}) == nullptr, "far untouched at LOD 2");
     }
 
     // 9. warmFiltered: shader só onde aparece (predicado de cena/LOD)
