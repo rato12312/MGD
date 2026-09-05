@@ -47,6 +47,35 @@ public:
         return stats;
     }
 
+    // Filtro genérico: shader só onde aparece coisa (visibilidade/LOD/cena).
+    // O predicado decide por polígono (ex.: dentro do frustum, LOD visível);
+    // o resto nem é tocado. Raio é só o caso padrão.
+    template <typename Resolver, typename Predicate>
+    static SeedShaderStats warmFiltered(SeedProvider& provider,
+                                        const WorldState& state,
+                                        PlayerAction action,
+                                        RegionPolygonCache& cache,
+                                        shader::ShaderCache& shaders,
+                                        Resolver&& resolve,
+                                        Predicate&& visible) {
+        SeedShaderStats stats;
+        auto preds = provider.predict(state, action);
+        for (const auto& p : preds) {
+            if (p.probability < provider.threshold()) continue;
+            stats.regions_predicted++;
+            const auto& polys = cache.getPolygons(p.region);
+            for (const auto& poly : polys) {
+                if (!visible(poly)) continue; // fora da cena visível: pula
+                shader::ShaderKey key{poly.asset_id, poly.polygon_id, 0};
+                if (shaders.lookup(key)) { stats.shaders_reused++; continue; }
+                auto [code, hash] = resolve(key);
+                shaders.store(key, code, hash);
+                stats.shaders_warmed++;
+            }
+        }
+        return stats;
+    }
+
     // Novo: shader calcula o POLÍGONO para onde vai, não o asset.
     // Na hora que o Seed pensa em ir para a posição X, os polígonos num
     // raio dela já são selecionados e seus shaders aquecidos. O resto

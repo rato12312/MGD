@@ -144,6 +144,33 @@ bool run_seed_provider_tests() {
         ASSERT_MSG(shaders2.lookup(mgd::shader::ShaderKey{55, 882, 0}) == nullptr, "far untouched");
     }
 
+    // 9. warmFiltered: shader só onde aparece (predicado de cena/LOD)
+    {
+        RegionPolygonCache cache3;
+        mgd::shader::ShaderCache shaders3(64);
+        SeedProvider sp3(5ull);
+        WorldState s3 = makeState();
+        RegionID r3 = ChunkManager::worldToRegionId(s3.player_pos);
+        s3.current_region = r3;
+        for (uint32_t i = 0; i < 4; ++i) {
+            Polygon p;
+            p.position = s3.player_pos;
+            p.polygon_id = 900 + i;
+            p.asset_id = 55;
+            p.flags = (i < 2) ? PolygonFlag::VISIBLE : PolygonFlag::OCCLUDED;
+            cache3.insert(r3, p);
+        }
+        auto stats = SeedShaderDirector::warmFiltered(
+            sp3, s3, PlayerAction::MoveForward, cache3, shaders3,
+            [](const mgd::shader::ShaderKey& k) {
+                return std::make_pair(k.asset_id * 1000u + k.polygon_id, 0xFFull);
+            },
+            [](const Polygon& p) { return p.hasFlag(PolygonFlag::VISIBLE); });
+        ASSERT_MSG(stats.shaders_warmed == 2, "only visible warmed");
+        ASSERT_MSG(shaders3.lookup(mgd::shader::ShaderKey{55, 900, 0}) != nullptr, "visible ready");
+        ASSERT_MSG(shaders3.lookup(mgd::shader::ShaderKey{55, 902, 0}) == nullptr, "occluded untouched");
+    }
+
     std::cout << "  Seed provider tests passed!" << std::endl;
     return true;
 }
