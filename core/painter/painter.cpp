@@ -45,7 +45,7 @@ Mat4 Painter::buildModelMatrix(const Transform& transform) const {
     return t * r * s;
 }
 
-std::vector<RenderEntity> Painter::prepareRenderEntities(const VisibleSet& visible, IRenderResourceProvider* resources) {
+std::vector<RenderEntity> Painter::prepareRenderEntities(const VisibleSet& visible, IRenderResourceProvider* /*resources*/) {
     std::vector<RenderEntity> entities;
     entities.reserve(visible.entities.size());
 

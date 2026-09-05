@@ -21,7 +21,8 @@ int resolveTexel(int a, int size, WrapMode mode) {
 
 } // namespace
 
-float TextureSampler::wrapCoordinate(float coord, int size, WrapMode mode) {
+float TextureSampler::wrapCoordinate(float coord, int /*size*/, WrapMode mode) {
+    // TODO(texture): usar size para wrap em texels quando o sampler operar em texels.
     if (mode == WrapMode::REPEAT) {
         coord = coord - std::floor(coord);
         if (coord < 0.0f) coord += 1.0f;

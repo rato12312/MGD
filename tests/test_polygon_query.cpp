@@ -105,10 +105,7 @@ bool run_polygon_query_tests() {
         ASSERT_EQ(polysA.size(), static_cast<size_t>(5));
         ASSERT_EQ(polysB.size(), static_cast<size_t>(1));
         ASSERT_MSG(polysB[0].polygon_id == 301, "regionB has 301");
-        // posição -> região via ChunkManager
-        Vec3 posA(0,0,0);
-        RegionID rA = ChunkManager::worldToRegionId(posA);
-        // rA may not be 100/200, but queryByPosition should use same mapping
+        // posição -> região via ChunkManager (mesmo mapeamento do queryByPosition)
         // Insert via position API
         Polygon pPos; pPos.position=Vec3(5000,0,5000); pPos.polygon_id=401; pPos.asset_id=aid1;
         RegionID rPos = ChunkManager::worldToRegionId(pPos.position);

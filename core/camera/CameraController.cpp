@@ -18,31 +18,6 @@ void CameraController::update(Camera& camera, float dt) {
     // Obra-prima: câmera guiada por colisão — antes de mover, deduz via Raycast
     // se há parede na frente. Se houver, reduz o movimento (slide) para não
     // atravessar. Usa arquivos do jogo (CollisionSystem) como fonte.
-    auto tryMove = [&](Vec3 dir, float amount) {
-        if (!collision || std::abs(amount) < 1e-5f) {
-            if (dir.x == 0 && dir.y == 0 && std::abs(dir.z) > 0.9f) {
-                // forward/backward sem colisão
-            }
-            return false;
-        }
-        Vec3 start = camera.getState().position;
-        Vec3 end = start + dir * amount;
-        Ray ray(start, dir);
-        RaycastSystem rc;
-        RayHit hit = rc.raycast(ray, std::abs(amount) + 0.2f, *collision);
-        if (hit.hit && hit.distance < std::abs(amount) + 0.1f) {
-            // Tem parede na frente — desliza, não atravessa (obra-prima)
-            float safe = std::max(0.0f, hit.distance - 0.05f);
-            if (safe > 0.01f) {
-                dir = dir * (safe / std::abs(amount));
-                // Caller vai aplicar o movimento reduzido
-            } else {
-                return true; // bloqueado
-            }
-        }
-        return false;
-    };
-
     if (input.forward != 0.0f) {
         Vec3 fwd = camera.getForward();
         Vec3 dir = fwd * (input.forward > 0 ? 1.0f : -1.0f);

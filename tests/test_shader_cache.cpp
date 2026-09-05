@@ -83,9 +83,9 @@ bool run_shader_cache_tests() {
             return std::make_pair(k.asset_id * 1000u + k.polygon_id, 0xFFull);
         });
         ASSERT_MSG(compiled == 3, "warmup compiles all misses");
-        size_t compiled2 = cache.warmup(keys, [](const ShaderKey& k) {
-            return std::make_pair(0u, 0ull);
-        });
+        size_t compiled2 = cache.warmup(keys, [](const ShaderKey&) {
+                                                  return std::make_pair(0u, 0ull);
+                                              });
         ASSERT_MSG(compiled2 == 0, "warmup reuses hits, zero recompiles");
         ASSERT_MSG(cache.lookup(keys[0])->pipeline_code == 1001, "warmed pipeline kept");
     }

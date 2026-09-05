@@ -11,7 +11,7 @@ uint32_t Rasterizer::rasterizeTriangle(
     Framebuffer& fb,
     DepthBuffer& db,
     const TextureData* tex,
-    const MaterialRecord& mat,
+    const MaterialRecord& /*mat*/, // TODO(lighting): usar material no shading
     bool backface_culling,
     bool depth_test)
 {
@@ -81,10 +81,7 @@ uint32_t Rasterizer::rasterizeTriangle(
             float pcU = (lambda0 * v0.uv.x * v0.rhw + lambda1 * v1.uv.x * v1.rhw + lambda2 * v2.uv.x * v2.rhw) * invWSum;
             float pcV = (lambda0 * v0.uv.y * v0.rhw + lambda1 * v1.uv.y * v1.rhw + lambda2 * v2.uv.y * v2.rhw) * invWSum;
 
-            float nx = (lambda0 * v0.normal.x * v0.rhw + lambda1 * v1.normal.x * v1.rhw + lambda2 * v2.normal.x * v2.rhw) * invWSum;
-            float ny = (lambda0 * v0.normal.y * v0.rhw + lambda1 * v1.normal.y * v1.rhw + lambda2 * v2.normal.y * v2.rhw) * invWSum;
-            float nz = (lambda0 * v0.normal.z * v0.rhw + lambda1 * v1.normal.z * v1.rhw + lambda2 * v2.normal.z * v2.rhw) * invWSum;
-
+            // TODO(lighting): interpolar normal e aplicar LightSystem por pixel.
             RGBA finalColor;
             if (tex) {
                 finalColor = TextureSampler::sample(*tex, pcU, pcV);
