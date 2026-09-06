@@ -613,6 +613,17 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(0) == 30, "10+20+0 (c=0 do borrow)");
     }
 
+    // BIC / ORN.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 0xFF);
+        cpu.setReg(2, 0x0F);
+        ASSERT_MSG(cpu.step(0x8A220020u), "bic x0,x1,x2");
+        ASSERT_MSG(cpu.reg(0) == 0xF0, "limpa bits");
+        ASSERT_MSG(cpu.step(0xAA220023u), "orn x3,x1,x2");
+        ASSERT_MSG(cpu.reg(3) == 0xFFFFFFFFFFFFFFFFull, "ou com not");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
