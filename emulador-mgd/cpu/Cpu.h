@@ -38,6 +38,7 @@ public:
         steps_ = 0;
         stopped_ = false;
         exit_code_ = 0;
+        flag_n_ = flag_z_ = flag_c_ = flag_v_ = false;
     }
 
     uint64_t reg(int i) const { return (i >= 0 && i < REG_COUNT) ? regs_[i] : 0; }
@@ -99,8 +100,10 @@ public:
             steps_++;
             return true;
         }
-        if (top == 0x91 || top == 0xD1) { // ADD / SUB imediato
-            bool isAdd = (top == 0x91);
+        if (top == 0x91 || top == 0xD1 || top == 0xB1 || top == 0xF1) {
+            // ADD / SUB / ADDS / SUBS imediato 64-bit
+            bool isAdd = (top == 0x91 || top == 0xB1);
+            bool setFlags = (top == 0xB1 || top == 0xF1);
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             uint32_t imm = static_cast<uint32_t>(dec.imm12);
@@ -108,7 +111,63 @@ public:
             uint64_t nv = (n == 31) ? 0 : regs_[n];
             uint64_t res = isAdd ? (nv + imm) : (nv - imm);
             if (d != 31) regs_[d] = res;
+            if (setFlags) {
+                flag_n_ = (res >> 63) != 0;
+                flag_z_ = (res == 0);
+                if (isAdd) {
+                    flag_c_ = res < nv;
+                    bool sn = ((nv >> 63) != 0), si = ((imm >> 31) != 0), sr = flag_n_;
+                    flag_v_ = (sn == si) && (sr != sn);
+                } else {
+                    flag_c_ = nv >= imm;
+                    bool sn = ((nv >> 63) != 0), si = ((imm >> 31) != 0), sr = flag_n_;
+                    flag_v_ = (sn != si) && (sr != sn);
+                }
+            }
             pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((top & 0xFC) == 0xF2) { // MOVK 64-bit (mantém o resto)
+            int d = static_cast<int>(dec.rd);
+            uint64_t imm = static_cast<uint64_t>((dec.hex >> 5) & 0xFFFF);
+            int shift = static_cast<int>(((dec.hex >> 21) & 0x3)) * 16;
+            uint64_t old = (d == 31) ? 0 : regs_[d];
+            uint64_t res = (old & ~(static_cast<uint64_t>(0xFFFF) << shift)) | (imm << shift);
+            if (d != 31) regs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if (top == 0x54) { // B.cond
+            int64_t imm = static_cast<int64_t>((insn >> 5) & 0x7FFFF);
+            if (imm & 0x40000) imm |= ~static_cast<int64_t>(0x7FFFF);
+            bool take = false;
+            switch (insn & 0xF) {
+                case 0x0: take = flag_z_; break;
+                case 0x1: take = !flag_z_; break;
+                case 0x2: take = flag_c_; break;
+                case 0x3: take = !flag_c_; break;
+                case 0x4: take = flag_n_; break;
+                case 0x5: take = !flag_n_; break;
+                case 0x6: take = flag_v_; break;
+                case 0x7: take = !flag_v_; break;
+                case 0x8: take = flag_c_ && !flag_z_; break;
+                case 0x9: take = !(flag_c_ && !flag_z_); break;
+                case 0xA: take = flag_n_ == flag_v_; break;
+                case 0xB: take = flag_n_ != flag_v_; break;
+                case 0xC: take = !flag_z_ && (flag_n_ == flag_v_); break;
+                case 0xD: take = flag_z_ || (flag_n_ != flag_v_); break;
+                case 0xE: take = true; break;
+                default: return false;
+            }
+            pc_ = take ? static_cast<uint64_t>(static_cast<int64_t>(pc_) + (imm << 2)) : pc_ + 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC1F) == 0xD65F0000) { // RET Xn
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            pc_ = (n == 31) ? 0 : regs_[n];
             steps_++;
             return true;
         }
@@ -241,6 +300,7 @@ private:
     uint64_t steps_ = 0;
     bool stopped_ = false;
     uint64_t exit_code_ = 0;
+    bool flag_n_ = false, flag_z_ = false, flag_c_ = false, flag_v_ = false;
 };
 
 } // namespace emu

@@ -235,6 +235,26 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(emu.world().present("switches_boot_x1.ppm", 1), "upscale x1 ok");
     }
 
+    // Flags + B.cond + MOVK + RET.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 7);
+        ASSERT_MSG(cpu.step(0xF1000FE0u), "subs xzr,x0,#7");
+        ASSERT_MSG(cpu.reg(0) == 7, "subs nao escreve xzr");
+        uint64_t pc = cpu.pc();
+        ASSERT_MSG(cpu.step(0x54000040u), "b.eq pula (z=1)");
+        ASSERT_MSG(cpu.pc() == pc + 8, "eq tomou");
+        pc = cpu.pc();
+        ASSERT_MSG(cpu.step(0x54000041u), "b.ne nao pula");
+        ASSERT_MSG(cpu.pc() == pc + 4, "ne seguiu");
+        cpu.setReg(0, 0x1234);
+        ASSERT_MSG(cpu.step(0xF2B579A0u), "movk x0,#0xabcd,lsl#16");
+        ASSERT_MSG(cpu.reg(0) == 0xABCD1234ull, "movk manteu baixo");
+        cpu.setReg(2, 0x400);
+        ASSERT_MSG(cpu.step(0xD65F0040u), "ret x2");
+        ASSERT_MSG(cpu.pc() == 0x400, "pc=x2");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
