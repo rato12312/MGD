@@ -1,5 +1,6 @@
 // Demo do port: boot (serviços+FS+relógio+GPU) e um frame pintado pelo DNA.
 // Uso: port_demo — prova que as peças conversam de verdade.
+#include <chrono>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -82,6 +83,24 @@ int main() {
     auto s3 = pipe.renderFrame({});
     std::printf("frame 3: rebuilt=%u reused=%u written=%u\n",
                 s3.rebuilt_polys, s3.reused_polys, s3.pixels_written);
+
+    // FPS no limite: 120 frames com câmera andando (LOD por distância)
+    // + governador mirando 30. Mede média e 1% low de verdade.
+    mgd::Vec3 cam(0, 0, 0);
+    double sum = 0, worst = 0;
+    const int FRAMES = 120;
+    for (int f = 0; f < FRAMES; ++f) {
+        cam.x += 2.0f; // câmera anda: LODs trocam, cache trabalha
+        auto t0 = std::chrono::steady_clock::now();
+        pipe.renderFrameLod(moving, cam, true, 30.0f, 80.0f);
+        auto t1 = std::chrono::steady_clock::now();
+        double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+        sum += ms;
+        if (ms > worst) worst = ms;
+    }
+    double avg = sum / FRAMES;
+    std::printf("120 frames com camera andando: %.4f ms (%.1f FPS), pior %.4f ms (%.1f FPS)\n",
+                avg, 1000.0 / avg, worst, 1000.0 / worst);
     std::printf("port demo OK\n");
     return 0;
 }
