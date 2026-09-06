@@ -128,9 +128,10 @@ public:
             int n = static_cast<int>(dec.rn);
             uint32_t imm = static_cast<uint32_t>(dec.imm12);
             if (insn & 0x00400000) imm <<= 12;
-            uint64_t nv = (n == 31) ? 0 : regs_[n];
+            uint64_t nv = (n == 31) ? (setFlags ? 0 : sp_) : regs_[n];
             uint64_t res = isAdd ? (nv + imm) : (nv - imm);
             if (d != 31) regs_[d] = res;
+            else if (!setFlags && n == 31) sp_ = res; // ADD/SUB SP,SP,#imm
             if (setFlags) {
                 flag_n_ = (res >> 63) != 0;
                 flag_z_ = (res == 0);
@@ -188,6 +189,23 @@ public:
         if ((insn & 0xFFFFFC1F) == 0xD65F0000) { // RET Xn
             int n = static_cast<int>((insn >> 5) & 0x1F);
             pc_ = (n == 31) ? 0 : regs_[n];
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFF800000) == 0xD3000000 && (insn & 0x400000)) {
+            // UBFM 64-bit (cobre LSL/LSR imediato): dst = ROR(src,R) & wmask
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            uint64_t r = (insn >> 16) & 0x3F, s = (insn >> 10) & 0x3F;
+            auto ones = [](uint64_t k) { return k >= 64 ? ~0ull : ((1ull << k) - 1ull); };
+            auto ror = [](uint64_t x, uint64_t rot) {
+                rot %= 64;
+                return rot == 0 ? x : ((x >> rot) | (x << (64 - rot)));
+            };
+            uint64_t wmask = ror(ones(s + 1), r);
+            uint64_t src = (n == 31) ? 0 : regs_[n];
+            if (d != 31) regs_[d] = ror(src, r) & wmask;
+            pc_ += 4;
             steps_++;
             return true;
         }

@@ -275,6 +275,20 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu2.pc() == 8, "pc andou");
     }
 
+    // SP de verdade + LSL/LSR imediato.
+    {
+        emu::Cpu cpu;
+        cpu.setSp(0x1000);
+        ASSERT_MSG(cpu.step(0xD10003FFu), "sub sp,sp,#16");
+        ASSERT_MSG(cpu.sp() == 0xFF0, "sp desceu");
+        cpu.setReg(1, 0xFF);
+        ASSERT_MSG(cpu.step(0xD378DC20u), "lsl x0,x1,#8");
+        ASSERT_MSG(cpu.reg(0) == 0xFF00, "shift esq");
+        cpu.setReg(1, 0xFF0);
+        ASSERT_MSG(cpu.step(0xD344FC22u), "lsr x2,x1,#4");
+        ASSERT_MSG(cpu.reg(2) == 0xFF, "shift dir");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
