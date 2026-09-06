@@ -460,6 +460,21 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(0) == 64, "zero -> 64");
     }
 
+    // RBIT / EXTR.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 0x8000000000000001ull);
+        ASSERT_MSG(cpu.step(0xDAC00020u), "rbit x0,x1");
+        ASSERT_MSG(cpu.reg(0) == 0x8000000000000001ull, "palindromo");
+        cpu.setReg(1, 0xF0);
+        ASSERT_MSG(cpu.step(0xDAC00020u), "rbit 2");
+        ASSERT_MSG(cpu.reg(0) == 0x0F00000000000000ull, "rbit certo");
+        cpu.setReg(1, 0xFF00);
+        cpu.setReg(2, 0x00FF);
+        ASSERT_MSG(cpu.step(0xD3821020u), "extr x0,x1,x2,#4");
+        ASSERT_MSG(cpu.reg(0) == 0xF000000000000FF0ull, "extr certo");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

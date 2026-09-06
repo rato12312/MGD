@@ -327,6 +327,31 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE0FC00) == 0xDAC00000) { // RBIT Xd,Xn
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            uint64_t v = (n == 31) ? 0 : regs_[n];
+            uint64_t res = 0;
+            for (int i = 0; i < 64; i++)
+                if ((v >> i) & 1ull) res |= 1ull << (63 - i);
+            if (d != 31) regs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFE00000) == 0xD3800000) { // EXTR Xd,Xn,Xm,#lsb
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int lsb = static_cast<int>((insn >> 10) & 0x3F);
+            uint64_t nv = (n == 31) ? 0 : regs_[n];
+            uint64_t mv = (m == 31) ? 0 : regs_[m];
+            uint64_t res = (lsb == 0) ? nv : ((nv >> lsb) | (mv << (64 - lsb)));
+            if (d != 31) regs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFE0FC00) == 0xDAC01000) { // CLZ Xd,Xn (0 -> 64)
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
