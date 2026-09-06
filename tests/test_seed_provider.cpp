@@ -107,7 +107,7 @@ bool run_seed_provider_tests() {
         ASSERT_MSG(stats.shaders_warmed == 1, "warmed only predicted");
         auto stats2 = SeedShaderDirector::warmPredicted(sp, s, PlayerAction::MoveForward,
                                                         cache, shaders,
-                                                        [](const mgd::shader::ShaderKey& k) {
+                                                        [](const mgd::shader::ShaderKey&) {
                                                             return std::make_pair(0u, 0ull);
                                                         });
         ASSERT_MSG(stats2.shaders_warmed == 0, "second pass reuses all");
