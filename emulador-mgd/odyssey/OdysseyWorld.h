@@ -40,7 +40,9 @@ public:
     const CheapMode& cheap() const { return cheap_; }
 
     // Boot: alimenta o mapa mental com N polígonos do reino. Retorna stats.
+    // Streaming: teto de RAM no cache (barato = teto menor, região velha cai).
     bridge::RuntimeFrameStats boot(uint32_t n = 20) {
+        rt_.cache().setBudget(cheap_.resolution_factor <= 0.4f ? 1024 : 4096);
         bridge::HandoffFrame f;
         f.frame_index = 1;
         f.camera.position = Vec3(0.0f, 8.0f, 20.0f);
