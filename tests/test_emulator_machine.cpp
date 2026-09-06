@@ -475,6 +475,20 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(0) == 0xF000000000000FF0ull, "extr certo");
     }
 
+    // SMADDL / UMADDL.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 0xFFFFFFFEull); // -2 como W
+        cpu.setReg(2, 3);
+        cpu.setReg(3, 100);
+        ASSERT_MSG(cpu.step(0x9B220C20u), "smaddl x0,w1,w2,x3");
+        ASSERT_MSG(cpu.reg(0) == 94, "100+(-2*3)");
+        cpu.setReg(1, 0xFFFFFFFFull);
+        cpu.setReg(2, 2);
+        ASSERT_MSG(cpu.step(0x9BA27C24u), "umaddl x4,w1,w2,xzr");
+        ASSERT_MSG(cpu.reg(4) == 0x1FFFFFFFEull, "unsigned 32->64");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

@@ -546,6 +546,29 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE08000) == 0x9B200000 || (insn & 0xFFE08000) == 0x9BA00000) {
+            // SMADDL / UMADDL Xd,Wn,Wm,Xa (32->64 com sinal ou não)
+            bool isSigned = (insn & 0xFFE08000) == 0x9B200000;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int a = static_cast<int>((insn >> 10) & 0x1F);
+            uint64_t av = (a == 31) ? 0 : regs_[a];
+            uint64_t prod;
+            if (isSigned) {
+                int64_t sn = static_cast<int64_t>(static_cast<int32_t>((n == 31) ? 0 : regs_[n]));
+                int64_t sm = static_cast<int64_t>(static_cast<int32_t>((m == 31) ? 0 : regs_[m]));
+                prod = static_cast<uint64_t>(sn * sm);
+            } else {
+                uint64_t un = (n == 31) ? 0 : (regs_[n] & 0xFFFFFFFFull);
+                uint64_t um = (m == 31) ? 0 : (regs_[m] & 0xFFFFFFFFull);
+                prod = un * um;
+            }
+            if (d != 31) regs_[d] = av + prod;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFE08000) == 0x9B008000) { // MADD Xd,Xn,Xm,Xa
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
