@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(mgd_port_odyssey VERSION 0.1.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+# C++20: BitField vendorado do Eden usa `requires`
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -55,3 +56,6 @@ add_executable(port_tests_npdm tests/test_npdm_header.cpp)
 target_link_libraries(port_tests_npdm PRIVATE mgd_port)
 add_executable(nca_list tools/nca_list.cpp)
 target_link_libraries(nca_list PRIVATE mgd_port)
+# Teste do BitField vendorado do Eden (headers em src/eden)
+add_executable(port_tests_bitfield tests/test_eden_bitfield.cpp)
+target_include_directories(port_tests_bitfield PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/eden)
