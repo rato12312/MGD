@@ -315,5 +315,66 @@ int main() {
         printf("  1%% low pipeline     | %8.4f | %9.1f\n", low, 1000.0/low);
     }
 
+    // ===== CENA FINAL 720p: tudo ligado (DNA+LOD+incremental+shader cache) =====
+    // Mesma cena, framebuffer 1280x720, 60 frames, 50 móveis. É o número honesto.
+    std::cout << "=== CENA FINAL 720p (tudo ligado) ===\n";
+    {
+        using namespace dna;
+        const int FBW = 1280, FBH = 720, FRAMES = 60;
+        std::vector<Polygon> scene;
+        for (uint32_t i = 1; i <= 2000; ++i) {
+            Polygon p;
+            p.position = Vec3(static_cast<float>((i * 37) % 1000), 0.0f, static_cast<float>((i * 53) % 1000));
+            p.polygon_id = 5000 + i; p.asset_id = 1 + (i % 10); p.flags = PolygonFlag::VISIBLE;
+            scene.push_back(p);
+        }
+        for (uint32_t i = 1; i <= 50; ++i) {
+            Polygon p;
+            p.position = Vec3(static_cast<float>(i * 10), 0.0f, 0.0f);
+            p.polygon_id = 9000 + i; p.asset_id = 2; p.flags = PolygonFlag::VISIBLE;
+            scene.push_back(p);
+        }
+        auto ms = [](auto a, auto b){ return std::chrono::duration<double,std::milli>(b-a).count(); };
+        // Tradicional em 720p (para comparar)
+        double tTrad;
+        {
+            Framebuffer fb(FBW, FBH);
+            auto s = Clock::now();
+            for (int f = 0; f < FRAMES; ++f) {
+                fb.clear(RGBA(0,0,0,255));
+                for (auto& p : scene) {
+                    int cx = static_cast<int>(p.position.x * 0.5f + 50.0f) % FBW;
+                    if (cx < 0) cx += FBW;
+                    int cy = static_cast<int>(p.position.z * 0.5f + 50.0f) % FBH;
+                    if (cy < 0) cy += FBH;
+                    RGBA c(static_cast<uint8_t>((p.polygon_id * 67u) % 256u),
+                           static_cast<uint8_t>((p.polygon_id * 131u) % 256u),
+                           static_cast<uint8_t>((p.polygon_id * 197u) % 256u), 255);
+                    for (int oy = 0; oy < 4; ++oy) for (int ox = 0; ox < 4; ++ox)
+                        fb.setPixel((cx+ox)%FBW, (cy+oy)%FBH, c);
+                }
+            }
+            tTrad = ms(s, Clock::now()) / FRAMES;
+        }
+        // Pipeline completo em 720p
+        DnaPipeline pipe(FBW, FBH);
+        pipe.buildFromPolygons(scene, 10);
+        pipe.renderFrame({});
+        std::vector<PolygonID> moving;
+        for (uint32_t i = 1; i <= 50; ++i) moving.push_back(9000 + i);
+        std::vector<double> fms; fms.reserve(FRAMES);
+        for (int f = 0; f < FRAMES; ++f) {
+            auto fs = Clock::now();
+            pipe.renderFrame(moving);
+            fms.push_back(ms(fs, Clock::now()));
+        }
+        std::sort(fms.begin(), fms.end());
+        double sum = 0; for (double v : fms) sum += v;
+        double avg = sum / FRAMES;
+        double low = fms.back();
+        std::cout << "  tradicional 720p: " << tTrad << " ms (" << 1000.0/tTrad << " FPS)\n";
+        std::cout << "  pipeline 720p:    " << avg << " ms (" << 1000.0/avg << " FPS), 1% low " << low << " ms (" << 1000.0/low << " FPS)\n";
+    }
+
     return 0;
 }
