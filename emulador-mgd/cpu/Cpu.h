@@ -311,7 +311,31 @@ public:
             return true;
         }
         if (top == 0xF8 || top == 0xF9) { // STR / LDR Xt,[Xn,#imm*8]
+            if (top == 0xF9 && ((insn >> 22) & 0x3) == 0x0) { // PRFM: aceita e segue
+                pc_ += 4;
+                steps_++;
+                return true;
+            }
             return memAccess(dec, 8, top == 0xF9);
+        }
+        if ((insn & 0xFFE0FC00) == 0x9AC02000 || (insn & 0xFFE0FC00) == 0x9AC02400 ||
+            (insn & 0xFFE0FC00) == 0x9AC02800 || (insn & 0xFFE0FC00) == 0x9AC02C00) {
+            // LSLV / LSRV / ASRV / RORV Xd,Xn,Xm (shift = Xm % 64)
+            int op = static_cast<int>((insn >> 10) & 0x3);
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            uint64_t nv = (n == 31) ? 0 : regs_[n];
+            uint64_t sh = ((m == 31) ? 0 : regs_[m]) % 64;
+            uint64_t res = nv;
+            if (op == 0) res = (sh == 0) ? nv : (nv << sh);
+            else if (op == 1) res = (sh == 0) ? nv : (nv >> sh);
+            else if (op == 2) res = (sh == 0) ? nv : static_cast<uint64_t>(static_cast<int64_t>(nv) >> sh);
+            else res = (sh == 0) ? nv : ((nv >> sh) | (nv << (64 - sh)));
+            if (d != 31) regs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
         }
         if (top == 0xB8 || top == 0xB9) { // STRW / LDRW / LDRSW
             int opc = static_cast<int>((insn >> 22) & 0x3);

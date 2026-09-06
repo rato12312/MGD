@@ -403,6 +403,20 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(0) == 0xFFFFFFFFFFFFFFFFull, "sinal estendido");
     }
 
+    // Shifts registrados + PRFM.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 1);
+        cpu.setReg(2, 3);
+        ASSERT_MSG(cpu.step(0x9AC22020u), "lslv x0,x1,x2");
+        ASSERT_MSG(cpu.reg(0) == 8, "1<<3");
+        cpu.setReg(1, 0x8000000000000000ull);
+        cpu.setReg(2, 4);
+        ASSERT_MSG(cpu.step(0x9AC22823u), "asrv x3,x1,x2");
+        ASSERT_MSG(cpu.reg(3) == 0xF800000000000000ull, "asr propaga sinal");
+        ASSERT_MSG(cpu.step(0xF9800000u), "prfm aceito");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
