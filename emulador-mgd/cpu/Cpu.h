@@ -637,6 +637,31 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE0FC00) == 0xBA000000 || (insn & 0xFFE0FC00) == 0xFA000000) {
+            // ADCS / SBCS Xd,Xn,Xm (com carry, atualiza flags)
+            bool isAdd = (insn & 0xFFE0FC00) == 0xBA000000;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            uint64_t nv = (n == 31) ? 0 : regs_[n];
+            uint64_t mv = (m == 31) ? 0 : regs_[m];
+            uint64_t c = flag_c_ ? 1ull : 0ull;
+            __uint128_t wide;
+            if (isAdd) wide = static_cast<__uint128_t>(nv) + mv + c;
+            else wide = static_cast<__uint128_t>(nv) - mv - (flag_c_ ? 0u : 1u);
+            uint64_t res = static_cast<uint64_t>(wide);
+            if (d != 31) regs_[d] = res;
+            flag_n_ = (res >> 63) != 0;
+            flag_z_ = (res == 0);
+            bool wrapped = static_cast<uint64_t>(wide >> 64) != 0;
+            flag_c_ = isAdd ? wrapped : !wrapped; // sub: C = sem borrow
+            flag_v_ = isAdd ? (~(nv ^ mv) & (nv ^ res)) >> 63
+                            : ((nv ^ mv) & (nv ^ res)) >> 63;
+            flag_v_ = flag_v_ != 0;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFE08000) == 0x9B008000) { // MADD Xd,Xn,Xm,Xa
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);

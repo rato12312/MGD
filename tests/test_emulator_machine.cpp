@@ -598,6 +598,21 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == 0x99, "lsl#3 certo");
     }
 
+    // ADCS / SBCS com carry.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 0);
+        ASSERT_MSG(cpu.step(0xF100001Fu), "subs xzr,x0,x0 (c=1)");
+        cpu.setReg(1, 10);
+        cpu.setReg(2, 20);
+        ASSERT_MSG(cpu.step(0xFA020023u), "sbcs x3,x1,x2");
+        ASSERT_MSG(cpu.reg(3) == 0xFFFFFFFFFFFFFFF6ull, "10-20 com c=1");
+        cpu.setReg(1, 10);
+        cpu.setReg(2, 20);
+        ASSERT_MSG(cpu.step(0xBA020020u), "adcs x0,x1,x2");
+        ASSERT_MSG(cpu.reg(0) == 30, "10+20+0 (c=0 do borrow)");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
