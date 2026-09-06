@@ -435,12 +435,16 @@ bool run_emulator_machine_tests() {
         cpu.setReg(1, 4);
         ASSERT_MSG(cpu.step(0x1E660000u), "scvtf d0,x0 (3.0)");
         ASSERT_MSG(cpu.step(0x1E660021u), "scvtf d1,x1 (4.0)");
-        ASSERT_MSG(cpu.step(0x1E612802u), "fadd d2,d0,d1");
+        ASSERT_MSG(cpu.step(0x1EE12002u), "fadd d2,d0,d1");
         ASSERT_MSG(cpu.step(0x1E620043u), "scvtf x3,d2");
         ASSERT_MSG(cpu.reg(3) == 7, "3+4");
-        ASSERT_MSG(cpu.step(0x1E612004u), "fmul d4,d0,d1");
+        ASSERT_MSG(cpu.step(0x1EE10004u), "fmul d4,d0,d1");
         ASSERT_MSG(cpu.step(0x1E620085u), "scvtf x5,d4");
         ASSERT_MSG(cpu.reg(5) == 12, "3*4");
+        ASSERT_MSG(cpu.step(0x1E612020u), "fcmp d0,d1 (3<4)");
+        uint64_t pc = cpu.pc();
+        ASSERT_MSG(cpu.step(0x54000044u), "b.mi pula (n=1)");
+        ASSERT_MSG(cpu.pc() == pc + 8, "fp comparou");
     }
 
     // REV / REV32 / REV16 / CLZ.

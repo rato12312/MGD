@@ -265,19 +265,32 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFE0FC00) == 0x1E602000 || (insn & 0xFFE0FC00) == 0x1E602800 ||
-            (insn & 0xFFE0FC00) == 0x1E603800 || (insn & 0xFFE0FC00) == 0x1E602400) {
-            // FMUL / FADD / FSUB / FDIV Dd,Dn,Dm
-            uint32_t base = insn & 0xFFE0FC00;
+        if ((insn & 0xFFE03C00) == 0x1EE00000 || (insn & 0xFFE03C00) == 0x1EE02000 ||
+            (insn & 0xFFE03C00) == 0x1EE03000 || (insn & 0xFFE03C00) == 0x1EE01000) {
+            // FMUL / FADD / FSUB / FDIV Dd,Dn,Dm (família 0x1EE, opcode [15:12])
+            uint32_t base = insn & 0xFFE03C00;
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             int m = static_cast<int>((insn >> 16) & 0x1F);
             double res = 0;
-            if (base == 0x1E602800) res = fpregs_[n] + fpregs_[m];
-            else if (base == 0x1E603800) res = fpregs_[n] - fpregs_[m];
-            else if (base == 0x1E602000) res = fpregs_[n] * fpregs_[m];
+            if (base == 0x1EE02000) res = fpregs_[n] + fpregs_[m];
+            else if (base == 0x1EE03000) res = fpregs_[n] - fpregs_[m];
+            else if (base == 0x1EE00000) res = fpregs_[n] * fpregs_[m];
             else res = fpregs_[n] / fpregs_[m];
             fpregs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFE0FC00) == 0x1E602000) { // FCMP Dn,Dm (flags; NaN = unordered)
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            double a = fpregs_[n], b = fpregs_[m];
+            bool nan = (a != a) || (b != b);
+            flag_n_ = !nan && (a < b);
+            flag_z_ = !nan && (a == b);
+            flag_c_ = nan || (a >= b);
+            flag_v_ = nan;
             pc_ += 4;
             steps_++;
             return true;
