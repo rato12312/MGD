@@ -417,6 +417,16 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.step(0xF9800000u), "prfm aceito");
     }
 
+    // Ponto flutuante: int->double->reg->int.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 42);
+        ASSERT_MSG(cpu.step(0x1E660000u), "scvtf d0,x0");
+        ASSERT_MSG(cpu.step(0x1E604020u), "fmov d1,d0");
+        ASSERT_MSG(cpu.step(0x1E620021u), "scvtf x1,d1");
+        ASSERT_MSG(cpu.reg(1) == 42, "round-trip double");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

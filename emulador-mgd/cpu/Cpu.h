@@ -247,6 +247,39 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFC0FC00) == 0x1E604000) { // FMOV Dd,Dn
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            fpregs_[d] = fpregs_[n];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFC0FC00) == 0x1E620000 || (insn & 0xFFC0FC00) == 0x1E630000) {
+            // SCVTF / UCVTF Xd,Dn (double -> int64/uint64)
+            bool isSigned = (insn & 0xFFC0FC00) == 0x1E620000;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            double v = fpregs_[n];
+            uint64_t res = isSigned ? static_cast<uint64_t>(static_cast<int64_t>(v))
+                                    : static_cast<uint64_t>(v);
+            if (d != 31) regs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFC0FC00) == 0x1E660000 || (insn & 0xFFC0FC00) == 0x1E670000) {
+            // SCVTF / UCVTF Dd,Xn (int -> double)
+            bool isSigned = (insn & 0xFFC0FC00) == 0x1E660000;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            uint64_t nv = (n == 31) ? 0 : regs_[n];
+            fpregs_[d] = isSigned ? static_cast<double>(static_cast<int64_t>(nv))
+                                  : static_cast<double>(nv);
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFFFF01F) == 0xD503201F) { // NOP e HINTs: aceita e segue
             pc_ += 4;
             steps_++;
@@ -505,7 +538,19 @@ private:
         return true;
     }
 
+    static uint64_t d2u(double d) {
+        uint64_t u = 0;
+        __builtin_memcpy(&u, &d, 8);
+        return u;
+    }
+    static double u2d(uint64_t u) {
+        double d = 0;
+        __builtin_memcpy(&d, &u, 8);
+        return d;
+    }
+
     std::array<uint64_t, REG_COUNT> regs_{};
+    std::array<double, 32> fpregs_{};
     std::vector<uint8_t> mem_;
     Mmu* mmu_ = nullptr;
     uint64_t sp_ = 0;
