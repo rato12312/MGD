@@ -5,6 +5,8 @@
 
 #include <cstdint>
 
+#include "../ram/Mmu.h"
+
 namespace mgd {
 namespace hos {
 
@@ -31,6 +33,8 @@ class Kernel {
 public:
     Kernel() = default;
 
+    void setMmu(emu::Mmu* mmu) { mmu_ = mmu; }
+
     uint64_t heapBase() const { return heap_base_; }
     uint64_t heapSize() const { return heap_size_; }
     bool exited() const { return exited_; }
@@ -38,9 +42,10 @@ public:
     SvcResult call(uint32_t num, SvcArgs& args) {
         switch (num) {
             case SVC_SET_HEAP_SIZE: {
-                // X1 = tamanho pedido; devolve base em out[0].
+                // X1 = tamanho pedido; devolve base em out[0] e mapeia o heap.
                 heap_size_ = args.x[1];
                 args.out[0] = heap_base_;
+                if (mmu_ && heap_size_ > 0) mmu_->map(heap_base_, heap_base_, heap_size_, true, true, false);
                 return RESULT_OK;
             }
             case SVC_EXIT_PROCESS: {
@@ -63,6 +68,7 @@ private:
     uint64_t heap_base_ = 0x08000000; // base típica do heap do app
     uint64_t heap_size_ = 0;
     bool exited_ = false;
+    emu::Mmu* mmu_ = nullptr;
 };
 
 } // namespace hos

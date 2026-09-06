@@ -535,6 +535,8 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(emu.cpu().stopped(), "exit parou");
         ASSERT_MSG(emu.kernel().exited(), "kernel marcou");
         ASSERT_MSG(emu.kernel().heapSize() == 1, "heap pedido");
+        uint64_t pa = 0;
+        ASSERT_MSG(emu.mmu().translate(emu.kernel().heapBase(), 1, false, false, pa), "heap mapeado");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
