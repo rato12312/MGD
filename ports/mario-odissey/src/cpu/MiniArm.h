@@ -3,20 +3,20 @@
 #include <array>
 #include <cstdint>
 
-#include "eden/common/bit_field.h"
+#include "mgd/common/BitField.h"
 
 namespace port {
 namespace cpu {
 
-// Decodificador de instrução usando o BitField vendorado do Eden.
+// Decodificador de instrução: peça do Eden transformada em MGD.
 union ArmInsn {
     uint32_t hex;
-    BitField<0, 5, uint32_t> rd;    // registrador destino
-    BitField<5, 5, uint32_t> rn;    // primeiro operando
-    BitField<10, 12, uint32_t> imm12; // imediato 12 bits
-    BitField<16, 5, uint32_t> rm;   // segundo operando (reg)
-    BitField<21, 2, uint32_t> hw;   // MOVZ: qual meia-palavra
-    BitField<0, 26, int32_t> off26; // B: offset (com sinal)
+    mgd::Field<0, 5, uint32_t> rd;      // registrador destino
+    mgd::Field<5, 5, uint32_t> rn;      // primeiro operando
+    mgd::Field<10, 12, uint32_t> imm12; // imediato 12 bits
+    mgd::Field<16, 5, uint32_t> rm;     // segundo operando (reg)
+    mgd::Field<21, 2, uint32_t> hw;     // MOVZ: qual meia-palavra
+    mgd::Field<0, 26, int32_t> off26;   // B: offset (com sinal)
 };
 
 // Interpretador ARM64 mínimo do port (primeiro passo da execução).
