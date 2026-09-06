@@ -196,6 +196,12 @@ bool run_emulator_machine_tests() {
         // escrita em região r-- nega
         cpu.setReg(2, 0x2000);
         ASSERT_MSG(!cpu.step(0xF8000020u), "str sem w nega");
+        // remapeamento: VA 0x3000 enxerga o PA 0x1000
+        mmu.map(0x3000, 0x1000, 0x1000, true, true, false);
+        cpu.setReg(2, 0x3000);
+        cpu.setReg(0, 0);
+        ASSERT_MSG(cpu.step(0xF9400020u), "ldr via alias ok");
+        ASSERT_MSG(cpu.reg(0) == 0x1234, "alias le o mesmo fisico");
         // fetch sem x para o run
         emu::Cpu cpu2;
         emu::Mmu mmu2;
