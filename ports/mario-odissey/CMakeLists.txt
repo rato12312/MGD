@@ -12,3 +12,6 @@ target_include_directories(mgd_port PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 add_executable(mgd_port_check tools/check.cpp)
 target_link_libraries(mgd_port_check PRIVATE mgd_port)
+
+add_executable(port_tests tests/test_nso_header.cpp)
+target_link_libraries(port_tests PRIVATE mgd_port)
