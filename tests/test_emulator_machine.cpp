@@ -255,6 +255,26 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.pc() == 0x400, "pc=x2");
     }
 
+    // BL + RET (chamada e retorno) + LDR literal.
+    {
+        emu::Cpu cpu;
+        // pc=0: BL +8 (para 0x8); 0x4: MOVZ X0,#1; 0x8: MOVZ X0,#2; RET X30
+        ASSERT_MSG(cpu.step(0x94000002u), "bl +8");
+        ASSERT_MSG(cpu.pc() == 8 && cpu.reg(30) == 4, "x30=retorno");
+        ASSERT_MSG(cpu.step(0xD2800040u), "movz x0,#2");
+        ASSERT_MSG(cpu.reg(0) == 2, "pulou o movz #1");
+        ASSERT_MSG(cpu.step(0xD65F03C0u), "ret x30");
+        ASSERT_MSG(cpu.pc() == 4, "voltou");
+        // LDR X1,[PC,#8]: pc=4 -> lê de 4+8=12
+        emu::Cpu cpu2;
+        cpu2.setPc(4);
+        uint64_t blob = 0x1122334455667788ull;
+        for (int i = 0; i < 8; i++) cpu2.ram()[12 + i] = static_cast<uint8_t>(blob >> (8 * i));
+        ASSERT_MSG(cpu2.step(0x58000041u), "ldr x1,[pc,#8]");
+        ASSERT_MSG(cpu2.reg(1) == blob, "literal certo");
+        ASSERT_MSG(cpu2.pc() == 8, "pc andou");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

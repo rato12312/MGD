@@ -85,8 +85,28 @@ public:
             return true;
         }
         if ((insn >> 26) == 0x05) { // B
-            int32_t off = static_cast<int32_t>(dec.off26);
+            int32_t off = static_cast<int32_t>(dec.off26); // já com sinal
             pc_ = static_cast<uint64_t>(static_cast<int64_t>(pc_) + (static_cast<int64_t>(off) << 2));
+            steps_++;
+            return true;
+        }
+        if ((insn >> 26) == 0x25) { // BL (chamada: X30 = retorno)
+            int32_t off = static_cast<int32_t>(dec.off26);
+            regs_[30] = pc_ + 4;
+            pc_ = static_cast<uint64_t>(static_cast<int64_t>(pc_) + (static_cast<int64_t>(off) << 2));
+            steps_++;
+            return true;
+        }
+        if (top == 0x58) { // LDR Xt,[PC,#imm19*4]
+            int t = static_cast<int>(dec.rd);
+            int64_t imm = static_cast<int64_t>((insn >> 5) & 0x7FFFF);
+            if (imm & 0x40000) imm |= ~static_cast<int64_t>(0x7FFFF);
+            uint64_t addr = pc_ + static_cast<uint64_t>(imm << 2);
+            bool ok = true;
+            uint64_t v = load64(addr, ok);
+            if (!ok) return false;
+            if (t != 31) regs_[t] = v;
+            pc_ += 4;
             steps_++;
             return true;
         }
