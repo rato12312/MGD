@@ -587,6 +587,28 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE0FC00) == 0x1AC00400 || (insn & 0xFFE0FC00) == 0x1AC00800 ||
+            (insn & 0xFFE0FC00) == 0x1AC00C00 || (insn & 0xFFE0FC00) == 0x9AC00400) {
+            // CRC32B/H/W/X Wd,Wn,Wm (refletido, sem init/xor — como o ARM)
+            uint32_t base = insn & 0xFFE0FC00;
+            int bytes = (base == 0x1AC00400) ? 1 : (base == 0x1AC00800) ? 2
+                        : (base == 0x9AC00400) ? 8 : 4;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            uint32_t crc = (n == 31) ? 0 : static_cast<uint32_t>(regs_[n]);
+            uint64_t mv = (m == 31) ? 0 : regs_[m];
+            for (int i = 0; i < bytes; i++) {
+                uint32_t byte = static_cast<uint32_t>((mv >> (8 * i)) & 0xFFu);
+                crc ^= byte;
+                for (int b = 0; b < 8; b++)
+                    crc = (crc & 1u) ? ((crc >> 1) ^ 0xEDB88320u) : (crc >> 1);
+            }
+            if (d != 31) regs_[d] = (static_cast<uint64_t>(crc) & 0xFFFFFFFFull);
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFE08000) == 0x9B008000) { // MADD Xd,Xn,Xm,Xa
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);

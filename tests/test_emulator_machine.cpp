@@ -565,6 +565,24 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(state == hos::MEM_UNMAPPED, "fora = unmapped");
     }
 
+    // CRC32: X de 8 bytes == 8 passos B.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 0);
+        cpu.setReg(2, 0x0102030405060708ull);
+        ASSERT_MSG(cpu.step(0x9AC20420u), "crc32x x0,x1,x2");
+        uint64_t x = cpu.reg(0);
+        cpu.setReg(0, 0);
+        for (int i = 0; i < 8; i++) {
+            cpu.setReg(1, cpu.reg(0));
+            cpu.setReg(2, 0x0102030405060708ull >> (8 * i));
+            uint32_t insn = 0x1AC00400u | (2u << 16) | (1u << 5) | 0u;
+            ASSERT_MSG(cpu.step(insn), "crc32b passo");
+        }
+        ASSERT_MSG(cpu.reg(0) == x, "x == 8x b");
+        ASSERT_MSG(x != 0, "crc nao trivial");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
