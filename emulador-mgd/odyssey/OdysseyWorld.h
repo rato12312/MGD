@@ -5,6 +5,7 @@
 // Reaproveita core/bridge (MentalMapRuntime) e core/query (DNA, polígonos).
 
 #include <cstdint>
+#include <cstdio>
 #include <vector>
 
 #include "core/bridge/MentalMapRuntime.h"
@@ -60,6 +61,25 @@ public:
     }
 
     bridge::MentalMapRuntime& runtime() { return rt_; }
+
+    // Painter apresenta: despeja o framebuffer do pipeline em PPM (P6).
+    bool present(const char* path) {
+        const Framebuffer& fb = rt_.pipeline().framebuffer();
+        int w = fb.width(), h = fb.height();
+        if (w <= 0 || h <= 0) return false;
+        FILE* f = std::fopen(path, "wb");
+        if (!f) return false;
+        std::fprintf(f, "P6\n%d %d\n255\n", w, h);
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                RGBA c = fb.getPixel(x, y);
+                uint8_t rgb[3] = {c.r, c.g, c.b};
+                if (std::fwrite(rgb, 1, 3, f) != 3) { std::fclose(f); return false; }
+            }
+        }
+        std::fclose(f);
+        return true;
+    }
 
 private:
     static std::vector<Polygon> makeKingdom(uint32_t n) {

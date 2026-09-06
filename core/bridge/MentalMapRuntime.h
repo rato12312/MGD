@@ -62,6 +62,7 @@ public:
 
     MentalMap& map() { return map_; }
     RegionPolygonCache& cache() { return cache_; }
+    dna::DnaPipeline& pipeline() { return pipe_; }
 
 private:
     RegionPolygonCache cache_;

@@ -35,6 +35,8 @@ public:
         sp_ = 0;
         pc_ = 0;
         steps_ = 0;
+        stopped_ = false;
+        exit_code_ = 0;
     }
 
     uint64_t reg(int i) const { return (i >= 0 && i < REG_COUNT) ? regs_[i] : 0; }
@@ -47,9 +49,12 @@ public:
     uint8_t* ram() { return mem_.data(); }
     uint64_t ramSize() const { return static_cast<uint64_t>(mem_.size()); }
 
+    bool stopped() const { return stopped_; }
+    uint64_t exitCode() const { return exit_code_; }
+
     uint64_t run(uint64_t maxSteps) {
         uint64_t done = 0;
-        while (done < maxSteps) {
+        while (done < maxSteps && !stopped_) {
             if (pc_ + 4 > ramSize()) break;
             uint32_t insn = 0;
             for (int i = 0; i < 4; i++)
@@ -60,10 +65,20 @@ public:
         return done;
     }
 
-    // B, MOVZ, ADD/SUB imediato, ORR reg, LDR/STR imediato 64-bit.
+    // B, MOVZ, ADD/SUB imediato, ORR reg, LDR/STR (64/32/8-bit),
+    // SVC mínimo (#0 sai com 0, #1 sai com X0).
     bool step(uint32_t insn) {
         ArmInsn dec;
         dec.hex = insn;
+        if ((insn & 0xFFE0001F) == 0xD4000001) { // SVC #imm
+            uint32_t imm = (insn >> 5) & 0xFFFF;
+            if (imm == 0) { stopped_ = true; exit_code_ = 0; }
+            else if (imm == 1) { stopped_ = true; exit_code_ = regs_[0] & 0xFF; }
+            else return false;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn >> 26) == 0x05) { // B
             int32_t off = static_cast<int32_t>(dec.off26);
             pc_ = static_cast<uint64_t>(static_cast<int64_t>(pc_) + (static_cast<int64_t>(off) << 2));
@@ -105,35 +120,46 @@ public:
             return true;
         }
         if (top == 0xF8 || top == 0xF9) { // STR / LDR Xt,[Xn,#imm*8]
-            bool isLoad = (top == 0xF9);
-            int t = static_cast<int>(dec.rd);
-            int n = static_cast<int>(dec.rn);
-            uint64_t base = (n == 31) ? sp_ : regs_[n];
-            uint64_t addr = base + static_cast<uint64_t>(dec.imm12) * 8u;
-            if (addr + 8 > ramSize()) return false;
-            if (isLoad) {
-                uint64_t v = 0;
-                for (int i = 0; i < 8; i++)
-                    v |= static_cast<uint64_t>(mem_[static_cast<size_t>(addr) + i]) << (8 * i);
-                if (t != 31) regs_[t] = v;
-            } else {
-                uint64_t v = (t == 31) ? 0 : regs_[t];
-                for (int i = 0; i < 8; i++)
-                    mem_[static_cast<size_t>(addr) + i] = static_cast<uint8_t>(v >> (8 * i));
-            }
-            pc_ += 4;
-            steps_++;
-            return true;
+            return memAccess(dec, 8, top == 0xF9);
+        }
+        if (top == 0xB8 || top == 0xB9) { // STR / LDR Wt (32-bit, zero-extend)
+            return memAccess(dec, 4, top == 0xB9);
+        }
+        if (top == 0x38 || top == 0x39) { // STRB / LDRB (byte)
+            return memAccess(dec, 1, top == 0x39);
         }
         return false;
     }
 
 private:
+    bool memAccess(const ArmInsn& dec, int width, bool isLoad) {
+        int t = static_cast<int>(dec.rd);
+        int n = static_cast<int>(dec.rn);
+        uint64_t base = (n == 31) ? sp_ : regs_[n];
+        uint64_t addr = base + static_cast<uint64_t>(dec.imm12) * static_cast<uint64_t>(width);
+        if (addr + static_cast<uint64_t>(width) > ramSize()) return false;
+        if (isLoad) {
+            uint64_t v = 0;
+            for (int i = 0; i < width; i++)
+                v |= static_cast<uint64_t>(mem_[static_cast<size_t>(addr) + i]) << (8 * i);
+            if (t != 31) regs_[t] = v; // 32/8-bit já vêm zerados acima
+        } else {
+            uint64_t v = (t == 31) ? 0 : regs_[t];
+            for (int i = 0; i < width; i++)
+                mem_[static_cast<size_t>(addr) + i] = static_cast<uint8_t>(v >> (8 * i));
+        }
+        pc_ += 4;
+        steps_++;
+        return true;
+    }
+
     std::array<uint64_t, REG_COUNT> regs_{};
     std::vector<uint8_t> mem_;
     uint64_t sp_ = 0;
     uint64_t pc_ = 0;
     uint64_t steps_ = 0;
+    bool stopped_ = false;
+    uint64_t exit_code_ = 0;
 };
 
 } // namespace emu
