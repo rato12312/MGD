@@ -297,6 +297,29 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE0FC00) == 0x9AC00C00 || (insn & 0xFFE0FC00) == 0x9A800C00) {
+            // SDIV / UDIV Xd,Xn,Xm (div por zero = 0, sem trap)
+            bool isSigned = (insn & 0xFFE0FC00) == 0x9AC00C00;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            uint64_t nv = (n == 31) ? 0 : regs_[n];
+            uint64_t mv = (m == 31) ? 0 : regs_[m];
+            uint64_t res = 0;
+            if (mv != 0) {
+                if (isSigned) {
+                    int64_t sn = static_cast<int64_t>(nv), sm = static_cast<int64_t>(mv);
+                    if (!(sn == INT64_MIN && sm == -1)) res = static_cast<uint64_t>(sn / sm);
+                    else res = static_cast<uint64_t>(INT64_MIN); // overflow: quociente
+                } else {
+                    res = nv / mv;
+                }
+            }
+            if (d != 31) regs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFE08000) == 0x9B008000) { // MADD Xd,Xn,Xm,Xa
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);

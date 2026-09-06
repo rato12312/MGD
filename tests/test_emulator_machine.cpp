@@ -343,6 +343,21 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.pc() == pc + 4, "tbz seguiu");
     }
 
+    // SDIV / UDIV.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 20);
+        cpu.setReg(2, 4);
+        ASSERT_MSG(cpu.step(0x9A820C20u), "udiv x0,x1,x2");
+        ASSERT_MSG(cpu.reg(0) == 5, "20/4");
+        cpu.setReg(1, static_cast<uint64_t>(-20));
+        ASSERT_MSG(cpu.step(0x9AC20C23u), "sdiv x3,x1,x2");
+        ASSERT_MSG(cpu.reg(3) == static_cast<uint64_t>(-5), "-20/4");
+        cpu.setReg(2, 0);
+        ASSERT_MSG(cpu.step(0x9A820C20u), "udiv por zero");
+        ASSERT_MSG(cpu.reg(0) == 0, "zero sem trap");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
