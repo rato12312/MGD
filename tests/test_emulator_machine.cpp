@@ -232,6 +232,7 @@ bool run_emulator_machine_tests() {
         emu.switches().mgd_image = true;
         emu.bootWorld(5);
         ASSERT_MSG(emu.present("switches_boot.ppm"), "imagem on apresenta");
+        ASSERT_MSG(emu.world().present("switches_boot_x1.ppm", 1), "upscale x1 ok");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
