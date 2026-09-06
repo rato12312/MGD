@@ -6,6 +6,7 @@
 #include <vector>
 #include "../src/loader/PatchManifest.h"
 #include "../src/loader/PatchCheck.h"
+#include "../src/loader/PatchApplier.h"
 
 static std::vector<uint8_t> hexBytes(const std::string& hex) {
     std::vector<uint8_t> out;
@@ -48,6 +49,29 @@ int main() {
         other[0] = 'N'; other[1] = 'S'; other[2] = 'O'; other[3] = '0';
         other[0x40] = 0xFF;
         assert(!port::matchNsoPatch(manifest, "mystery", other).has_value());
+    }
+
+    // Aplicador: 4 NSOs conhecidos do Odyssey aplicam, 1 estranho pula
+    {
+        port::PatchManifest manifest;
+        port::PatchApplier applier(manifest);
+        auto nsoWith = [&](const std::string& hexId) {
+            std::vector<uint8_t> nso(0x100, 0);
+            nso[0] = 'N'; nso[1] = 'S'; nso[2] = 'O'; nso[3] = '0';
+            auto id = hexBytes(hexId);
+            std::memcpy(nso.data() + 0x40, id.data(), id.size());
+            return nso;
+        };
+        assert(applier.apply(0x0100000000010000ull, "rtld", nsoWith("A75512BE30BB2A8C880177505D7A0B3E24E9D642")));
+        assert(applier.apply(0x0100000000010000ull, "main", nsoWith("3CA12DFAAF9C82DA064D1698DF79CDA1")));
+        assert(applier.apply(0x0100000000010000ull, "subsdk0", nsoWith("798C30E126697F2222CF843F78F5C1406287619A")));
+        assert(applier.apply(0x0100000000010000ull, "sdk", nsoWith("AE34E75D02925F4417B24499AD80C39412FC76DB")));
+        std::vector<uint8_t> strange(0x100, 0);
+        strange[0] = 'N'; strange[1] = 'S'; strange[2] = 'O'; strange[3] = '0';
+        strange[0x40] = 0xFF;
+        assert(applier.apply(0x0100000000010000ull, "mystery", strange));
+        assert(applier.applied().size() == 4);
+        assert(applier.skipped().size() == 1);
     }
 
     std::printf("patch manifest tests passed!\n");
