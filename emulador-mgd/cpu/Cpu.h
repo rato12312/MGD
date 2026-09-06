@@ -295,6 +295,21 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFC0FC00) == 0x1E61C000 || (insn & 0xFFC0FC00) == 0x1E614000 ||
+            (insn & 0xFFC0FC00) == 0x1E60C000) {
+            // FSQRT / FNEG / FABS Dd,Dn
+            uint32_t base = insn & 0xFFC0FC00;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            double v = fpregs_[n];
+            double res = (base == 0x1E61C000) ? __builtin_sqrt(v)
+                       : (base == 0x1E614000) ? -v
+                       : (v < 0 ? -v : v);
+            fpregs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFC0FC00) == 0x1E604000) { // FMOV Dd,Dn
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);

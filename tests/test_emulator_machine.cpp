@@ -641,6 +641,22 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == 22, "ne pega x2");
     }
 
+    // FSQRT / FNEG / FABS.
+    {
+        emu::Cpu cpu;
+        ASSERT_MSG(cpu.step(0xD2800200u), "movz x0,#16");
+        ASSERT_MSG(cpu.step(0x1E660000u), "scvtf d0,x0");
+        ASSERT_MSG(cpu.step(0x1E61C001u), "fsqrt d1,d0");
+        ASSERT_MSG(cpu.step(0x1E620021u), "scvtf x1,d1");
+        ASSERT_MSG(cpu.reg(1) == 4, "raiz de 16");
+        ASSERT_MSG(cpu.step(0x1E614022u), "fneg d2,d1");
+        ASSERT_MSG(cpu.step(0x1E620042u), "scvtf x2,d2");
+        ASSERT_MSG(cpu.reg(2) == static_cast<uint64_t>(-4), "-4");
+        ASSERT_MSG(cpu.step(0x1E60C043u), "fabs d3,d2");
+        ASSERT_MSG(cpu.step(0x1E620063u), "scvtf x3,d3");
+        ASSERT_MSG(cpu.reg(3) == 4, "abs volta");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
