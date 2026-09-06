@@ -327,6 +327,22 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(6) == (0xF0ull ^ (0x3Cull << 1)), "eor+shift certo");
     }
 
+    // TBZ / TBNZ.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 0);
+        uint64_t pc = cpu.pc();
+        ASSERT_MSG(cpu.step(0x36180040u), "tbz x0,#3 pula (bit limpo)");
+        ASSERT_MSG(cpu.pc() == pc + 8, "tbz tomou");
+        cpu.setReg(0, 8);
+        pc = cpu.pc();
+        ASSERT_MSG(cpu.step(0x37180040u), "tbnz x0,#3 pula (bit set)");
+        ASSERT_MSG(cpu.pc() == pc + 8, "tbnz tomou");
+        pc = cpu.pc();
+        ASSERT_MSG(cpu.step(0x36180040u), "tbz nao pula (bit set)");
+        ASSERT_MSG(cpu.pc() == pc + 4, "tbz seguiu");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

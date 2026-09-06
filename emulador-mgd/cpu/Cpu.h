@@ -186,6 +186,18 @@ public:
             steps_++;
             return true;
         }
+        if (top == 0x36 || top == 0x37) { // TBZ / TBNZ Xt,#bit,label
+            int t = static_cast<int>(dec.rd);
+            int bit = static_cast<int>(((insn >> 31) & 0x1) * 32 + ((insn >> 19) & 0x1F));
+            int64_t imm = static_cast<int64_t>((insn >> 5) & 0x3FFF);
+            if (imm & 0x2000) imm |= ~static_cast<int64_t>(0x3FFF); // sign 14
+            uint64_t v = (t == 31) ? 0 : regs_[t];
+            bool isSet = ((v >> bit) & 1u) != 0;
+            bool take = (top == 0x36) ? !isSet : isSet;
+            pc_ = take ? static_cast<uint64_t>(static_cast<int64_t>(pc_) + (imm << 2)) : pc_ + 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFFFF01F) == 0xD503201F) { // NOP e HINTs: aceita e segue
             pc_ += 4;
             steps_++;
