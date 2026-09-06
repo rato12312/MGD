@@ -289,6 +289,24 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(2) == 0xFF, "shift dir");
     }
 
+    // Pilha de verdade: STP pré-index + LDP pós-index + MADD.
+    {
+        emu::Cpu cpu;
+        cpu.setSp(0x1000);
+        cpu.setReg(0, 0xAA);
+        cpu.setReg(1, 0xBB);
+        ASSERT_MSG(cpu.step(0xA9BF07E0u), "stp x0,x1,[sp,#-16]!");
+        ASSERT_MSG(cpu.sp() == 0xFF0, "sp desceu 16");
+        ASSERT_MSG(cpu.step(0xA8C10FE2u), "ldp x2,x3,[sp],#16");
+        ASSERT_MSG(cpu.reg(2) == 0xAA && cpu.reg(3) == 0xBB, "par da pilha");
+        ASSERT_MSG(cpu.sp() == 0x1000, "sp voltou");
+        cpu.setReg(1, 3);
+        cpu.setReg(2, 4);
+        cpu.setReg(3, 5);
+        ASSERT_MSG(cpu.step(0x9B020C20u), "madd x0,x1,x2,x3");
+        ASSERT_MSG(cpu.reg(0) == 17, "5+3*4");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

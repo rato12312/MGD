@@ -241,16 +241,20 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFC00000) == 0xA9000000 || (insn & 0xFFC00000) == 0xA9400000) {
-            // STP / LDP Xt1,Xt2,[Xn,#imm7*8]
+        if ((insn & 0xFFC00000) == 0xA9000000 || (insn & 0xFFC00000) == 0xA9400000 ||
+            (insn & 0xFFC00000) == 0xA9800000 || (insn & 0xFFC00000) == 0xA9C00000 ||
+            (insn & 0xFFC00000) == 0xA8800000 || (insn & 0xFFC00000) == 0xA8C00000) {
+            // STP / LDP Xt1,Xt2,[Xn,#imm] offset, pré e pós-index
             bool isLoad = (insn & 0x400000) != 0;
+            bool preIndex = ((insn >> 23) & 0x3) == 0x1;
+            bool postIndex = ((insn >> 23) & 0x3) == 0x0;
             int t1 = static_cast<int>(insn & 0x1F);
             int n = static_cast<int>((insn >> 5) & 0x1F);
             int t2 = static_cast<int>((insn >> 10) & 0x1F);
             int64_t off = static_cast<int64_t>((insn >> 15) & 0x7F);
             if (off & 0x40) off |= ~static_cast<int64_t>(0x7F); // sign 7
             uint64_t base = (n == 31) ? sp_ : regs_[n];
-            uint64_t addr = base + static_cast<uint64_t>(off * 8);
+            uint64_t addr = base + (preIndex ? static_cast<uint64_t>(off * 8) : 0);
             if (isLoad) {
                 bool ok1 = true, ok2 = true;
                 uint64_t v1 = load64(addr, ok1), v2 = load64(addr + 8, ok2);
@@ -261,6 +265,24 @@ public:
                 if (!store64(addr, (t1 == 31) ? 0 : regs_[t1])) return false;
                 if (!store64(addr + 8, (t2 == 31) ? 0 : regs_[t2])) return false;
             }
+            if (preIndex || postIndex) { // writeback na base (ou SP)
+                uint64_t nb = base + static_cast<uint64_t>(off * 8);
+                if (n == 31) sp_ = nb;
+                else regs_[n] = nb;
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFE08000) == 0x9B008000) { // MADD Xd,Xn,Xm,Xa
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int a = static_cast<int>((insn >> 10) & 0x1F);
+            uint64_t nv = (n == 31) ? 0 : regs_[n];
+            uint64_t mv = (m == 31) ? 0 : regs_[m];
+            uint64_t av = (a == 31) ? 0 : regs_[a];
+            if (d != 31) regs_[d] = av + nv * mv;
             pc_ += 4;
             steps_++;
             return true;
