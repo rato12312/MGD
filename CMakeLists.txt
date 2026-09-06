@@ -155,6 +155,7 @@ add_executable(mgd_tests
     tests/test_seed_provider.cpp
     tests/test_mmap_runtime.cpp
     tests/test_emulator_odyssey.cpp
+    tests/test_emulator_machine.cpp
 )
 target_link_libraries(mgd_tests mgd_core)
 target_compile_definitions(mgd_tests PRIVATE MGD_TESTING)
