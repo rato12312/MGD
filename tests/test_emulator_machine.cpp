@@ -9,6 +9,7 @@
 #include "emulador-mgd/handoff/CaptureStub.h"
 #include "emulador-mgd/runtime/Emulator.h"
 #include "emulador-mgd/loader/NroLoader.h"
+#include "emulador-mgd/hos/Kernel.h"
 #include "emulador-mgd/ram/Mmu.h"
 #include "core/query/RegionPolygonCache.h"
 
@@ -487,6 +488,23 @@ bool run_emulator_machine_tests() {
         cpu.setReg(2, 2);
         ASSERT_MSG(cpu.step(0x9BA27C24u), "umaddl x4,w1,w2,xzr");
         ASSERT_MSG(cpu.reg(4) == 0x1FFFFFFFEull, "unsigned 32->64");
+    }
+
+    // Kernel HOS: heap, saída e stub honesto.
+    {
+        hos::Kernel k;
+        hos::SvcArgs a;
+        a.x[1] = 0x1000000;
+        ASSERT_MSG(k.call(hos::SVC_SET_HEAP_SIZE, a) == hos::RESULT_OK, "heap ok");
+        ASSERT_MSG(k.heapSize() == 0x1000000, "heap guardado");
+        ASSERT_MSG(a.out[0] == k.heapBase(), "base devolvida");
+        hos::SvcArgs b;
+        ASSERT_MSG(k.call(hos::SVC_GET_INFO, b) == hos::RESULT_OK, "info stub ok");
+        hos::SvcArgs c;
+        ASSERT_MSG(k.call(hos::SVC_EXIT_PROCESS, c) == hos::RESULT_OK, "exit ok");
+        ASSERT_MSG(k.exited(), "marcou saida");
+        hos::SvcArgs d;
+        ASSERT_MSG(k.call(0xFF, d) == hos::RESULT_UNIMPLEMENTED, "desconhecida nao trava");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
