@@ -8,16 +8,36 @@
 
 #include "../cpu/Cpu.h"
 #include "../odyssey/OdysseyWorld.h"
+#include "../config/MgdSwitches.h"
 
 namespace mgd {
 namespace emu {
 
 class Emulator {
 public:
-    Emulator() = default;
+    Emulator() { applySwitches(); }
 
     Cpu& cpu() { return cpu_; }
+    Mmu& mmu() { return mmu_; }
     odyssey::OdysseyWorld& world() { return world_; }
+    MgdSwitches& switches() { return switches_; }
+
+    // Aplica as chaves: MMU liga/desliga, barato segue a Mali, painter obedece.
+    void applySwitches() {
+        mmu_.clear();
+        if (switches_.mgd_translation) {
+            mmu_.map(0x0, 0x0, cpu_.ramSize(), true, true, true);
+            cpu_.setMmu(&mmu_);
+        } else {
+            cpu_.setMmu(nullptr);
+        }
+        world_.cheap(switches_.cheapForLevel());
+    }
+
+    bool present(const char* path) {
+        if (!switches_.mgd_image) return false;
+        return world_.present(path);
+    }
 
     // Deposita programa (u32 little-endian) na RAM da CPU.
     bool loadProgram(const std::vector<uint32_t>& prog, uint64_t base = 0) {
@@ -38,7 +58,9 @@ public:
 
 private:
     Cpu cpu_;
+    Mmu mmu_;
     odyssey::OdysseyWorld world_;
+    MgdSwitches switches_;
 };
 
 } // namespace emu

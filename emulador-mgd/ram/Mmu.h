@@ -46,6 +46,8 @@ public:
         return false;
     }
 
+    void clear() { regions_.clear(); }
+
     size_t regionCount() const { return regions_.size(); }
 
 private:

@@ -210,6 +210,30 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu2.run(4) == 0, "sem exec nao busca");
     }
 
+    // Chaves MGD: usuário decide onde o MGD assume.
+    {
+        emu::Emulator emu;
+        ASSERT_MSG(emu.switches().mgd_translation, "traducao on");
+        ASSERT_MSG(emu.switches().mgd_mali == emu::MaliLevel::Cheap, "mali cheap");
+        ASSERT_MSG(emu.world().cheap().resolution_factor == 0.5f, "mundo 0.5x");
+        // desliga tradução: acesso direto volta a valer
+        emu.switches().mgd_translation = false;
+        emu.applySwitches();
+        emu.cpu().setReg(2, 0x100);
+        emu.cpu().setReg(0, 0x55);
+        ASSERT_MSG(emu.cpu().step(0xF8000020u), "direto ok");
+        // mali Edge: mundo 0.4x
+        emu.switches().mgd_mali = emu::MaliLevel::Edge;
+        emu.applySwitches();
+        ASSERT_MSG(emu.world().cheap().resolution_factor == 0.4f, "mundo 0.4x");
+        // imagem off: painter não apresenta
+        emu.switches().mgd_image = false;
+        ASSERT_MSG(!emu.present("off.ppm"), "imagem off nega");
+        emu.switches().mgd_image = true;
+        emu.bootWorld(5);
+        ASSERT_MSG(emu.present("switches_boot.ppm"), "imagem on apresenta");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
