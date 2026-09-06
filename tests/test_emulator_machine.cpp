@@ -442,6 +442,24 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(5) == 12, "3*4");
     }
 
+    // REV / REV32 / REV16 / CLZ.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 0x0102030405060708ull);
+        ASSERT_MSG(cpu.step(0xDAC00C20u), "rev x0,x1");
+        ASSERT_MSG(cpu.reg(0) == 0x0807060504030201ull, "rev certo");
+        ASSERT_MSG(cpu.step(0xDAC00820u), "rev32 x0,x1");
+        ASSERT_MSG(cpu.reg(0) == 0x0403020108070605ull, "rev32 certo");
+        ASSERT_MSG(cpu.step(0xDAC00420u), "rev16 x0,x1");
+        ASSERT_MSG(cpu.reg(0) == 0x0201040306050807ull, "rev16 certo");
+        cpu.setReg(1, 0x00F0000000000000ull);
+        ASSERT_MSG(cpu.step(0xDAC01020u), "clz x0,x1");
+        ASSERT_MSG(cpu.reg(0) == 8, "8 zeros");
+        cpu.setReg(1, 0);
+        ASSERT_MSG(cpu.step(0xDAC01020u), "clz zero");
+        ASSERT_MSG(cpu.reg(0) == 64, "zero -> 64");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

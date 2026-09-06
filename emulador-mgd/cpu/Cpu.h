@@ -297,6 +297,50 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE0FC00) == 0xDAC00C00 || (insn & 0xFFE0FC00) == 0xDAC00800 ||
+            (insn & 0xFFE0FC00) == 0xDAC00400) {
+            // REV / REV32 / REV16 Xd,Xn
+            uint32_t base = insn & 0xFFE0FC00;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            uint64_t v = (n == 31) ? 0 : regs_[n];
+            uint64_t res = 0;
+            if (base == 0xDAC00C00) { // REV: 8 bytes
+                for (int i = 0; i < 8; i++)
+                    res |= ((v >> (8 * i)) & 0xFFull) << (8 * (7 - i));
+            } else if (base == 0xDAC00800) { // REV32: cada metade
+                for (int h = 0; h < 2; h++) {
+                    uint64_t half = (v >> (32 * h)) & 0xFFFFFFFFull;
+                    uint64_t rh = 0;
+                    for (int i = 0; i < 4; i++)
+                        rh |= ((half >> (8 * i)) & 0xFFull) << (8 * (3 - i));
+                    res |= rh << (32 * h);
+                }
+            } else { // REV16: cada par
+                for (int h = 0; h < 4; h++) {
+                    uint64_t phe = (v >> (16 * h)) & 0xFFFFull;
+                    res |= (((phe & 0xFFull) << 8) | ((phe >> 8) & 0xFFull)) << (16 * h);
+                }
+            }
+            if (d != 31) regs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFE0FC00) == 0xDAC01000) { // CLZ Xd,Xn (0 -> 64)
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            uint64_t v = (n == 31) ? 0 : regs_[n];
+            uint64_t c = 0;
+            for (int i = 63; i >= 0; i--) {
+                if ((v >> i) & 1ull) break;
+                c++;
+            }
+            if (d != 31) regs_[d] = c;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFFFF01F) == 0xD503201F) { // NOP e HINTs: aceita e segue
             pc_ += 4;
             steps_++;
