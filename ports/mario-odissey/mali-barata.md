@@ -26,6 +26,14 @@ Objetivo: Mali só entrega rascunho barato; o painter MGD completa.
 - Shaders: 100% do cache pré-compilado, zero compilação ao vivo
 - Fechar todos os apps antes (4 GB RAM é o piso)
 
+## Modo MGD Edge (lição do Skyline Edge)
+- Dois modos no APK: estável + Edge experimental.
+- Edge = tudo agressivo: 0.4x, accuracy mínima, batching máximo,
+  frame parado reaproveitado, sem pós nenhum.
+- Renderer pensando em GPU tiled (Mali): sem churn de framebuffer,
+  draws fundidos, texturas comprimidas.
+- Velocidade primeiro, precisão depois (Skyline voava assim).
+
 ## Medição
 - Anotar fps com e sem cada item, cena parada e cena em movimento.
 - Vale o que está medido, não o que foi projetado.
