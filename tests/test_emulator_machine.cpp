@@ -179,6 +179,31 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(!mmu.translate(0x1400, 8, false, false, pa), "sem regiao fault");
     }
 
+    // CPU ligada na MMU: acesso passa por translate.
+    {
+        emu::Cpu cpu;
+        emu::Mmu mmu;
+        mmu.map(0x0, 0x0, 0x1000, true, true, true);    // código rwx
+        mmu.map(0x1000, 0x1000, 0x1000, true, true, false); // dados rw-
+        mmu.map(0x2000, 0x2000, 0x1000, true, false, false); // const r--
+        cpu.setMmu(&mmu);
+        cpu.setReg(2, 0x1000);
+        cpu.setReg(0, 0x1234);
+        ASSERT_MSG(cpu.step(0xF8000020u), "str via mmu ok");
+        cpu.setReg(0, 0);
+        ASSERT_MSG(cpu.step(0xF9400020u), "ldr via mmu ok");
+        ASSERT_MSG(cpu.reg(0) == 0x1234, "dado certo");
+        // escrita em região r-- nega
+        cpu.setReg(2, 0x2000);
+        ASSERT_MSG(!cpu.step(0xF8000020u), "str sem w nega");
+        // fetch sem x para o run
+        emu::Cpu cpu2;
+        emu::Mmu mmu2;
+        mmu2.map(0x0, 0x0, 0x1000, true, true, false); // sem exec
+        cpu2.setMmu(&mmu2);
+        ASSERT_MSG(cpu2.run(4) == 0, "sem exec nao busca");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

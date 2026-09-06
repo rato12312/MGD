@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "../../ports/mario-odissey/src/mgd/common/BitField.h"
+#include "../ram/Mmu.h"
 
 namespace mgd {
 namespace emu {
@@ -52,13 +53,16 @@ public:
     bool stopped() const { return stopped_; }
     uint64_t exitCode() const { return exit_code_; }
 
+    void setMmu(Mmu* mmu) { mmu_ = mmu; }
+
     uint64_t run(uint64_t maxSteps) {
         uint64_t done = 0;
         while (done < maxSteps && !stopped_) {
-            if (pc_ + 4 > ramSize()) break;
+            uint64_t pa = 0;
+            if (!phys(pc_, 4, false, true, pa)) break; // fetch sem exec = para
             uint32_t insn = 0;
             for (int i = 0; i < 4; i++)
-                insn |= static_cast<uint32_t>(mem_[static_cast<size_t>(pc_) + i]) << (8 * i);
+                insn |= static_cast<uint32_t>(mem_[static_cast<size_t>(pa) + i]) << (8 * i);
             if (!step(insn)) break;
             done++;
         }
@@ -150,13 +154,15 @@ public:
             if (off & 0x40) off |= ~static_cast<int64_t>(0x7F); // sign 7
             uint64_t base = (n == 31) ? sp_ : regs_[n];
             uint64_t addr = base + static_cast<uint64_t>(off * 8);
-            if (addr + 16 > ramSize()) return false;
             if (isLoad) {
-                if (t1 != 31) regs_[t1] = load64(addr);
-                if (t2 != 31) regs_[t2] = load64(addr + 8);
+                bool ok1 = true, ok2 = true;
+                uint64_t v1 = load64(addr, ok1), v2 = load64(addr + 8, ok2);
+                if (!ok1 || !ok2) return false;
+                if (t1 != 31) regs_[t1] = v1;
+                if (t2 != 31) regs_[t2] = v2;
             } else {
-                store64(addr, (t1 == 31) ? 0 : regs_[t1]);
-                store64(addr + 8, (t2 == 31) ? 0 : regs_[t2]);
+                if (!store64(addr, (t1 == 31) ? 0 : regs_[t1])) return false;
+                if (!store64(addr + 8, (t2 == 31) ? 0 : regs_[t2])) return false;
             }
             pc_ += 4;
             steps_++;
@@ -176,15 +182,33 @@ public:
     }
 
 private:
-    uint64_t load64(uint64_t addr) const {
+    // VA -> PA (ou direto se sem MMU). false = fault.
+    bool phys(uint64_t va, int size, bool w, bool x, uint64_t& pa) const {
+        if (!mmu_) {
+            if (va + static_cast<uint64_t>(size) > ramSize()) return false;
+            pa = va;
+            return true;
+        }
+        if (!mmu_->translate(va, static_cast<uint64_t>(size), w, x, pa)) return false;
+        if (pa + static_cast<uint64_t>(size) > ramSize()) return false;
+        return true;
+    }
+
+    uint64_t load64(uint64_t addr, bool& ok) const {
+        uint64_t pa = 0;
+        ok = phys(addr, 8, false, false, pa);
+        if (!ok) return 0;
         uint64_t v = 0;
         for (int i = 0; i < 8; i++)
-            v |= static_cast<uint64_t>(mem_[static_cast<size_t>(addr) + i]) << (8 * i);
+            v |= static_cast<uint64_t>(mem_[static_cast<size_t>(pa) + i]) << (8 * i);
         return v;
     }
-    void store64(uint64_t addr, uint64_t v) {
+    bool store64(uint64_t addr, uint64_t v) {
+        uint64_t pa = 0;
+        if (!phys(addr, 8, true, false, pa)) return false;
         for (int i = 0; i < 8; i++)
-            mem_[static_cast<size_t>(addr) + i] = static_cast<uint8_t>(v >> (8 * i));
+            mem_[static_cast<size_t>(pa) + i] = static_cast<uint8_t>(v >> (8 * i));
+        return true;
     }
 
     bool memAccess(const ArmInsn& dec, int width, bool isLoad) {
@@ -192,16 +216,17 @@ private:
         int n = static_cast<int>(dec.rn);
         uint64_t base = (n == 31) ? sp_ : regs_[n];
         uint64_t addr = base + static_cast<uint64_t>(dec.imm12) * static_cast<uint64_t>(width);
-        if (addr + static_cast<uint64_t>(width) > ramSize()) return false;
+        uint64_t pa = 0;
+        if (!phys(addr, width, !isLoad, false, pa)) return false;
         if (isLoad) {
             uint64_t v = 0;
             for (int i = 0; i < width; i++)
-                v |= static_cast<uint64_t>(mem_[static_cast<size_t>(addr) + i]) << (8 * i);
+                v |= static_cast<uint64_t>(mem_[static_cast<size_t>(pa) + i]) << (8 * i);
             if (t != 31) regs_[t] = v; // 32/8-bit já vêm zerados acima
         } else {
             uint64_t v = (t == 31) ? 0 : regs_[t];
             for (int i = 0; i < width; i++)
-                mem_[static_cast<size_t>(addr) + i] = static_cast<uint8_t>(v >> (8 * i));
+                mem_[static_cast<size_t>(pa) + i] = static_cast<uint8_t>(v >> (8 * i));
         }
         pc_ += 4;
         steps_++;
@@ -210,6 +235,7 @@ private:
 
     std::array<uint64_t, REG_COUNT> regs_{};
     std::vector<uint8_t> mem_;
+    Mmu* mmu_ = nullptr;
     uint64_t sp_ = 0;
     uint64_t pc_ = 0;
     uint64_t steps_ = 0;
