@@ -315,12 +315,15 @@ int main() {
         printf("  1%% low pipeline     | %8.4f | %9.1f\n", low, 1000.0/low);
     }
 
-    // ===== CENA FINAL 720p: tudo ligado (DNA+LOD+incremental+shader cache) =====
-    // Mesma cena, framebuffer 1280x720, 60 frames, 50 móveis. É o número honesto.
-    std::cout << "=== CENA FINAL 720p (tudo ligado) ===\n";
-    {
-        using namespace dna;
-        const int FBW = 1280, FBH = 720, FRAMES = 60;
+    // ===== CENA FINAL 720p + 1080p: tudo ligado (DNA+LOD+incremental) =====
+    // Mesma cena, 60 frames, 50 móveis. É o número honesto.
+    for (int res = 0; res < 2; ++res) {
+        const int FBW = res == 0 ? 1280 : 1920;
+        const int FBH = res == 0 ? 720 : 1080;
+        const int FRAMES = 60;
+        std::cout << "=== CENA FINAL " << FBW << "x" << FBH << " (tudo ligado) ===\n";
+        {
+            using namespace dna;
         std::vector<Polygon> scene;
         for (uint32_t i = 1; i <= 2000; ++i) {
             Polygon p;
@@ -372,8 +375,9 @@ int main() {
         double sum = 0; for (double v : fms) sum += v;
         double avg = sum / FRAMES;
         double low = fms.back();
-        std::cout << "  tradicional 720p: " << tTrad << " ms (" << 1000.0/tTrad << " FPS)\n";
-        std::cout << "  pipeline 720p:    " << avg << " ms (" << 1000.0/avg << " FPS), 1% low " << low << " ms (" << 1000.0/low << " FPS)\n";
+        std::cout << "  tradicional " << FBW << "x" << FBH << ": " << tTrad << " ms (" << 1000.0/tTrad << " FPS)\n";
+        std::cout << "  pipeline " << FBW << "x" << FBH << ":    " << avg << " ms (" << 1000.0/avg << " FPS), 1% low " << low << " ms (" << 1000.0/low << " FPS)\n";
+        }
     }
 
     return 0;
