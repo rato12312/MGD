@@ -37,6 +37,17 @@ Jogo: SUPER MARIO ODYSSEY v1.0.0 (0100000000010000), firmware NX 22.5.0-1.0.
 
 Só entra peça que o Odyssey provar que usa (pelo log). O resto fica de fora.
 
+## Formatos do RomFS (para o scanner do port)
+
+Pesquisa confirma (comunidade modding + Odyssey-Toolkit):
+- `SZS`/`Yaz0` (compressão), `SARC` (arquivo), `BYML` (parâmetros),
+  `BFRES` (modelos), `BNTX` (texturas) — análogos a BSA/ESP do Skyrim.
+- Existe decomp em andamento (`MonsterDruide1/OdysseyDecomp`, v1.0.0).
+- Mod handheld troca interlaced `640x720` duplo por `1280x720` cheio —
+  prova que resolução do Odyssey é configurável por patch.
+- Próximo do port: analyzers de cabeçalho SARC/BYML/BFRES/BNTX
+  (só magic + versão, como fizemos com BSA/ESP).
+
 ## Achado de pesquisa (emulação do Odyssey no Android)
 
 - Odyssey roda 60 na maioria das áreas em Snapdragon flagship, com quedas em cutscene; dock mode ajuda em glitch 3D.
