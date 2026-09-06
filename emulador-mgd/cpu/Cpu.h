@@ -128,10 +128,65 @@ public:
         if (top == 0x38 || top == 0x39) { // STRB / LDRB (byte)
             return memAccess(dec, 1, top == 0x39);
         }
+        if ((insn & 0x9F000000) == 0x90000000) { // ADRP Xd, page
+            int d = static_cast<int>(dec.rd);
+            int64_t imm = (static_cast<int64_t>((insn >> 5) & 0x7FFFF) << 2) |
+                          static_cast<int64_t>((insn >> 29) & 0x3);
+            if (imm & 0x100000) imm |= ~static_cast<int64_t>(0x1FFFFF); // sign 21
+            uint64_t page = (pc_ & ~static_cast<uint64_t>(0xFFF)) +
+                            static_cast<uint64_t>(imm << 12);
+            setReg(d, page);
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFC00000) == 0xA9000000 || (insn & 0xFFC00000) == 0xA9400000) {
+            // STP / LDP Xt1,Xt2,[Xn,#imm7*8]
+            bool isLoad = (insn & 0x400000) != 0;
+            int t1 = static_cast<int>(insn & 0x1F);
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            int t2 = static_cast<int>((insn >> 10) & 0x1F);
+            int64_t off = static_cast<int64_t>((insn >> 15) & 0x7F);
+            if (off & 0x40) off |= ~static_cast<int64_t>(0x7F); // sign 7
+            uint64_t base = (n == 31) ? sp_ : regs_[n];
+            uint64_t addr = base + static_cast<uint64_t>(off * 8);
+            if (addr + 16 > ramSize()) return false;
+            if (isLoad) {
+                if (t1 != 31) regs_[t1] = load64(addr);
+                if (t2 != 31) regs_[t2] = load64(addr + 8);
+            } else {
+                store64(addr, (t1 == 31) ? 0 : regs_[t1]);
+                store64(addr + 8, (t2 == 31) ? 0 : regs_[t2]);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if (top == 0xB4 || top == 0xB5) { // CBZ / CBNZ Xt, label
+            int t = static_cast<int>(dec.rd);
+            int64_t imm = static_cast<int64_t>((insn >> 5) & 0x7FFFF);
+            if (imm & 0x40000) imm |= ~static_cast<int64_t>(0x7FFFF); // sign 19
+            uint64_t v = (t == 31) ? 0 : regs_[t];
+            bool take = (top == 0xB4) ? (v == 0) : (v != 0);
+            pc_ = take ? static_cast<uint64_t>(static_cast<int64_t>(pc_) + (imm << 2)) : pc_ + 4;
+            steps_++;
+            return true;
+        }
         return false;
     }
 
 private:
+    uint64_t load64(uint64_t addr) const {
+        uint64_t v = 0;
+        for (int i = 0; i < 8; i++)
+            v |= static_cast<uint64_t>(mem_[static_cast<size_t>(addr) + i]) << (8 * i);
+        return v;
+    }
+    void store64(uint64_t addr, uint64_t v) {
+        for (int i = 0; i < 8; i++)
+            mem_[static_cast<size_t>(addr) + i] = static_cast<uint8_t>(v >> (8 * i));
+    }
+
     bool memAccess(const ArmInsn& dec, int width, bool isLoad) {
         int t = static_cast<int>(dec.rd);
         int n = static_cast<int>(dec.rn);

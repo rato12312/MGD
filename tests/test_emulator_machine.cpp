@@ -9,6 +9,7 @@
 #include "emulador-mgd/handoff/CaptureStub.h"
 #include "emulador-mgd/runtime/Emulator.h"
 #include "emulador-mgd/loader/NroLoader.h"
+#include "emulador-mgd/ram/Mmu.h"
 #include "core/query/RegionPolygonCache.h"
 
 using namespace mgd;
@@ -135,6 +136,47 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cache.polygonCount() <= 10, "teto respeitado");
         ASSERT_MSG(cache.evictions() >= 1, "eviccao aconteceu");
         ASSERT_MSG(!cache.findPolygon(100).has_value(), "regiao antiga caiu");
+    }
+
+    // ADRP + STP/LDP + CBZ/CBNZ (prólogo real de função).
+    {
+        emu::Cpu cpu;
+        cpu.setPc(0x1000);
+        ASSERT_MSG(cpu.step(0x90000000u), "adrp x0,page");
+        ASSERT_MSG(cpu.reg(0) == 0x1000, "x0=page");
+        cpu.setReg(0, 11);
+        cpu.setReg(1, 22);
+        cpu.setReg(2, 0x200);
+        ASSERT_MSG(cpu.step(0xA9010440u), "stp x0,x1,[x2,#16]");
+        ASSERT_MSG(cpu.step(0xA9411063u), "ldp x3,x4,[x2,#16]");
+        ASSERT_MSG(cpu.reg(3) == 11 && cpu.reg(4) == 22, "par ok");
+        cpu.setReg(0, 0);
+        uint64_t pc = cpu.pc();
+        ASSERT_MSG(cpu.step(0xB4000040u), "cbz x0,+8 pula");
+        ASSERT_MSG(cpu.pc() == pc + 8, "pulou");
+        cpu.setReg(1, 5);
+        pc = cpu.pc();
+        ASSERT_MSG(cpu.step(0xB5000041u), "cbnz x1,+8 pula");
+        ASSERT_MSG(cpu.pc() == pc + 8, "pulou 2");
+        cpu.setReg(1, 0);
+        pc = cpu.pc();
+        ASSERT_MSG(cpu.step(0xB5000041u), "cbnz x1 nao pula");
+        ASSERT_MSG(cpu.pc() == pc + 4, "seguiu");
+    }
+
+    // MMU: mapa + permissão + fault fechado.
+    {
+        emu::Mmu mmu;
+        mmu.map(0x1000, 0x1000, 0x1000, true, false, true); // r-x
+        uint64_t pa = 0;
+        ASSERT_MSG(mmu.translate(0x1400, 8, false, false, pa) && pa == 0x1400, "le ok");
+        ASSERT_MSG(mmu.translate(0x1400, 8, false, true, pa), "exec ok");
+        ASSERT_MSG(!mmu.translate(0x1400, 8, true, false, pa), "escrita negada");
+        ASSERT_MSG(!mmu.translate(0x5000, 8, false, false, pa), "fora fault");
+        ASSERT_MSG(!mmu.translate(0x1FFC, 8, false, false, pa), "corta regiao fault");
+        mmu.unmap(0x1000);
+        ASSERT_MSG(mmu.regionCount() == 0, "desmapeou");
+        ASSERT_MSG(!mmu.translate(0x1400, 8, false, false, pa), "sem regiao fault");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
