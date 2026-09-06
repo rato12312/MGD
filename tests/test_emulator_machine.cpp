@@ -522,6 +522,21 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.stopped(), "exit parou a cpu");
     }
 
+    // Máquina completa: programa pede heap via SVC e sai via ExitProcess.
+    {
+        emu::Emulator emu;
+        std::vector<uint32_t> prog = {
+            0xD2800021u, // MOVZ X1, #1
+            0xD4000021u, // SVC #1 = SetHeapSize(1)
+            0xD40000C1u, // SVC #6 = ExitProcess
+        };
+        ASSERT_MSG(emu.loadProgram(prog, 0), "programa hos cabe");
+        emu.runCpu(8);
+        ASSERT_MSG(emu.cpu().stopped(), "exit parou");
+        ASSERT_MSG(emu.kernel().exited(), "kernel marcou");
+        ASSERT_MSG(emu.kernel().heapSize() == 1, "heap pedido");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

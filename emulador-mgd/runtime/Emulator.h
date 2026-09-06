@@ -19,11 +19,13 @@ public:
 
     Cpu& cpu() { return cpu_; }
     Mmu& mmu() { return mmu_; }
+    hos::Kernel& kernel() { return kernel_; }
     odyssey::OdysseyWorld& world() { return world_; }
     MgdSwitches& switches() { return switches_; }
 
     // Aplica as chaves: MMU liga/desliga, barato segue a Mali, painter obedece.
     void applySwitches() {
+        cpu_.setKernel(&kernel_);
         mmu_.clear();
         if (switches_.mgd_translation) {
             mmu_.map(0x0, 0x0, cpu_.ramSize(), true, true, true);
@@ -59,6 +61,7 @@ public:
 private:
     Cpu cpu_;
     Mmu mmu_;
+    hos::Kernel kernel_;
     odyssey::OdysseyWorld world_;
     MgdSwitches switches_;
 };
