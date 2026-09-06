@@ -9,6 +9,7 @@
 #include "emulador-mgd/handoff/CaptureStub.h"
 #include "emulador-mgd/runtime/Emulator.h"
 #include "emulador-mgd/loader/NroLoader.h"
+#include "core/query/RegionPolygonCache.h"
 
 using namespace mgd;
 
@@ -116,6 +117,24 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(0) == 7 && cpu.stopped(), "x0=7 e parou");
         emu::NroImage bad = emu::parseNro(blob.data(), 16);
         ASSERT_MSG(!bad.valid, "curto invalido");
+    }
+
+    // Orçamento de RAM: teto de 10 polígonos, região antiga cai.
+    {
+        RegionPolygonCache cache;
+        cache.setBudget(10);
+        for (uint32_t r = 0; r < 3; ++r) {
+            for (uint32_t i = 0; i < 5; ++i) {
+                Polygon p;
+                p.position = Vec3(static_cast<float>(r * 100 + i), 0.0f, 0.0f);
+                p.polygon_id = 100 + r * 10 + i;
+                p.asset_id = 1;
+                cache.insert(r, p);
+            }
+        }
+        ASSERT_MSG(cache.polygonCount() <= 10, "teto respeitado");
+        ASSERT_MSG(cache.evictions() >= 1, "eviccao aconteceu");
+        ASSERT_MSG(!cache.findPolygon(100).has_value(), "regiao antiga caiu");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;

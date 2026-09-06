@@ -4,9 +4,23 @@ namespace mgd {
 
 const std::vector<Polygon> RegionPolygonCache::kEmpty{};
 
+void RegionPolygonCache::enforceBudget() {
+    if (budget_ == 0) return;
+    while (polygon_index_.size() >= budget_ && !region_order_.empty()) {
+        RegionID oldest = region_order_.front();
+        region_order_.pop_front();
+        region_seen_.erase(oldest);
+        if (region_to_polys_.find(oldest) == region_to_polys_.end()) continue;
+        clearRegion(oldest);
+        evictions_++;
+    }
+}
+
 bool RegionPolygonCache::insert(RegionID region, const Polygon& poly) {
     if (poly.polygon_id == INVALID_POLYGON_ID) return false;
     if (polygon_index_.find(poly.polygon_id) != polygon_index_.end()) return false; // já existe
+    if (region_seen_.insert(region).second) region_order_.push_back(region);
+    enforceBudget();
     auto& vec = region_to_polys_[region];
     size_t idx = vec.size();
     vec.push_back(poly);
@@ -17,6 +31,8 @@ bool RegionPolygonCache::insert(RegionID region, const Polygon& poly) {
 bool RegionPolygonCache::insert(RegionID region, Polygon&& poly) {
     if (poly.polygon_id == INVALID_POLYGON_ID) return false;
     if (polygon_index_.find(poly.polygon_id) != polygon_index_.end()) return false;
+    if (region_seen_.insert(region).second) region_order_.push_back(region);
+    enforceBudget();
     auto& vec = region_to_polys_[region];
     size_t idx = vec.size();
     vec.push_back(std::move(poly));
@@ -105,11 +121,14 @@ void RegionPolygonCache::clearRegion(RegionID region) {
     if (it == region_to_polys_.end()) return;
     for (auto& p : it->second) polygon_index_.erase(p.polygon_id);
     region_to_polys_.erase(it);
+    region_seen_.erase(region);
 }
 
 void RegionPolygonCache::clear() {
     region_to_polys_.clear();
     polygon_index_.clear();
+    region_order_.clear();
+    region_seen_.clear();
     hits_ = misses_ = 0;
 }
 

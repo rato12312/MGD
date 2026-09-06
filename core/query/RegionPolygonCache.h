@@ -4,6 +4,8 @@
 #include "../common/Types.h"
 #include "../common/AABB.h"
 #include <unordered_map>
+#include <unordered_set>
+#include <deque>
 #include <vector>
 #include <optional>
 #include <cstdint>
@@ -41,6 +43,12 @@ public:
     void clearRegion(RegionID region);
     void clear();
 
+    // Orçamento de RAM: teto de polígonos; estourou, a região mais
+    // antiga cai (FIFO por região). 0 = sem teto.
+    void setBudget(size_t maxPolygons) { budget_ = maxPolygons; enforceBudget(); }
+    size_t budget() const { return budget_; }
+    uint64_t evictions() const { return evictions_; }
+
     // Stats para benchmark
     size_t regionCount() const;
     size_t polygonCount() const;
@@ -61,8 +69,14 @@ private:
     struct Loc { RegionID region; size_t idx; };
     std::unordered_map<PolygonID, Loc> polygon_index_;
 
+    void enforceBudget();
+
     mutable uint64_t hits_ = 0;
     mutable uint64_t misses_ = 0;
+    size_t budget_ = 0; // 0 = sem teto
+    uint64_t evictions_ = 0;
+    std::deque<RegionID> region_order_; // FIFO de regiões (mais antiga na frente)
+    std::unordered_set<RegionID> region_seen_;
 
     static const std::vector<Polygon> kEmpty;
 };
