@@ -20,30 +20,37 @@ public:
         w_ = w; h_ = h;
         codes_.assign(static_cast<size_t>(w) * h, kEmptyCode);
         dirty_.assign(static_cast<size_t>(w) * h, 0);
+        dirty_list_.clear();
+        dirty_list_.reserve(static_cast<size_t>(w) * h / 16);
         dirty_count_ = 0;
     }
 
-    // Define código do pixel; marca dirty só se mudou.
+    // Define código do pixel; marca dirty só se mudou (e registra na lista).
     void setPixelCode(uint32_t pixelIndex, uint16_t code) {
         if (pixelIndex >= codes_.size()) return;
         if (codes_[pixelIndex] != code) {
             codes_[pixelIndex] = code;
-            if (!dirty_[pixelIndex]) { dirty_[pixelIndex] = 1; dirty_count_++; }
+            if (!dirty_[pixelIndex]) {
+                dirty_[pixelIndex] = 1;
+                dirty_list_.push_back(pixelIndex);
+                dirty_count_++;
+            }
         }
     }
 
     // Escreve só pixels alterados no framebuffer via LUT (sem recalcular cor).
+    // Anda só pela lista de sujos: O(dirty), não O(W*H).
     uint32_t flush(Framebuffer& fb) {
         uint32_t written = 0;
         if (fb.width() != w_ || fb.height() != h_) return 0;
-        for (uint32_t i = 0; i < codes_.size(); ++i) {
-            if (!dirty_[i]) continue;
+        for (uint32_t i : dirty_list_) {
             dirty_[i] = 0;
             int x = static_cast<int>(i % static_cast<uint32_t>(w_));
             int y = static_cast<int>(i / static_cast<uint32_t>(w_));
             fb.setPixel(x, y, ColorCode::decode(codes_[i]));
             written++;
         }
+        dirty_list_.clear();
         dirty_count_ = 0;
         return written;
     }
@@ -51,7 +58,8 @@ public:
     uint32_t dirtyCount() const { return dirty_count_; }
     size_t pixelCount() const { return codes_.size(); }
     void clearDirty() {
-        dirty_.assign(codes_.size(), 0);
+        for (uint32_t i : dirty_list_) dirty_[i] = 0;
+        dirty_list_.clear();
         dirty_count_ = 0;
     }
 
@@ -60,6 +68,7 @@ private:
     int w_ = 0, h_ = 0;
     std::vector<uint16_t> codes_;
     std::vector<char> dirty_;
+    std::vector<uint32_t> dirty_list_; // só índices sujos: flush O(dirty)
     uint32_t dirty_count_ = 0;
 };
 
