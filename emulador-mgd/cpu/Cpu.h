@@ -219,6 +219,34 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFFFF000) == 0xD5033000) { // DMB/DSB/ISB: single-thread, só segue
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFE0FC00) == 0xC85FFC00) { // LDAXR Xt,[Xn]
+            int t = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            uint64_t base = (n == 31) ? sp_ : regs_[n];
+            bool ok = true;
+            uint64_t v = load64(base, ok);
+            if (!ok) return false;
+            if (t != 31) regs_[t] = v;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFE0FC00) == 0xC8007C00) { // STLXR Ws,Xt,[Xn] (sempre vence)
+            int s = static_cast<int>(dec.rd);
+            int t = static_cast<int>((insn >> 16) & 0x1F);
+            int n = static_cast<int>(dec.rn);
+            uint64_t base = (n == 31) ? sp_ : regs_[n];
+            if (!store64(base, (t == 31) ? 0 : regs_[t])) return false;
+            if (s != 31) regs_[s] = 0;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFFFF01F) == 0xD503201F) { // NOP e HINTs: aceita e segue
             pc_ += 4;
             steps_++;

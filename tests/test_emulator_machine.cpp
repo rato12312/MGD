@@ -381,6 +381,18 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(0) == 3, "timer = 3 instr");
     }
 
+    // Barreiras + LDAXR/STLXR (trava single-thread).
+    {
+        emu::Cpu cpu;
+        ASSERT_MSG(cpu.step(0xD5033BBFu), "dmb sy");
+        cpu.setReg(1, 0x300);
+        cpu.setReg(0, 0x77);
+        ASSERT_MSG(cpu.step(0xC8007C22u), "stlxr w2,x0,[x1]");
+        ASSERT_MSG(cpu.reg(2) == 0, "venceu");
+        ASSERT_MSG(cpu.step(0xC85FFC20u), "ldaxr x0,[x1]");
+        ASSERT_MSG(cpu.reg(0) == 0x77, "leu de volta");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
