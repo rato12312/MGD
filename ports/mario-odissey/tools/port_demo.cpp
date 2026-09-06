@@ -9,6 +9,7 @@
 #include "../src/runtime/VirtualFs.h"
 #include "../src/runtime/SystemClock.h"
 #include "../src/runtime/GpuCaps.h"
+#include "../src/runtime/RuntimeConfig.h"
 #include "../src/mgd/query/Polygon.h"
 #include "../src/mgd/query/RegionPolygonCache.h"
 #include "../src/mgd/query/dna/DnaPipeline.h"
@@ -49,6 +50,9 @@ bool stepGpu(std::string& note) {
 } // namespace
 
 int main() {
+    port::RuntimeConfig cfg = port::RuntimeConfig::maliDefaults();
+    std::printf("port demo (config %s, gpu low, async shaders)\n",
+                cfg.resolutionLabel().c_str());
     port::BootSequence boot;
     boot.addStep(port::BootStage::Services, stepServices);
     boot.addStep(port::BootStage::Filesystem, stepFs);
@@ -60,7 +64,10 @@ int main() {
     }
     std::printf("boot OK (%zu etapas)\n", boot.passed());
 
+    // Framebuffer segue a config (0.5x = metade de 192x108 de base).
     // Cena: 200 polígonos, 10 móveis. Pipeline DNA pinta 3 frames.
+    const int fbW = cfg.resolution_scale == 0 ? 96 : 192;
+    const int fbH = cfg.resolution_scale == 0 ? 54 : 108;
     std::vector<mgd::Polygon> scene;
     for (uint32_t i = 1; i <= 200; ++i) {
         mgd::Polygon p;
@@ -71,7 +78,7 @@ int main() {
         p.flags = mgd::PolygonFlag::VISIBLE;
         scene.push_back(p);
     }
-    mgd::dna::DnaPipeline pipe(96, 54);
+    mgd::dna::DnaPipeline pipe(fbW, fbH);
     pipe.buildFromPolygons(scene, 10);
     auto s1 = pipe.renderFrame({});
     std::printf("frame 1: rebuilt=%u written=%u\n", s1.rebuilt_polys, s1.pixels_written);
