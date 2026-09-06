@@ -53,7 +53,7 @@ public:
             built_ = true;
         }
         std::vector<PolygonID> empty;
-        DnaFrameStats fs = pipe_.renderFrame(empty);
+        dna::DnaFrameStats fs = pipe_.renderFrame(empty);
         stats.rebuilt = fs.rebuilt_polys;
         stats.reused = fs.reused_polys;
         stats.pixels_written = fs.pixels_written;
