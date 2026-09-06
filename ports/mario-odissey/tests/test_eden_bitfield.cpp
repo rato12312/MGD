@@ -19,8 +19,9 @@ int main() {
     assert(static_cast<uint32_t>(insn.rn) == 0);
     assert(static_cast<uint32_t>(insn.imm) == 5);
     // FormatValue monta de volta
-    uint32_t rebuilt = AddImm::rd::FormatValue(2) | AddImm::rn::FormatValue(0) |
-                       AddImm::imm::FormatValue(5);
+    uint32_t rebuilt = decltype(AddImm::rd)::FormatValue(2) |
+                       decltype(AddImm::rn)::FormatValue(0) |
+                       decltype(AddImm::imm)::FormatValue(5);
     assert((rebuilt & 0x001FFFFFu) == (0x91001402u & 0x001FFFFFu));
     std::printf("eden bitfield tests passed!\n");
     return 0;
