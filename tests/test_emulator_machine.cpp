@@ -507,6 +507,21 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(k.call(0xFF, d) == hos::RESULT_UNIMPLEMENTED, "desconhecida nao trava");
     }
 
+    // CPU chama o kernel HOS via SVC.
+    {
+        emu::Cpu cpu;
+        hos::Kernel kernel;
+        cpu.setKernel(&kernel);
+        cpu.setReg(1, 0x2000000); // tamanho do heap pedido
+        ASSERT_MSG(cpu.step(0xD4000021u), "svc #1 = SetHeapSize");
+        ASSERT_MSG(cpu.reg(0) == kernel.heapBase(), "base do heap em x0");
+        ASSERT_MSG(kernel.heapSize() == 0x2000000, "kernel guardou");
+        ASSERT_MSG(cpu.step(0xD4000521u), "svc #0x29 = GetInfo");
+        ASSERT_MSG(cpu.lastSvc() == hos::RESULT_OK, "info ok");
+        ASSERT_MSG(cpu.step(0xD40000C1u), "svc #6 = ExitProcess");
+        ASSERT_MSG(cpu.stopped(), "exit parou a cpu");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

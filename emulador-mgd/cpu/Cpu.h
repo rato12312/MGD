@@ -10,6 +10,7 @@
 
 #include "../../ports/mario-odissey/src/mgd/common/BitField.h"
 #include "../ram/Mmu.h"
+#include "../hos/Kernel.h"
 
 namespace mgd {
 namespace emu {
@@ -55,6 +56,8 @@ public:
     uint64_t exitCode() const { return exit_code_; }
 
     void setMmu(Mmu* mmu) { mmu_ = mmu; }
+    void setKernel(hos::Kernel* k) { kernel_ = k; }
+    hos::SvcResult lastSvc() const { return last_svc_; }
 
     uint64_t run(uint64_t maxSteps) {
         uint64_t done = 0;
@@ -78,7 +81,22 @@ public:
         if ((insn & 0xFFE0001F) == 0xD4000001) { // SVC #imm
             uint32_t imm = (insn >> 5) & 0xFFFF;
             if (imm == 0) { stopped_ = true; exit_code_ = 0; }
-            else if (imm == 1) { stopped_ = true; exit_code_ = regs_[0] & 0xFF; }
+            else if (imm == 1 && !kernel_) { stopped_ = true; exit_code_ = regs_[0] & 0xFF; }
+            else if (kernel_) {
+                // Chamada HOS: X0-X7 entram, OK devolve out em X0/X1,
+                // erro devolve o código em X0 (convenção nossa, documentada).
+                hos::SvcArgs args;
+                for (int i = 0; i < 8; i++) args.x[i] = regs_[i];
+                hos::SvcResult r = kernel_->call(imm, args);
+                last_svc_ = r;
+                if (r == hos::RESULT_OK) {
+                    regs_[0] = args.out[0];
+                    regs_[1] = args.out[1];
+                } else {
+                    regs_[0] = static_cast<uint64_t>(r);
+                }
+                if (kernel_->exited()) { stopped_ = true; exit_code_ = 0; }
+            }
             else return false;
             pc_ += 4;
             steps_++;
@@ -662,6 +680,8 @@ private:
     std::array<double, 32> fpregs_{};
     std::vector<uint8_t> mem_;
     Mmu* mmu_ = nullptr;
+    hos::Kernel* kernel_ = nullptr;
+    hos::SvcResult last_svc_ = hos::RESULT_OK;
     uint64_t sp_ = 0;
     uint64_t pc_ = 0;
     uint64_t steps_ = 0;
