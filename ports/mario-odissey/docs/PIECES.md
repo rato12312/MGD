@@ -33,3 +33,12 @@ Odyssey provar que usa.
 3. GPU Mali-amigável até primeiro frame
 4. MGD assume apresentação (DNA, cache, incremental)
 5. Medir no A15, travar 30
+
+## Fronteira de execução (não extraível por peça)
+
+O coração (`System::Run`, `Load`, `ExecuteProgram` em `src/core/core.h`,
+com `cpu_manager`, `core_timing`, kernel e JIT) depende do Eden inteiro:
+não dá para levar só ele ao port sem levar o emulador junto.
+Estratégia mantida: modificar o Eden na base (já com MGD dentro) para o
+jogo executar, e o port dedicado cresce em volta com loader, serviços
+mínimos e apresentação MGD. Longo prazo, sem atalho.
