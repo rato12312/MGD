@@ -369,6 +369,18 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == 7, "10-3");
     }
 
+    // TPIDR_EL0 (TLS) + timer.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(5, 0xCAFE);
+        ASSERT_MSG(cpu.step(0xD51BD0A0u), "msr tpidr_el0,x5");
+        cpu.setReg(5, 0);
+        ASSERT_MSG(cpu.step(0xD53BD040u), "mrs x0,tpidr_el0");
+        ASSERT_MSG(cpu.reg(0) == 0xCAFE, "tls certo");
+        ASSERT_MSG(cpu.step(0xD53BE040u), "mrs x0,cntvct_el0");
+        ASSERT_MSG(cpu.reg(0) == 3, "timer = 3 instr");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

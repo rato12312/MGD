@@ -198,6 +198,27 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFFFFFE0) == 0xD53BD040) { // MRS Xd,TPIDR_EL0 (TLS)
+            int d = static_cast<int>(dec.rd);
+            if (d != 31) regs_[d] = tpidr_;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFFE0) == 0xD51BD040) { // MSR TPIDR_EL0,Xn
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            tpidr_ = (n == 31) ? 0 : regs_[n];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFFE0) == 0xD53BE040) { // MRS Xd,CNTVCT_EL0 (timer)
+            int d = static_cast<int>(dec.rd);
+            if (d != 31) regs_[d] = steps_; // contador = instruções executadas
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFFFF01F) == 0xD503201F) { // NOP e HINTs: aceita e segue
             pc_ += 4;
             steps_++;
@@ -422,6 +443,7 @@ private:
     uint64_t sp_ = 0;
     uint64_t pc_ = 0;
     uint64_t steps_ = 0;
+    uint64_t tpidr_ = 0;
     bool stopped_ = false;
     uint64_t exit_code_ = 0;
     bool flag_n_ = false, flag_z_ = false, flag_c_ = false, flag_v_ = false;
