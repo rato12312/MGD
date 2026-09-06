@@ -27,6 +27,7 @@ public:
     void applySwitches() {
         cpu_.setKernel(&kernel_);
         kernel_.setMmu(&mmu_);
+        kernel_.setRam(cpu_.ram(), cpu_.ramSize());
         mmu_.clear();
         if (switches_.mgd_translation) {
             mmu_.map(0x0, 0x0, cpu_.ramSize(), true, true, true);

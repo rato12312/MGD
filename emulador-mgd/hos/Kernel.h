@@ -13,8 +13,24 @@ namespace hos {
 // Números SVC do Horizon OS (subset inicial).
 enum SvcNumber : uint32_t {
     SVC_SET_HEAP_SIZE = 0x01,
+    SVC_QUERY_MEMORY = 0x05,
     SVC_EXIT_PROCESS = 0x06,
     SVC_GET_INFO = 0x29,
+};
+
+// Estados de memória (resumo honesto do HOS).
+enum MemState : uint32_t {
+    MEM_UNMAPPED = 0x00,
+    MEM_NORMAL = 0x03,
+};
+
+// Layout que escrevemos no guest: base(0) size(8) state(16) perm(20).
+// perm: bit0=r bit1=w bit2=x.
+struct MemInfo {
+    uint64_t base = 0;
+    uint64_t size = 0;
+    uint32_t state = MEM_UNMAPPED;
+    uint32_t perm = 0;
 };
 
 // Resultados (códigos reais do HOS, resumidos).
@@ -34,6 +50,7 @@ public:
     Kernel() = default;
 
     void setMmu(emu::Mmu* mmu) { mmu_ = mmu; }
+    void setRam(uint8_t* ram, uint64_t size) { ram_ = ram; ram_size_ = size; }
 
     uint64_t heapBase() const { return heap_base_; }
     uint64_t heapSize() const { return heap_size_; }
@@ -46,6 +63,27 @@ public:
                 heap_size_ = args.x[1];
                 args.out[0] = heap_base_;
                 if (mmu_ && heap_size_ > 0) mmu_->map(heap_base_, heap_base_, heap_size_, true, true, false);
+                return RESULT_OK;
+            }
+            case SVC_QUERY_MEMORY: {
+                // X0 = out (MemInfo no guest), X2 = endereço consultado.
+                if (!mmu_ || !ram_) return RESULT_INVALID_HANDLE;
+                MemInfo info;
+                const emu::MemRegion* r = mmu_->find(args.x[2]);
+                if (r) {
+                    info.base = r->va_base;
+                    info.size = r->size;
+                    info.state = MEM_NORMAL;
+                    info.perm = (r->r ? 1u : 0u) | (r->w ? 2u : 0u) | (r->x ? 4u : 0u);
+                }
+                uint64_t out = args.x[0];
+                if (out + sizeof(MemInfo) > ram_size_) return RESULT_INVALID_HANDLE;
+                uint8_t* d = ram_ + out;
+                for (int i = 0; i < 8; i++) d[i] = static_cast<uint8_t>(info.base >> (8 * i));
+                for (int i = 0; i < 8; i++) d[8 + i] = static_cast<uint8_t>(info.size >> (8 * i));
+                for (int i = 0; i < 4; i++) d[16 + i] = static_cast<uint8_t>(info.state >> (8 * i));
+                for (int i = 0; i < 4; i++) d[20 + i] = static_cast<uint8_t>(info.perm >> (8 * i));
+                args.out[0] = 0;
                 return RESULT_OK;
             }
             case SVC_EXIT_PROCESS: {

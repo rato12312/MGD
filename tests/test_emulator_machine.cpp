@@ -539,6 +539,32 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(emu.mmu().translate(emu.kernel().heapBase(), 1, false, false, pa), "heap mapeado");
     }
 
+    // QueryMemory responde a partir do mapa real.
+    {
+        emu::Emulator emu;
+        emu.switches().mgd_translation = false; // RAM direta p/ escrita do kernel
+        emu.applySwitches();
+        hos::SvcArgs a;
+        a.x[0] = 0x100; // out no guest
+        a.x[2] = 0x200; // consulta endereço mapeado (ram direta)
+        // sem mmu não há mapa: mapeia via tradução ligada rapidinho
+        emu.switches().mgd_translation = true;
+        emu.applySwitches();
+        ASSERT_MSG(emu.kernel().call(hos::SVC_QUERY_MEMORY, a) == hos::RESULT_OK, "query ok");
+        uint64_t base = 0, size = 0;
+        for (int i = 0; i < 8; i++) base |= static_cast<uint64_t>(emu.cpu().ram()[0x100 + i]) << (8 * i);
+        for (int i = 0; i < 8; i++) size |= static_cast<uint64_t>(emu.cpu().ram()[0x108 + i]) << (8 * i);
+        ASSERT_MSG(base == 0 && size == emu.cpu().ramSize(), "regiao identidade");
+        hos::SvcArgs b;
+        b.x[0] = 0x100;
+        b.x[2] = emu.cpu().ramSize() + 0x1000; // fora de tudo
+        ASSERT_MSG(emu.kernel().call(hos::SVC_QUERY_MEMORY, b) == hos::RESULT_OK, "query fora ok");
+        uint32_t state = 0;
+        for (int i = 0; i < 4; i++)
+            state |= static_cast<uint32_t>(emu.cpu().ram()[0x110 + i]) << (8 * i);
+        ASSERT_MSG(state == hos::MEM_UNMAPPED, "fora = unmapped");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

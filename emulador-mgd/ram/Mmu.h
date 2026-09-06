@@ -48,6 +48,13 @@ public:
 
     void clear() { regions_.clear(); }
 
+    const MemRegion* find(uint64_t va) const {
+        for (const auto& r : regions_) {
+            if (va >= r.va_base && va < r.va_base + r.size) return &r;
+        }
+        return nullptr;
+    }
+
     size_t regionCount() const { return regions_.size(); }
 
 private:
