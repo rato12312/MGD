@@ -313,7 +313,23 @@ public:
         if (top == 0xF8 || top == 0xF9) { // STR / LDR Xt,[Xn,#imm*8]
             return memAccess(dec, 8, top == 0xF9);
         }
-        if (top == 0xB8 || top == 0xB9) { // STR / LDR Wt (32-bit, zero-extend)
+        if (top == 0xB8 || top == 0xB9) { // STRW / LDRW / LDRSW
+            int opc = static_cast<int>((insn >> 22) & 0x3);
+            if (top == 0xB8 && opc == 0x2) { // LDRSW Xt (estende sinal)
+                int t = static_cast<int>(dec.rd);
+                int n = static_cast<int>(dec.rn);
+                uint64_t base = (n == 31) ? sp_ : regs_[n];
+                uint64_t addr = base + static_cast<uint64_t>(dec.imm12) * 4u;
+                uint64_t pa = 0;
+                if (!phys(addr, 4, false, false, pa)) return false;
+                uint32_t w = 0;
+                for (int i = 0; i < 4; i++)
+                    w |= static_cast<uint32_t>(mem_[static_cast<size_t>(pa) + i]) << (8 * i);
+                if (t != 31) regs_[t] = static_cast<uint64_t>(static_cast<int64_t>(static_cast<int32_t>(w)));
+                pc_ += 4;
+                steps_++;
+                return true;
+            }
             return memAccess(dec, 4, top == 0xB9);
         }
         if (top == 0x38 || top == 0x39) { // STRB / LDRB (byte)

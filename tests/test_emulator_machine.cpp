@@ -393,6 +393,16 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(0) == 0x77, "leu de volta");
     }
 
+    // LDRSW estende o sinal.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(2, 0x100);
+        cpu.setReg(1, 0xFFFFFFFFull);
+        ASSERT_MSG(cpu.step(0xB8000041u), "strw");
+        ASSERT_MSG(cpu.step(0xB8800020u), "ldrsw x0,[x1]");
+        ASSERT_MSG(cpu.reg(0) == 0xFFFFFFFFFFFFFFFFull, "sinal estendido");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
