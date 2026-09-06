@@ -316,6 +316,17 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.step(0xD503203Fu), "hint aceita");
     }
 
+    // AND / EOR com shift.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 0xF0);
+        cpu.setReg(2, 0x3C);
+        ASSERT_MSG(cpu.step(0x8A020025u), "and x5,x1,x2");
+        ASSERT_MSG(cpu.reg(5) == 0x30, "and certo");
+        ASSERT_MSG(cpu.step(0xCA020426u), "eor x6,x1,x2,lsl#1");
+        ASSERT_MSG(cpu.reg(6) == (0xF0ull ^ (0x3Cull << 1)), "eor+shift certo");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

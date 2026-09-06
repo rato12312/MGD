@@ -214,13 +214,19 @@ public:
             steps_++;
             return true;
         }
-        if (((insn >> 21) & 0x7FF) == 0x550) { // ORR 64-bit
+        if (((insn & 0xFF200000) == 0x8A000000 || (insn & 0xFF200000) == 0xAA000000 ||
+             (insn & 0xFF200000) == 0xCA000000) && ((insn >> 22) & 0x3) == 0x0) {
+            // AND / ORR / EOR 64-bit com LSL #n
+            int opc = static_cast<int>((insn >> 29) & 0x3);
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             int m = static_cast<int>(dec.rm);
+            int sh = static_cast<int>((insn >> 10) & 0x3F);
             uint64_t nv = (n == 31) ? 0 : regs_[n];
             uint64_t mv = (m == 31) ? 0 : regs_[m];
-            if (d != 31) regs_[d] = nv | mv;
+            uint64_t sv = (sh == 0) ? mv : (mv << sh);
+            uint64_t res = (opc == 0) ? (nv & sv) : (opc == 1) ? (nv | sv) : (nv ^ sv);
+            if (d != 31) regs_[d] = res;
             pc_ += 4;
             steps_++;
             return true;
