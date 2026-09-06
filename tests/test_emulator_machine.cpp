@@ -307,6 +307,15 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(0) == 17, "5+3*4");
     }
 
+    // NOP/HINT não travam o run.
+    {
+        emu::Cpu cpu;
+        uint64_t pc = cpu.pc();
+        ASSERT_MSG(cpu.step(0xD503201Fu), "nop");
+        ASSERT_MSG(cpu.pc() == pc + 4, "nop anda");
+        ASSERT_MSG(cpu.step(0xD503203Fu), "hint aceita");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

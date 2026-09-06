@@ -186,6 +186,11 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFFFF01F) == 0xD503201F) { // NOP e HINTs: aceita e segue
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFFFFC1F) == 0xD65F0000) { // RET Xn
             int n = static_cast<int>((insn >> 5) & 0x1F);
             pc_ = (n == 31) ? 0 : regs_[n];
