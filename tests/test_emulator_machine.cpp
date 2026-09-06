@@ -358,6 +358,17 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(0) == 0, "zero sem trap");
     }
 
+    // ADD / SUB registrado com shift.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 10);
+        cpu.setReg(2, 3);
+        ASSERT_MSG(cpu.step(0x8B020820u), "add x0,x1,x2,lsl#2");
+        ASSERT_MSG(cpu.reg(0) == 22, "10+3*4");
+        ASSERT_MSG(cpu.step(0xCB020023u), "sub x3,x1,x2");
+        ASSERT_MSG(cpu.reg(3) == 7, "10-3");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
