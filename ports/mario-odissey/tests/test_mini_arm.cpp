@@ -69,6 +69,28 @@ int main() {
         assert(cpu.pc() == pc);
     }
 
+    // run(): programinha depositado na RAM executa pelo PC
+    {
+        cpu.reset();
+        auto poke = [&](uint64_t addr, uint32_t insn) {
+            for (int i = 0; i < 4; i++)
+                cpu.ram()[addr + i] = static_cast<uint8_t>(insn >> (8 * i));
+        };
+        poke(0, 0xD28000E0u); // MOVZ X0, #7
+        poke(4, 0x91000C01u); // ADD X1, X0, #3
+        poke(8, 0xF8000041u); // STR X1, [X2]
+        poke(12, 0xD4000001u); // SVC #0 (para o run)
+        cpu.setReg(2, 0x200);
+        assert(cpu.run(16) == 3);
+        assert(cpu.reg(1) == 10);
+        assert(cpu.pc() == 12);
+        // X1 foi parar na RAM em 0x200
+        uint64_t v = 0;
+        for (int i = 0; i < 8; i++)
+            v |= static_cast<uint64_t>(cpu.ram()[0x200 + i]) << (8 * i);
+        assert(v == 10);
+    }
+
     cpu.reset();
     assert(cpu.pc() == 0 && cpu.reg(0) == 0 && cpu.steps() == 0);
 

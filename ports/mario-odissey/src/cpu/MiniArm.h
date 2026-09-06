@@ -50,6 +50,22 @@ public:
     uint8_t* ram() { return mem_.data(); }
     uint64_t ramSize() const { return RAM_SIZE; }
 
+    // Executa até maxSteps instruções buscando na RAM pelo PC.
+    // Para no primeiro opcode desconhecido ou fora da RAM.
+    // Retorna quantas instruções executou.
+    uint64_t run(uint64_t maxSteps) {
+        uint64_t done = 0;
+        while (done < maxSteps) {
+            if (pc_ + 4 > RAM_SIZE) break;
+            uint32_t insn = 0;
+            for (int i = 0; i < 4; i++)
+                insn |= static_cast<uint32_t>(mem_[pc_ + i]) << (8 * i);
+            if (!step(insn)) break;
+            done++;
+        }
+        return done;
+    }
+
     // Executa UMA instrução de 32 bits. Retorna false se opcode desconhecido.
     // Subconjunto ARMv8 64-bit (máscaras no byte alto / bits fixos):
     // - B <off26>              : 000101 (insn>>26 == 0x05)
