@@ -45,6 +45,30 @@ int main() {
     }
 
     assert(cpu.steps() == 7);
+
+    // STR X0, [X1] + LDR X5, [X1] (round-trip pela RAM)
+    cpu.reset();
+    assert(cpu.step(0xD2824680u)); // X0 = 0x1234
+    cpu.setReg(1, 0x100);          // X1 = base
+    assert(cpu.step(0xF8000020u)); // STR X0, [X1]
+    cpu.setReg(0, 0);
+    assert(cpu.step(0xF9400025u)); // LDR X5, [X1]
+    assert(cpu.reg(5) == 0x1234u);
+
+    // STR/LDR com offset: STR X5, [X1, #16] + LDR X6, [X1, #16]
+    assert(cpu.step(0xF8000825u)); // STR X5, [X1, #16]
+    cpu.setReg(5, 0);
+    assert(cpu.step(0xF9400866u)); // LDR X6, [X1, #16]
+    assert(cpu.reg(6) == 0x1234u);
+
+    // fora da RAM retorna false sem andar
+    {
+        cpu.setReg(1, cpu.ramSize() - 4);
+        uint64_t pc = cpu.pc();
+        assert(!cpu.step(0xF8000020u)); // STR X0, [X1] estoura
+        assert(cpu.pc() == pc);
+    }
+
     cpu.reset();
     assert(cpu.pc() == 0 && cpu.reg(0) == 0 && cpu.steps() == 0);
 

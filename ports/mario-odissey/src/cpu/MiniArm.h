@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <vector>
 
 #include "mgd/common/BitField.h"
 
@@ -20,12 +21,13 @@ union ArmInsn {
 };
 
 // Interpretador ARM64 mínimo do port (primeiro passo da execução).
-// Escopo deliberado: 31 registradores X + SP + PC e um punhado de
-// instruções (MOVZ, ADD/SUB imediato, ORR, B). Sem MMU, sem SVC, sem NEON.
-// Cada instrução nova entra com teste. O resto vem depois.
+// Escopo deliberado: 31 registradores X + SP + PC, RAM flat e um punhado de
+// instruções (MOVZ, ADD/SUB imediato, ORR, B, LDR/STR imediato 64-bit).
+// Sem MMU, sem SVC, sem NEON. Cada instrução nova entra com teste.
 class MiniArm {
 public:
     static constexpr int REG_COUNT = 31;
+    static constexpr uint64_t RAM_SIZE = 64 * 1024; // 64 KiB flat
 
     MiniArm() { reset(); }
 
@@ -34,13 +36,19 @@ public:
         sp_ = 0;
         pc_ = 0;
         steps_ = 0;
+        mem_.assign(RAM_SIZE, 0);
     }
 
     uint64_t reg(int i) const { return (i >= 0 && i < REG_COUNT) ? regs_[i] : 0; }
     void setReg(int i, uint64_t v) { if (i >= 0 && i < REG_COUNT) regs_[i] = v; }
+    uint64_t sp() const { return sp_; }
+    void setSp(uint64_t v) { sp_ = v; }
     uint64_t pc() const { return pc_; }
     void setPc(uint64_t v) { pc_ = v; }
     uint64_t steps() const { return steps_; }
+    // RAM crua (para o loader depositar binário / teste inspecionar)
+    uint8_t* ram() { return mem_.data(); }
+    uint64_t ramSize() const { return RAM_SIZE; }
 
     // Executa UMA instrução de 32 bits. Retorna false se opcode desconhecido.
     // Subconjunto ARMv8 64-bit (máscaras no byte alto / bits fixos):
@@ -93,11 +101,33 @@ public:
             steps_++;
             return true;
         }
-        return false; // opcode fora do escopo: chamador decide (TODO: SVC, LDR/STR, MMU)
+        if (top == 0xF8 || top == 0xF9) { // STR / LDR Xt,[Xn,#imm12*8]
+            bool isLoad = (top == 0xF9);
+            int t = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            uint64_t base = (n == 31) ? sp_ : regs_[n];
+            uint64_t addr = base + static_cast<uint64_t>(dec.imm12) * 8u;
+            if (addr + 8 > RAM_SIZE) return false; // fora da RAM: chamador decide
+            if (isLoad) {
+                uint64_t v = 0;
+                for (int i = 0; i < 8; i++)
+                    v |= static_cast<uint64_t>(mem_[addr + i]) << (8 * i);
+                if (t != 31) regs_[t] = v;
+            } else {
+                uint64_t v = (t == 31) ? 0 : regs_[t];
+                for (int i = 0; i < 8; i++)
+                    mem_[addr + i] = static_cast<uint8_t>(v >> (8 * i));
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        return false; // opcode fora do escopo: chamador decide (TODO: SVC, MMU)
     }
 
 private:
     std::array<uint64_t, REG_COUNT> regs_{};
+    std::vector<uint8_t> mem_;
     uint64_t sp_ = 0;
     uint64_t pc_ = 0;
     uint64_t steps_ = 0;
