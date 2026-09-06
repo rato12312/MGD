@@ -18,6 +18,7 @@ bool run_shader_cache_tests();
 bool run_pipeline_full_tests();
 bool run_seed_provider_tests();
 bool run_mmap_runtime_tests();
+bool run_emulator_odyssey_tests();
 
 struct TestResult {
     std::string name;
@@ -42,6 +43,7 @@ int main() {
     results.push_back({"PipelineFull", run_pipeline_full_tests()});
     results.push_back({"SeedProvider", run_seed_provider_tests()});
     results.push_back({"MMapRuntime", run_mmap_runtime_tests()});
+    results.push_back({"EmulatorOdyssey", run_emulator_odyssey_tests()});
 
     int passed = 0, failed = 0;
     for (auto& r : results) {
