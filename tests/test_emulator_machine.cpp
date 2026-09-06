@@ -624,6 +624,19 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == 0xFFFFFFFFFFFFFFFFull, "ou com not");
     }
 
+    // CSEL condicional.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 5);
+        ASSERT_MSG(cpu.step(0xF100001Fu), "subs z=1");
+        cpu.setReg(1, 11);
+        cpu.setReg(2, 22);
+        ASSERT_MSG(cpu.step(0x9A820420u), "csel x0,x1,x2,eq");
+        ASSERT_MSG(cpu.reg(0) == 11, "eq pega x1");
+        ASSERT_MSG(cpu.step(0x9A821423u), "csel x3,x1,x2,ne");
+        ASSERT_MSG(cpu.reg(3) == 22, "ne pega x2");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

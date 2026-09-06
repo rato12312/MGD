@@ -384,6 +384,32 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE00C00) == 0x9A800400) {
+            // CSEL / CSINC / CSINV / CSNEG Xd,Xn,Xm,cond
+            int op = static_cast<int>((insn >> 10) & 0x3);
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int cond = static_cast<int>((insn >> 12) & 0xF);
+            uint64_t nv = (n == 31) ? 0 : regs_[n];
+            uint64_t mv = (m == 31) ? 0 : regs_[m];
+            uint64_t res;
+            if (condTrue(cond)) {
+                res = nv;
+            } else if (op == 0) {
+                res = mv;
+            } else if (op == 1) {
+                res = mv + 1;
+            } else if (op == 2) {
+                res = ~mv;
+            } else {
+                res = ~mv + 1;
+            }
+            if (d != 31) regs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFFFF01F) == 0xD503201F) { // NOP e HINTs: aceita e segue
             pc_ += 4;
             steps_++;
@@ -706,6 +732,27 @@ public:
     }
 
 private:
+    bool condTrue(int cond) const {
+        switch (cond & 0xF) {
+            case 0x0: return flag_z_;
+            case 0x1: return !flag_z_;
+            case 0x2: return flag_c_;
+            case 0x3: return !flag_c_;
+            case 0x4: return flag_n_;
+            case 0x5: return !flag_n_;
+            case 0x6: return flag_v_;
+            case 0x7: return !flag_v_;
+            case 0x8: return flag_c_ && !flag_z_;
+            case 0x9: return !(flag_c_ && !flag_z_);
+            case 0xA: return flag_n_ == flag_v_;
+            case 0xB: return flag_n_ != flag_v_;
+            case 0xC: return !flag_z_ && (flag_n_ == flag_v_);
+            case 0xD: return flag_z_ || (flag_n_ != flag_v_);
+            case 0xE: return true;
+            default: return false;
+        }
+    }
+
     // VA -> PA (ou direto se sem MMU). false = fault.
     bool phys(uint64_t va, int size, bool w, bool x, uint64_t& pa) const {
         if (!mmu_) {
