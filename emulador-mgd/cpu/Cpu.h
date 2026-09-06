@@ -608,6 +608,29 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFC00000) == 0xFD000000 || (insn & 0xFFC00000) == 0xFD400000) {
+            // STR / LDR Dn,[Xn,#imm*8] (double bit-exato)
+            bool isLoad = (insn & 0xFFC00000) == 0xFD400000;
+            int t = static_cast<int>(insn & 0x1F);
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            uint64_t base = (n == 31) ? sp_ : regs_[n];
+            uint64_t addr = base + static_cast<uint64_t>((insn >> 10) & 0xFFF) * 8u;
+            uint64_t pa = 0;
+            if (!phys(addr, 8, !isLoad, false, pa)) return false;
+            if (isLoad) {
+                uint64_t v = 0;
+                for (int i = 0; i < 8; i++)
+                    v |= static_cast<uint64_t>(mem_[static_cast<size_t>(pa) + i]) << (8 * i);
+                fpregs_[t] = u2d(v);
+            } else {
+                uint64_t v = d2u(fpregs_[t]);
+                for (int i = 0; i < 8; i++)
+                    mem_[static_cast<size_t>(pa) + i] = static_cast<uint8_t>(v >> (8 * i));
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if (top == 0xB8 || top == 0xB9) { // STRW / LDRW / LDRSW
             int opc = static_cast<int>((insn >> 22) & 0x3);
             if (top == 0xB8 && opc == 0x2) { // LDRSW Xt (estende sinal)

@@ -672,6 +672,20 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == 7, "float 3+4");
     }
 
+    // LDR/STR double bit-exato.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 7);
+        ASSERT_MSG(cpu.step(0x1E660000u), "d0=7.0");
+        cpu.setReg(1, 0x100);
+        ASSERT_MSG(cpu.step(0xFD000020u), "str d0,[x1]");
+        ASSERT_MSG(cpu.step(0x1E6043E0u), "fmov d0,d31 (limpa)");
+        cpu.setReg(1, 0x100);
+        ASSERT_MSG(cpu.step(0xFD400022u), "ldr d2,[x1]");
+        ASSERT_MSG(cpu.step(0x1E620043u), "scvtf x3,d2");
+        ASSERT_MSG(cpu.reg(3) == 7, "double voltou");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
