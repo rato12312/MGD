@@ -583,6 +583,21 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(x != 0, "crc nao trivial");
     }
 
+    // LDR/STR com offset registrado.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 0x100);
+        cpu.setReg(2, 0x10);
+        cpu.setReg(0, 0x99);
+        ASSERT_MSG(cpu.step(0xF8226820u), "str x0,[x1,x2]");
+        cpu.setReg(0, 0);
+        ASSERT_MSG(cpu.step(0xF8626823u), "ldr x3,[x1,x2]");
+        ASSERT_MSG(cpu.reg(3) == 0x99, "offset reg certo");
+        cpu.setReg(2, 2);
+        ASSERT_MSG(cpu.step(0xF8627823u), "ldr x3,[x1,x2,lsl#3]");
+        ASSERT_MSG(cpu.reg(3) == 0x99, "lsl#3 certo");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

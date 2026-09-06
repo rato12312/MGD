@@ -474,6 +474,34 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE0FC00) == 0xF8206800 || (insn & 0xFFE0FC00) == 0xF8207800 ||
+            (insn & 0xFFE0FC00) == 0xF8606800 || (insn & 0xFFE0FC00) == 0xF8607800) {
+            // STR / LDR Xt,[Xn,Xm{,LSL #3}] (offset registrado, option=LSL)
+            uint32_t opt = insn & 0xFFE0FC00;
+            bool isLoad = (opt == 0xF8606800 || opt == 0xF8607800);
+            int t = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int s = static_cast<int>((insn >> 12) & 0x1);
+            uint64_t base = (n == 31) ? sp_ : regs_[n];
+            uint64_t off = (m == 31) ? 0 : regs_[m];
+            uint64_t addr = base + (s ? (off << 3) : off);
+            uint64_t pa = 0;
+            if (!phys(addr, 8, !isLoad, false, pa)) return false;
+            if (isLoad) {
+                uint64_t v = 0;
+                for (int i = 0; i < 8; i++)
+                    v |= static_cast<uint64_t>(mem_[static_cast<size_t>(pa) + i]) << (8 * i);
+                if (t != 31) regs_[t] = v;
+            } else {
+                uint64_t v = (t == 31) ? 0 : regs_[t];
+                for (int i = 0; i < 8; i++)
+                    mem_[static_cast<size_t>(pa) + i] = static_cast<uint8_t>(v >> (8 * i));
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if (top == 0xB8 || top == 0xB9) { // STRW / LDRW / LDRSW
             int opc = static_cast<int>((insn >> 22) & 0x3);
             if (top == 0xB8 && opc == 0x2) { // LDRSW Xt (estende sinal)
