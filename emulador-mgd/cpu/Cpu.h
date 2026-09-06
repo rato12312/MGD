@@ -247,6 +247,23 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE0FC00) == 0x1E602000 || (insn & 0xFFE0FC00) == 0x1E602800 ||
+            (insn & 0xFFE0FC00) == 0x1E603800 || (insn & 0xFFE0FC00) == 0x1E602400) {
+            // FMUL / FADD / FSUB / FDIV Dd,Dn,Dm
+            uint32_t base = insn & 0xFFE0FC00;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            double res = 0;
+            if (base == 0x1E602800) res = fpregs_[n] + fpregs_[m];
+            else if (base == 0x1E603800) res = fpregs_[n] - fpregs_[m];
+            else if (base == 0x1E602000) res = fpregs_[n] * fpregs_[m];
+            else res = fpregs_[n] / fpregs_[m];
+            fpregs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFC0FC00) == 0x1E604000) { // FMOV Dd,Dn
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);

@@ -427,6 +427,21 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(1) == 42, "round-trip double");
     }
 
+    // FADD / FMUL double.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 3);
+        cpu.setReg(1, 4);
+        ASSERT_MSG(cpu.step(0x1E660000u), "scvtf d0,x0 (3.0)");
+        ASSERT_MSG(cpu.step(0x1E660021u), "scvtf d1,x1 (4.0)");
+        ASSERT_MSG(cpu.step(0x1E612802u), "fadd d2,d0,d1");
+        ASSERT_MSG(cpu.step(0x1E620043u), "scvtf x3,d2");
+        ASSERT_MSG(cpu.reg(3) == 7, "3+4");
+        ASSERT_MSG(cpu.step(0x1E612004u), "fmul d4,d0,d1");
+        ASSERT_MSG(cpu.step(0x1E620085u), "scvtf x5,d4");
+        ASSERT_MSG(cpu.reg(5) == 12, "3*4");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
