@@ -1,7 +1,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
-#include "eden/common/bit_field.h"
+#include "common/bit_field.h"
 
 // Prova que o BitField vendorado do Eden decodifica instrução ARM64:
 // ADD X2, X0, #5 = 0x91001402 -> Rd=2, Rn=0, imm12=5.
