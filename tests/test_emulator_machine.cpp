@@ -657,6 +657,21 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == 4, "abs volta");
     }
 
+    // Float 32-bit: double->float->soma->double->int.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 3);
+        cpu.setReg(1, 4);
+        ASSERT_MSG(cpu.step(0x1E660000u), "d0=3.0");
+        ASSERT_MSG(cpu.step(0x1E660021u), "d1=4.0");
+        ASSERT_MSG(cpu.step(0x1E624000u), "fcvt s0,d0");
+        ASSERT_MSG(cpu.step(0x1E624021u), "fcvt s1,d1");
+        ASSERT_MSG(cpu.step(0x1E212002u), "fadd s2,s0,s1");
+        ASSERT_MSG(cpu.step(0x1E22C042u), "fcvt d2,s2");
+        ASSERT_MSG(cpu.step(0x1E620043u), "scvtf x3,d2");
+        ASSERT_MSG(cpu.reg(3) == 7, "float 3+4");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

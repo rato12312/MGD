@@ -310,6 +310,41 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE03C00) == 0x1E200000 || (insn & 0xFFE03C00) == 0x1E202000 ||
+            (insn & 0xFFE03C00) == 0x1E203000 || (insn & 0xFFE03C00) == 0x1E201000) {
+            // FMUL / FADD / FSUB / FDIV Sd,Sn,Sm (float, precisão simples)
+            uint32_t base = insn & 0xFFE03C00;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            float a = static_cast<float>(fpregs_[n]);
+            float b = static_cast<float>(fpregs_[m]);
+            float res = 0;
+            if (base == 0x1E202000) res = a + b;
+            else if (base == 0x1E203000) res = a - b;
+            else if (base == 0x1E200000) res = a * b;
+            else res = a / b;
+            fpregs_[d] = static_cast<double>(res);
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFC0FC00) == 0x1E624000) { // FCVT Sd,Dn (double->float)
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            fpregs_[d] = static_cast<double>(static_cast<float>(fpregs_[n]));
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFC0FC00) == 0x1E22C000) { // FCVT Dd,Sn (float->double)
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            fpregs_[d] = fpregs_[n]; // já guardado como double do float
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFC0FC00) == 0x1E604000) { // FMOV Dd,Dn
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
