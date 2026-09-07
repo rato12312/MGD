@@ -19,31 +19,25 @@ public:
 
     bool write32(uint64_t addr, uint32_t v) {
         if (addr + 4 > size()) return false;
-        for (int i = 0; i < 4; i++)
-            mem_[static_cast<size_t>(addr) + i] = static_cast<uint8_t>(v >> (8 * i));
+        __builtin_memcpy(&mem_[static_cast<size_t>(addr)], &v, 4);
         return true;
     }
 
     bool read32(uint64_t addr, uint32_t& out) const {
         if (addr + 4 > size()) return false;
-        out = 0;
-        for (int i = 0; i < 4; i++)
-            out |= static_cast<uint32_t>(mem_[static_cast<size_t>(addr) + i]) << (8 * i);
+        __builtin_memcpy(&out, &mem_[static_cast<size_t>(addr)], 4);
         return true;
     }
 
     bool write64(uint64_t addr, uint64_t v) {
         if (addr + 8 > size()) return false;
-        for (int i = 0; i < 8; i++)
-            mem_[static_cast<size_t>(addr) + i] = static_cast<uint8_t>(v >> (8 * i));
+        __builtin_memcpy(&mem_[static_cast<size_t>(addr)], &v, 8);
         return true;
     }
 
     bool read64(uint64_t addr, uint64_t& out) const {
         if (addr + 8 > size()) return false;
-        out = 0;
-        for (int i = 0; i < 8; i++)
-            out |= static_cast<uint64_t>(mem_[static_cast<size_t>(addr) + i]) << (8 * i);
+        __builtin_memcpy(&out, &mem_[static_cast<size_t>(addr)], 8);
         return true;
     }
 
