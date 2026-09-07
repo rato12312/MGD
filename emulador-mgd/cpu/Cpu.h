@@ -717,6 +717,32 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE00C00) == 0x1A800400) {
+            // CSEL / CSINC / CSINV / CSNEG Wd,Wn,Wm,cond (32-bit, zero-extend)
+            int op = static_cast<int>((insn >> 10) & 0x3);
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int cond = static_cast<int>((insn >> 12) & 0xF);
+            uint32_t nv = (n == 31) ? 0 : static_cast<uint32_t>(regs_[n]);
+            uint32_t mv = (m == 31) ? 0 : static_cast<uint32_t>(regs_[m]);
+            uint32_t res;
+            if (condTrue(cond)) {
+                res = nv;
+            } else if (op == 0) {
+                res = mv;
+            } else if (op == 1) {
+                res = mv + 1;
+            } else if (op == 2) {
+                res = ~mv;
+            } else {
+                res = ~mv + 1;
+            }
+            if (d != 31) regs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFE00C00) == 0x9A800400) {
             // CSEL / CSINC / CSINV / CSNEG Xd,Xn,Xm,cond
             int op = static_cast<int>((insn >> 10) & 0x3);

@@ -2134,6 +2134,17 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.pc() == pc + 8, "comparou igual 32");
     }
 
+    // CSEL 32-bit.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 5);
+        ASSERT_MSG(cpu.step(0xF100001Fu), "subs z=1");
+        cpu.setReg(1, 11);
+        cpu.setReg(2, 22);
+        ASSERT_MSG(cpu.step(0x1A820420u), "csel w0,w1,w2,eq");
+        ASSERT_MSG(cpu.reg(0) == 11, "eq pega w1");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
