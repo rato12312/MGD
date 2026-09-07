@@ -272,7 +272,7 @@ bool run_emulator_machine_tests() {
     {
         emu::Cpu cpu;
         cpu.setReg(0, 7);
-        ASSERT_MSG(cpu.step(0xF1000FE0u), "subs xzr,x0,#7");
+        ASSERT_MSG(cpu.step(0xF1001C1Fu), "subs xzr,x0,#7");
         ASSERT_MSG(cpu.reg(0) == 7, "subs nao escreve xzr");
         uint64_t pc = cpu.pc();
         ASSERT_MSG(cpu.step(0x54000040u), "b.eq pula (z=1)");
