@@ -25,6 +25,7 @@
 #include "emulador-mgd/hos/HidService.h"
 #include "emulador-mgd/hos/LblService.h"
 #include "emulador-mgd/hos/PsmService.h"
+#include "emulador-mgd/hos/SetService.h"
 #include "emulador-mgd/hos/TimeService.h"
 #include "emulador-mgd/hos/ServiceManager.h"
 #include "emulador-mgd/hos/Thread.h"
@@ -1626,6 +1627,20 @@ bool run_emulator_machine_tests() {
         float b = 0;
         std::memcpy(&b, &u, 4);
         ASSERT_MSG(b == 1.0f, "brilho 1.0");
+    }
+
+    // Idioma en-US e região Américas.
+    {
+        hos::SetService set;
+        hos::IpcMessage g;
+        hos::IpcMessage r;
+        g.cmd = 1;
+        ASSERT_MSG(set.dispatch(g, r) && r.cmd == 1, "idioma veio");
+        ASSERT_MSG(r.payload.size() == 8 && r.payload[0] == 'e' && r.payload[4] == 'S',
+                   "en-US");
+        g.cmd = 2;
+        hos::IpcMessage rr;
+        ASSERT_MSG(set.dispatch(g, rr) && rr.payload[0] == 1, "americas");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;

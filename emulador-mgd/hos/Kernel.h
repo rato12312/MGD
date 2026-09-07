@@ -15,6 +15,7 @@
 #include "HidService.h"
 #include "LblService.h"
 #include "PsmService.h"
+#include "SetService.h"
 #include "TimeService.h"
 #include "NvService.h"
 #include "ViService.h"
@@ -136,6 +137,7 @@ public:
         services_.publish("apm");     // performance (handheld)
         services_.publish("psm");     // bateria
         services_.publish("lbl:u");   // brilho
+        services_.publish("set:sys"); // idioma/região
     }
 
     // Bomba: um pedido pendente por sessão anda até o serviço dono.
@@ -157,6 +159,7 @@ public:
             else if (name == "apm") understood = apm_.dispatch(req, rep);
             else if (name == "psm") understood = psm_.dispatch(req, rep);
             else if (name == "lbl:u") understood = lbl_.dispatch(req, rep);
+            else if (name == "set:sys") understood = set_.dispatch(req, rep);
             if (understood && kv.second->sendReply(rep)) done++;
         }
         return done;
@@ -170,6 +173,7 @@ public:
     ApmService& apm() { return apm_; }
     PsmService& psm() { return psm_; }
     LblService& lbl() { return lbl_; }
+    SetService& set() { return set_; }
 
     SvcResult call(uint32_t num, SvcArgs& args) {
         switch (num) {
@@ -274,6 +278,7 @@ private:
     ApmService apm_;
     PsmService psm_;
     LblService lbl_;
+    SetService set_;
 };
 
 } // namespace hos
