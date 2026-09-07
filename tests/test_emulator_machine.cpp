@@ -749,6 +749,17 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == 4, "pl pega maior");
     }
 
+    // ADDW/SUBW 32-bit com wrap.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 0xFFFFFFFFull);
+        ASSERT_MSG(cpu.step(0x11000400u), "addw w0,w0,#1");
+        ASSERT_MSG(cpu.reg(0) == 0, "wrap 32-bit");
+        cpu.setReg(1, 5);
+        ASSERT_MSG(cpu.step(0x51002021u), "subw w1,w1,#8");
+        ASSERT_MSG(cpu.reg(1) == 0xFFFFFFFDull, "5-8 wrap zero-extend");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

@@ -138,6 +138,34 @@ public:
             steps_++;
             return true;
         }
+        if (top == 0x11 || top == 0x51 || top == 0x31 || top == 0x71) {
+            // ADDW / SUBW / ADDSW / SUBSW (32-bit, zero-extend)
+            bool isAdd = (top == 0x11 || top == 0x31);
+            bool setFlags = (top == 0x31 || top == 0x71);
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            uint32_t imm = static_cast<uint32_t>(dec.imm12);
+            if (insn & 0x00400000) imm <<= 12;
+            uint32_t nv = (n == 31) ? 0 : static_cast<uint32_t>(regs_[n]);
+            uint32_t res = isAdd ? (nv + imm) : (nv - imm);
+            if (d != 31) regs_[d] = res;
+            if (setFlags) {
+                flag_n_ = (res >> 31) != 0;
+                flag_z_ = (res == 0);
+                if (isAdd) {
+                    flag_c_ = res < nv;
+                    bool sn = ((nv >> 31) != 0), si = ((imm >> 31) != 0), sr = flag_n_;
+                    flag_v_ = (sn == si) && (sr != sn);
+                } else {
+                    flag_c_ = nv >= imm;
+                    bool sn = ((nv >> 31) != 0), si = ((imm >> 31) != 0), sr = flag_n_;
+                    flag_v_ = (sn != si) && (sr != sn);
+                }
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if (top == 0x91 || top == 0xD1 || top == 0xB1 || top == 0xF1) {
             // ADD / SUB / ADDS / SUBS imediato 64-bit
             bool isAdd = (top == 0x91 || top == 0xB1);
