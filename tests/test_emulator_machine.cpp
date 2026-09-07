@@ -1411,6 +1411,19 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(t.dispatch(s, sr) && t.now() == 1800000000ull, "hora ajustada");
     }
 
+    // Processos: cria, lê, mata.
+    {
+        hos::Kernel kernel;
+        uint64_t game = kernel.createProcess("odyssey");
+        uint64_t applet = kernel.createProcess("miiEdit");
+        ASSERT_MSG(game != applet, "pids únicos");
+        hos::Process p;
+        ASSERT_MSG(kernel.getProcess(game, p) && p.name == "odyssey", "jogo achado");
+        ASSERT_MSG(kernel.killProcess(applet), "applet morreu");
+        ASSERT_MSG(!kernel.getProcess(applet, p), "morto nega");
+        ASSERT_MSG(kernel.processCount() == 1, "resta o jogo");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

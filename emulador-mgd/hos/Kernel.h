@@ -5,6 +5,7 @@
 
 #include <cstdint>
 
+#include <string>
 #include <unordered_map>
 
 #include "../ram/Mmu.h"
@@ -60,9 +61,28 @@ struct SvcArgs {
     uint64_t out[2] = {0, 0};                 // X0-X1 na saída
 };
 
+struct Process {
+    uint64_t pid = 0;
+    std::string name;
+};
+
 class Kernel : public emu::SvcHost {
 public:
     Kernel() = default;
+
+    uint64_t createProcess(const std::string& name) {
+        uint64_t pid = next_pid_++;
+        processes_[pid] = Process{pid, name};
+        return pid;
+    }
+    bool getProcess(uint64_t pid, Process& out) const {
+        auto it = processes_.find(pid);
+        if (it == processes_.end()) return false;
+        out = it->second;
+        return true;
+    }
+    bool killProcess(uint64_t pid) { return processes_.erase(pid) > 0; }
+    size_t processCount() const { return processes_.size(); }
 
     // Handles: id opaco -> etiqueta (sessão, porta, thread...).
     uint32_t createHandle(uint32_t tag) {
@@ -226,6 +246,8 @@ private:
     uint64_t heap_size_ = 0;
     bool exited_ = false;
     uint64_t slept_ns_ = 0;
+    uint64_t next_pid_ = 1;
+    std::unordered_map<uint64_t, Process> processes_;
     uint32_t next_handle_ = 1;
     std::unordered_map<uint32_t, uint32_t> handles_;
     emu::Mmu* mmu_ = nullptr;
