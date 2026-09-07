@@ -11,6 +11,7 @@
 #include "emulador-mgd/loader/NroLoader.h"
 #include "emulador-mgd/hos/Kernel.h"
 #include "emulador-mgd/hos/Session.h"
+#include "emulador-mgd/hos/PortRegistry.h"
 #include "emulador-mgd/hos/Thread.h"
 
 static void poke32(emu::Cpu& cpu, uint64_t addr, uint32_t insn) {
@@ -1170,6 +1171,22 @@ bool run_emulator_machine_tests() {
         hos::IpcMessage back;
         ASSERT_MSG(s.recvReply(back) && back.cmd == 2, "cliente leu");
         ASSERT_MSG(!s.recvReply(back), "fila vazia nega");
+    }
+
+    // Porta nomeada vira sessão ligada.
+    {
+        hos::PortRegistry ports;
+        ASSERT_MSG(ports.registerPort("sm:"), "registrou sm:");
+        ASSERT_MSG(!ports.registerPort("sm:"), "duplicada nega");
+        std::shared_ptr<hos::Session> cli, srv;
+        ASSERT_MSG(ports.connect("sm:", cli, srv), "conectou");
+        std::shared_ptr<hos::Session> bad_c, bad_s;
+        ASSERT_MSG(!ports.connect("nope:", bad_c, bad_s), "inexistente nega");
+        hos::IpcMessage req;
+        req.cmd = 99;
+        ASSERT_MSG(cli->sendRequest(req), "cliente pede");
+        hos::IpcMessage got;
+        ASSERT_MSG(srv->recvRequest(got) && got.cmd == 99, "servidor recebe");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
