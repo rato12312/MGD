@@ -642,6 +642,14 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFC0FC00) == 0x1E680000) { // FMOV Xd,Dn (bits)
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            if (d != 31) regs_[d] = fp_.q[n][0];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFC0FC00) == 0x1E604000) { // FMOV Dd,Dn
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);

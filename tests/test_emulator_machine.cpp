@@ -2096,6 +2096,15 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == 7, "float 32 voltou");
     }
 
+    // FMOV Xd,Dn: bits do double no GPR.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 7);
+        ASSERT_MSG(cpu.step(0x1E660000u), "d0=7.0");
+        ASSERT_MSG(cpu.step(0x1E680001u), "fmov x1,d0");
+        ASSERT_MSG(cpu.reg(1) == 0x401C000000000000ull, "bits de 7.0");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
