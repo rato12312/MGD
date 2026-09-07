@@ -2197,6 +2197,18 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(ok, "128 bits intactos");
     }
 
+    // FNMUL escalar.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 3);
+        cpu.setReg(1, 4);
+        ASSERT_MSG(cpu.step(0x1E660000u), "d0=3.0");
+        ASSERT_MSG(cpu.step(0x1E660021u), "d1=4.0");
+        ASSERT_MSG(cpu.step(0x1EE18002u), "fnmul d2,d0,d1");
+        ASSERT_MSG(cpu.step(0x1E620043u), "scvtf x3,d2");
+        ASSERT_MSG(cpu.reg(3) == static_cast<uint64_t>(-12), "-(3*4)");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

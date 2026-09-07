@@ -376,8 +376,9 @@ public:
         }
         if ((insn & 0xFFE03C00) == 0x1EE00000 || (insn & 0xFFE03C00) == 0x1EE02000 ||
             (insn & 0xFFE03C00) == 0x1EE03000 || (insn & 0xFFE03C00) == 0x1EE01000 ||
-            (insn & 0xFFE03C00) == 0x1EE04000 || (insn & 0xFFE03C00) == 0x1EE05000) {
-            // FMUL / FADD / FSUB / FDIV / FMAX / FMIN Dd,Dn,Dm
+            (insn & 0xFFE03C00) == 0x1EE04000 || (insn & 0xFFE03C00) == 0x1EE05000 ||
+            (insn & 0xFFE03C00) == 0x1EE08000) {
+            // FMUL / FADD / FSUB / FDIV / FMAX / FMIN / FNMUL Dd,Dn,Dm
             uint32_t base = insn & 0xFFE03C00;
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
@@ -389,6 +390,7 @@ public:
             else if (base == 0x1EE00000) res = a * b;
             else if (base == 0x1EE04000) res = (a >= b) ? a : b;
             else if (base == 0x1EE05000) res = (a <= b) ? a : b;
+            else if (base == 0x1EE08000) res = -(a * b);
             else res = a / b;
             fp_.d[d] = res;
             pc_ += 4;
