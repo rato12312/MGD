@@ -962,6 +962,20 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(2) == 0x5A, "aquire certo");
     }
 
+    // SWPAL troca.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(2, 0x100);
+        cpu.setReg(1, 0xAA);
+        cpu.setReg(0, 0xBB);
+        ASSERT_MSG(cpu.step(0xF8000041u), "str x1,[x2] base");
+        cpu.setReg(1, 0xCC);
+        ASSERT_MSG(cpu.step(0xC8ECFC40u), "swpal x0,x1,[x2]");
+        ASSERT_MSG(cpu.reg(0) == 0xAA, "velho em x0");
+        ASSERT_MSG(cpu.step(0xF9400041u), "ldr x1,[x2]");
+        ASSERT_MSG(cpu.reg(1) == 0xCC, "novo na ram");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

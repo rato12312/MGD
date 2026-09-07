@@ -336,6 +336,20 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE0FC00) == 0xC8EBFC00) { // SWPAL Xt,Xs,[Xn]
+            int t = static_cast<int>(dec.rd);
+            int s = static_cast<int>((insn >> 16) & 0x1F);
+            int n = static_cast<int>(dec.rn);
+            uint64_t base = (n == 31) ? sp_ : regs_[n];
+            bool ok = true;
+            uint64_t old = load64(base, ok);
+            if (!ok) return false;
+            if (!store64(base, (s == 31) ? 0 : regs_[s])) return false;
+            if (t != 31) regs_[t] = old;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFE0FC00) == 0xC8007C00) { // STLXR Ws,Xt,[Xn] (sempre vence)
             int s = static_cast<int>(dec.rd);
             int t = static_cast<int>((insn >> 16) & 0x1F);
