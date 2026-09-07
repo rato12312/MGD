@@ -88,6 +88,39 @@ inline void encryptEcb(const uint8_t key[16], const uint8_t in[16], uint8_t out[
     detail::encryptBlock(rk, in, out);
 }
 
+// CMAC (SP 800-38B): autentica blocos (cabeçalho NCA usa).
+inline void cmac(const uint8_t key[16], const uint8_t* msg, size_t len, uint8_t out[16]) {
+    uint8_t rk[176];
+    detail::expandKey(key, rk);
+    uint8_t L[16] = {0};
+    detail::encryptBlock(rk, L, L);
+    uint8_t K1[16], K2[16];
+    bool msb = (L[0] & 0x80) != 0;
+    for (int i = 0; i < 15; i++) K1[i] = (L[i] << 1) | (L[i + 1] >> 7);
+    K1[15] = (L[15] << 1) ^ (msb ? 0x87 : 0);
+    msb = (K1[0] & 0x80) != 0;
+    for (int i = 0; i < 15; i++) K2[i] = (K1[i] << 1) | (K1[i + 1] >> 7);
+    K2[15] = (K1[15] << 1) ^ (msb ? 0x87 : 0);
+    size_t nblocks = len == 0 ? 1 : (len + 15) / 16;
+    bool last_complete = len > 0 && (len % 16 == 0);
+    uint8_t X[16] = {0};
+    for (size_t b = 0; b + 1 < nblocks; b++) {
+        for (int i = 0; i < 16; i++) X[i] ^= msg[b * 16 + i];
+        detail::encryptBlock(rk, X, X);
+    }
+    uint8_t last[16] = {0};
+    if (last_complete) {
+        for (int i = 0; i < 16; i++) last[i] = msg[(nblocks - 1) * 16 + i] ^ K1[i];
+    } else {
+        size_t rem = len - (nblocks - 1) * 16;
+        for (size_t i = 0; i < rem; i++) last[i] = msg[(nblocks - 1) * 16 + i];
+        last[rem] = 0x80;
+        for (int i = 0; i < 16; i++) last[i] ^= K2[i];
+    }
+    for (int i = 0; i < 16; i++) X[i] ^= last[i];
+    detail::encryptBlock(rk, X, out);
+}
+
 // CTR: keystream = E(nonce||ctr BE), XOR nos dados. Criptografa = descriptografa.
 inline void cryptCtr(const uint8_t key[16], const uint8_t nonce12[12], const uint8_t* in,
                      uint8_t* out, size_t len, uint32_t ctr0 = 0) {

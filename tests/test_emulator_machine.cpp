@@ -1754,6 +1754,16 @@ bool run_emulator_machine_tests() {
         bool diff = false;
         for (int i = 0; i < 40; i++) diff = diff || (enc[i] != msg[i]);
         ASSERT_MSG(diff, "CTR embaralhou");
+        // CMAC NIST: key 2b7e..., msg vazio -> bb1d6929e95937287fa37d129b756746
+        uint8_t k2[16] = {0x2B, 0x7E, 0x15, 0x16, 0x28, 0xAE, 0xD2, 0xA6,
+                          0xAB, 0xF7, 0x15, 0x88, 0x09, 0xCF, 0x4F, 0x3C};
+        uint8_t tag[16] = {0};
+        emu::aes::cmac(k2, nullptr, 0, tag);
+        const uint8_t want2[16] = {0xBB, 0x1D, 0x69, 0x29, 0xE9, 0x59, 0x37, 0x28,
+                                   0x7F, 0xA3, 0x7D, 0x12, 0x9B, 0x75, 0x67, 0x46};
+        bool ok2 = true;
+        for (int i = 0; i < 16; i++) ok2 = ok2 && (tag[i] == want2[i]);
+        ASSERT_MSG(ok2, "NIST CMAC bate");
     }
 
     // SHA-256: vetor NIST "abc".
