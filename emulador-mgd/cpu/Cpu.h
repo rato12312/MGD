@@ -662,6 +662,29 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFF800000) == 0x53000000 && !(insn & 0x400000)) {
+            // UBFM 32-bit (LSL/LSR W): resultado zero-extend
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            uint64_t r = (insn >> 16) & 0x1F, s = (insn >> 10) & 0x1F;
+            uint32_t src = (n == 31) ? 0 : static_cast<uint32_t>(regs_[n]);
+            uint64_t res;
+            if (s >= r) {
+                uint32_t w = (s == 31 && r == 0) ? 0xFFFFFFFFu
+                             : static_cast<uint32_t>((((1ull << (s + 1)) - 1ull) >> r) << r);
+                uint32_t rot = (r == 0) ? src : (src >> r) | (src << (32 - r));
+                res = rot & w;
+            } else {
+                uint32_t lo = static_cast<uint32_t>((1ull << (s + 1)) - 1ull);
+                uint32_t hi = static_cast<uint32_t>(0xFFFFFFFFull << r);
+                uint32_t rot = (src >> r) | (src << (32 - r));
+                res = rot & (lo | hi);
+            }
+            if (d != 31) regs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFF800000) == 0xD3000000 && (insn & 0x400000)) {
             // UBFM 64-bit (cobre LSL/LSR imediato): dst = ROR(src,R) & wmask
             int d = static_cast<int>(dec.rd);

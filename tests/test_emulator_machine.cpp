@@ -1034,6 +1034,17 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(0) == 0x7F, "mantem");
     }
 
+    // UBFM 32-bit.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 0xFF);
+        ASSERT_MSG(cpu.step(0x53185C20u), "lsl w0,w1,#8");
+        ASSERT_MSG(cpu.reg(0) == 0xFF00, "lsl w");
+        cpu.setReg(1, 0xFF0);
+        ASSERT_MSG(cpu.step(0x53047C22u), "lsr w2,w1,#4");
+        ASSERT_MSG(cpu.reg(2) == 0xFF, "lsr w");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
