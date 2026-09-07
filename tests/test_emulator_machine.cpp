@@ -11,6 +11,11 @@
 #include "emulador-mgd/loader/NroLoader.h"
 #include "emulador-mgd/hos/Kernel.h"
 #include "emulador-mgd/hos/Thread.h"
+
+static void poke32(emu::Cpu& cpu, uint64_t addr, uint32_t insn) {
+    for (int i = 0; i < 4; i++)
+        cpu.ram()[addr + i] = static_cast<uint8_t>(insn >> (8 * i));
+}
 #include "emulador-mgd/ram/Mmu.h"
 #include "core/query/RegionPolygonCache.h"
 
@@ -1098,6 +1103,39 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(0) == 120, "fat(5)=120");
         ASSERT_MSG(cpu.sp() == 0x8000, "pilha zerada");
         (void)done;
+    }
+
+    // Main cria worker; worker aloca heap e grava marcador.
+    {
+        emu::Cpu cpu;
+        hos::Kernel kernel;
+        cpu.setSvcHost(&kernel);
+        // main @0: X1=0x40 entry, X2=0x9000 sp, CreateThread, SVC#0
+        poke32(cpu, 0x00, 0xD2800801u); // MOVZ X1, #0x40
+        poke32(cpu, 0x04, 0xD2920002u); // MOVZ X2, #0x9000
+        poke32(cpu, 0x08, 0xD4000101u); // SVC #8 CreateThread
+        poke32(cpu, 0x0C, 0xD4000001u); // SVC#0
+        // worker @0x40: heap=64, marcador 0xB em [0x100], SVC#0
+        poke32(cpu, 0x40, 0xD2800801u); // MOVZ X1, #64
+        poke32(cpu, 0x44, 0xD4000021u); // SVC #1 SetHeapSize
+        poke32(cpu, 0x48, 0xD2802000u); // MOVZ X0, #0x100
+        poke32(cpu, 0x4C, 0xD2800162u); // MOVZ X2, #0xB
+        poke32(cpu, 0x50, 0xF8000020u); // STR X2, [X0]
+        poke32(cpu, 0x54, 0xD4000001u); // SVC#0
+        cpu.setSp(0x8000);
+        kernel.setRam(cpu.ram(), cpu.ramSize());
+        cpu.setPc(0);
+        uint64_t d1 = cpu.run(8);
+        ASSERT_MSG(d1 == 4, "main criou e saiu");
+        ASSERT_MSG(kernel.scheduler().pending() == 1, "worker na fila");
+        uint64_t d2 = kernel.runThreads(cpu, 32, 8);
+        ASSERT_MSG(d2 == 6, "worker rodou 6");
+        ASSERT_MSG(kernel.heapSize() == 64, "heap 64");
+        ASSERT_MSG(kernel.scheduler().pending() == 0, "fila vazia");
+        uint64_t mark = 0;
+        for (int i = 0; i < 8; i++)
+            mark |= static_cast<uint64_t>(cpu.ram()[0x100 + i]) << (8 * i);
+        ASSERT_MSG(mark == 0xB, "marcador do worker");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
