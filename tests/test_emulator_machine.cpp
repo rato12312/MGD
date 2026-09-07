@@ -2219,6 +2219,18 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == static_cast<uint64_t>(-12), "-(3*4)");
     }
 
+    // DC ZVA zera 64 bytes; IC IVAU aceita.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 0x100);
+        cpu.setReg(1, 0xFFFFFFFFFFFFFFFFull);
+        ASSERT_MSG(cpu.step(0xF8000001u), "str x1,[x0]");
+        ASSERT_MSG(cpu.step(0xD50B7420u), "dc zva, x0");
+        ASSERT_MSG(cpu.step(0xF9400042u), "ldr x2,[x0]");
+        ASSERT_MSG(cpu.reg(2) == 0, "zerou");
+        ASSERT_MSG(cpu.step(0xD50B7520u), "ic ivau, x0");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

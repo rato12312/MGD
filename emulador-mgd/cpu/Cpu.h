@@ -896,6 +896,21 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFFFFFE0) == 0xD50B7420) { // DC ZVA, Xt (zera 64 bytes)
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            uint64_t base = (n == 31) ? sp_ : regs_[n];
+            uint64_t pa = 0;
+            if (!phys(base, 64, true, false, pa)) return false;
+            for (int i = 0; i < 64; i++) mem_[static_cast<size_t>(pa) + i] = 0;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFFE0) == 0xD50B7520) { // IC IVAU, Xt (single-thread: nada)
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFFFF01F) == 0xD503201F) { // NOP e HINTs: aceita e segue
             pc_ += 4;
             steps_++;
