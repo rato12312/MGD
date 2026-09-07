@@ -20,7 +20,9 @@ public:
     // cmd 3 = Submit: payload = id(4) + bytes do command buffer;
     //         enfileira e responde fence id. Execução vem depois.
     // cmd 4 = QueryFence: payload = fence; responde 1 pronto / 0 fila.
-    // outro cmd = não entendido (false).
+    // cmd 5 = GetFence: payload = fence; responde 1 pronto / 0 fila (alias).
+    // cmd 6 = WaitFence: payload = fence; bloqueia até pronto (simulado).
+    // cmd 7 = GetInfo: payload = 0; responde info do driver.
     bool dispatch(const IpcMessage& req, IpcMessage& rep) {
         if (req.cmd == 1) {
             uint32_t tag = req.payload.empty() ? 0 : req.payload[0];
@@ -38,7 +40,8 @@ public:
                 rep.cmd = 0;
                 return true;
             }
-            rep.cmd = channels_.erase(rd32(req.payload, 0)) > 0 ? 1 : 0;
+            uint32_t id = rd32(req.payload, 0);
+            rep.cmd = channels_.erase(id) > 0 ? 1 : 0;
             return true;
         }
         if (req.cmd == 3) {
@@ -60,13 +63,33 @@ public:
                            static_cast<uint8_t>((f >> 24) & 0xFF)};
             return true;
         }
-        if (req.cmd == 4) {
+        if (req.cmd == 4 || req.cmd == 5) {
             if (req.payload.size() < 4) {
                 rep.cmd = 0;
                 return true;
             }
             uint32_t f = rd32(req.payload, 0);
             rep.cmd = (f < completed_fence_) ? 1 : 0;
+            return true;
+        }
+        if (req.cmd == 6) {
+            if (req.payload.size() < 4) {
+                rep.cmd = 0;
+                return true;
+            }
+            uint32_t f = rd32(req.payload, 0);
+            // Simula wait: avança fence até o pedido
+            for (auto& p : pending_) {
+                if (p.fence <= rd32(req.payload, 0)) {
+                    completeUpTo(p.fence);
+                }
+            }
+            rep.cmd = 1;
+            return true;
+        }
+        if (req.cmd == 7) {
+            rep.cmd = 1;
+            rep.payload = {0x01, 0x00, 0x00, 0x00}; // versão fake
             return true;
         }
         return false;
