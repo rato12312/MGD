@@ -796,6 +796,46 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(0) == 5, "20/4");
     }
 
+    // Sistema inteiro: NRO pede heap, soma em FP, salva na pilha, sai, mundo pinta.
+    {
+        // .text: MOVZ X1,#16 | SVC#1 SetHeapSize | SCVTF D0,X1 | FMOV D1,D0 |
+        //        FADD D2,D0,D1 | STP X0,X1,[SP,#-16]! | LDP X3,X4,[SP],#16 |
+        //        SVC#6 ExitProcess
+        std::vector<uint32_t> text = {
+            0xD2800201u, // MOVZ X1, #16
+            0xD4000021u, // SVC #1 SetHeapSize(16)
+            0x1E660020u, // SCVTF D0, X1 (16.0)
+            0x1E604001u, // FMOV D1, D0
+            0x1EE12002u, // FADD D2, D0, D1 (32.0)
+            0xA9BF07E0u, // STP X0, X1, [SP, #-16]!
+            0xA8C10FE2u, // LDP X2, X3, [SP], #16
+            0xD40000C1u, // SVC #6 ExitProcess
+        };
+        std::vector<uint8_t> blob(0x80 + text.size() * 4, 0);
+        blob[0x10] = 'N'; blob[0x11] = 'R'; blob[0x12] = 'O'; blob[0x13] = '0';
+        blob[0x20] = 0x80; // text em 0x80
+        blob[0x24] = static_cast<uint8_t>(text.size() * 4);
+        for (size_t i = 0; i < text.size(); ++i)
+            for (int b = 0; b < 4; b++)
+                blob[0x80 + i * 4 + b] = static_cast<uint8_t>(text[i] >> (8 * b));
+        emu::Emulator emu;
+        emu::NroImage img = emu::parseNro(blob.data(), blob.size());
+        ASSERT_MSG(img.valid, "nro sistema valido");
+        uint64_t entry = 0;
+        ASSERT_MSG(emu::loadNroInto(img, blob.data(), emu.cpu().ram(), emu.cpu().ramSize(), 0, entry),
+                   "nro mapeado");
+        emu.cpu().setSp(0x8000);
+        emu.cpu().setPc(entry + 0x80);
+        emu.runCpu(64);
+        ASSERT_MSG(emu.cpu().stopped(), "sistema parou limpo");
+        ASSERT_MSG(emu.kernel().heapSize() == 16, "heap 16");
+        ASSERT_MSG(emu.cpu().reg(2) == 0 && emu.cpu().reg(3) == 16, "pilha round-trip");
+        ASSERT_MSG(emu.cpu().sp() == 0x8000, "sp voltou");
+        bridge::RuntimeFrameStats s = emu.bootWorld(8);
+        ASSERT_MSG(s.polygons_fed == 8 && s.pixels_written > 0, "mundo pintou");
+        ASSERT_MSG(emu.present("sistema_boot.ppm"), "sistema apresenta");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
