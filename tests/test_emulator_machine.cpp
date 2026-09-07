@@ -1006,6 +1006,17 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.unknownCount() == 2, "contou 2");
     }
 
+    // STP / LDP de par 32-bit.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 0xAAAAAAAAull);
+        cpu.setReg(1, 0xBBBBBBBBull);
+        cpu.setReg(2, 0x100);
+        ASSERT_MSG(cpu.step(0x29010440u), "stp w0,w1,[x2,#8]");
+        ASSERT_MSG(cpu.step(0x29411443u), "ldp w3,w4,[x2,#8]");
+        ASSERT_MSG(cpu.reg(3) == 0xAAAAAAAAull && cpu.reg(4) == 0xBBBBBBBBull, "par w certo");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

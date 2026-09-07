@@ -855,6 +855,57 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFC00000) == 0x29000000 || (insn & 0xFFC00000) == 0x29400000 ||
+            (insn & 0xFFC00000) == 0x29800000 || (insn & 0xFFC00000) == 0x29C00000 ||
+            (insn & 0xFFC00000) == 0x28800000 || (insn & 0xFFC00000) == 0x28C00000) {
+            // STP / LDP Wt1,Wt2 (32-bit, zero-extend), offset/pre/pos
+            uint32_t fam = insn & 0xFFC00000;
+            bool isLoad = (fam == 0x29400000 || fam == 0x29C00000 || fam == 0x28C00000);
+            bool preIndex = (fam == 0x29800000 || fam == 0x29C00000);
+            bool postIndex = (fam == 0x28800000 || fam == 0x28C00000);
+            int t1 = static_cast<int>(insn & 0x1F);
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            int t2 = static_cast<int>((insn >> 10) & 0x1F);
+            int64_t off = static_cast<int64_t>((insn >> 15) & 0x7F);
+            if (off & 0x40) off |= ~static_cast<int64_t>(0x7F);
+            uint64_t base = (n == 31) ? sp_ : regs_[n];
+            uint64_t addr = base + (preIndex ? static_cast<uint64_t>(off * 4) : 0);
+            auto ldw = [&](uint64_t a, bool& ok) {
+                uint64_t pa = 0;
+                ok = phys(a, 4, false, false, pa);
+                if (!ok) return uint32_t(0);
+                uint32_t v = 0;
+                for (int i = 0; i < 4; i++)
+                    v |= static_cast<uint32_t>(mem_[static_cast<size_t>(pa) + i]) << (8 * i);
+                return v;
+            };
+            auto stw = [&](uint64_t a, uint32_t v) {
+                uint64_t pa = 0;
+                if (!phys(a, 4, true, false, pa)) return false;
+                for (int i = 0; i < 4; i++)
+                    mem_[static_cast<size_t>(pa) + i] = static_cast<uint8_t>(v >> (8 * i));
+                return true;
+            };
+            if (isLoad) {
+                bool ok1 = true, ok2 = true;
+                uint32_t v1 = ldw(addr, ok1), v2 = ldw(addr + 4, ok2);
+                if (!ok1 || !ok2) return false;
+                if (t1 != 31) regs_[t1] = v1;
+                if (t2 != 31) regs_[t2] = v2;
+            } else {
+                uint32_t v1 = (t1 == 31) ? 0 : static_cast<uint32_t>(regs_[t1]);
+                uint32_t v2 = (t2 == 31) ? 0 : static_cast<uint32_t>(regs_[t2]);
+                if (!stw(addr, v1) || !stw(addr + 4, v2)) return false;
+            }
+            if (preIndex || postIndex) {
+                uint64_t nb = base + static_cast<uint64_t>(off * 4);
+                if (n == 31) sp_ = nb;
+                else regs_[n] = nb;
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if (top == 0xB8 || top == 0xB9) { // STRW / LDRW / LDRSW
             int opc = static_cast<int>((insn >> 22) & 0x3);
             if (top == 0xB8 && opc == 0x2) { // LDRSW Xt (estende sinal)
