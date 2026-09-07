@@ -6,6 +6,7 @@
 #include <cstdint>
 
 #include "../ram/Mmu.h"
+#include "Thread.h"
 
 namespace mgd {
 namespace hos {
@@ -15,6 +16,7 @@ enum SvcNumber : uint32_t {
     SVC_SET_HEAP_SIZE = 0x01,
     SVC_QUERY_MEMORY = 0x05,
     SVC_EXIT_PROCESS = 0x06,
+    SVC_CREATE_THREAD = 0x08, // simplificada: X1=entry, X2=sp
     SVC_GET_INFO = 0x29,
 };
 
@@ -45,16 +47,30 @@ struct SvcArgs {
     uint64_t out[2] = {0, 0};                 // X0-X1 na saída
 };
 
-class Kernel {
+class Kernel : public emu::SvcHost {
 public:
     Kernel() = default;
 
     void setMmu(emu::Mmu* mmu) { mmu_ = mmu; }
     void setRam(uint8_t* ram, uint64_t size) { ram_ = ram; ram_size_ = size; }
 
+    uint32_t svcCall(uint32_t num, uint64_t x[8], uint64_t out[2]) override {
+        SvcArgs args;
+        for (int i = 0; i < 8; i++) args.x[i] = x[i];
+        SvcResult r = call(num, args);
+        out[0] = args.out[0];
+        out[1] = args.out[1];
+        return static_cast<uint32_t>(r);
+    }
+    bool svcExited() const override { return exited_; }
+
     uint64_t heapBase() const { return heap_base_; }
     uint64_t heapSize() const { return heap_size_; }
     bool exited() const { return exited_; }
+    Scheduler& scheduler() { return sched_; }
+    uint64_t runThreads(emu::Cpu& cpu, uint64_t maxSteps, uint64_t quantum = 4) {
+        return sched_.run(cpu, maxSteps, quantum);
+    }
 
     SvcResult call(uint32_t num, SvcArgs& args) {
         switch (num) {
@@ -86,6 +102,11 @@ public:
                 args.out[0] = 0;
                 return RESULT_OK;
             }
+            case SVC_CREATE_THREAD: {
+                uint64_t id = sched_.spawn(args.x[1], args.x[2]);
+                args.out[0] = id;
+                return RESULT_OK;
+            }
             case SVC_EXIT_PROCESS: {
                 exited_ = true;
                 return RESULT_OK;
@@ -107,6 +128,7 @@ private:
     uint64_t heap_size_ = 0;
     bool exited_ = false;
     emu::Mmu* mmu_ = nullptr;
+    Scheduler sched_;
 };
 
 } // namespace hos

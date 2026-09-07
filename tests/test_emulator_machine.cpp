@@ -868,6 +868,26 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(1) == 2, "B contou 2");
     }
 
+    // CreateThread via SVC cria thread executável.
+    {
+        emu::Cpu cpu;
+        hos::Kernel kernel;
+        cpu.setSvcHost(&kernel);
+        cpu.setReg(1, 0x40); // entry
+        cpu.setReg(2, 0x9000); // sp
+        // programa da thread em 0x40: ADD X0,X0,#1 ; SVC#0
+        cpu.ram()[0x40] = 0x00; cpu.ram()[0x41] = 0x04;
+        cpu.ram()[0x42] = 0x00; cpu.ram()[0x43] = 0x91;
+        cpu.ram()[0x44] = 0x01; cpu.ram()[0x45] = 0x00;
+        cpu.ram()[0x46] = 0x00; cpu.ram()[0x47] = 0xD4;
+        ASSERT_MSG(cpu.step(0xD4000101u), "svc #8 = CreateThread");
+        ASSERT_MSG(cpu.reg(0) == 1, "id da thread em x0");
+        uint64_t done = kernel.runThreads(cpu, 16, 4);
+        ASSERT_MSG(done == 2, "thread rodou 2");
+        ASSERT_MSG(kernel.scheduler().pending() == 0, "thread saiu");
+        ASSERT_MSG(cpu.reg(0) == 1, "x0=1 na thread");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

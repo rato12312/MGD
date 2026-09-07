@@ -10,10 +10,16 @@
 
 #include "../../ports/mario-odissey/src/mgd/common/BitField.h"
 #include "../ram/Mmu.h"
-#include "../hos/Kernel.h"
 
 namespace mgd {
 namespace emu {
+
+// Dono das SVCs (o Kernel HOS implementa). Quebra o ciclo Cpu<->Kernel.
+struct SvcHost {
+    virtual ~SvcHost() = default;
+    virtual uint32_t svcCall(uint32_t num, uint64_t x[8], uint64_t out[2]) = 0;
+    virtual bool svcExited() const = 0;
+};
 
 union ArmInsn {
     uint32_t hex;
@@ -79,8 +85,10 @@ public:
     }
 
     void setMmu(Mmu* mmu) { mmu_ = mmu; }
-    void setKernel(hos::Kernel* k) { kernel_ = k; }
-    hos::SvcResult lastSvc() const { return last_svc_; }
+    void setSvcHost(SvcHost* h) { svc_host_ = h; }
+    // Mantido por compatibilidade com os testes (aponta para o host).
+    void setKernel(SvcHost* h) { svc_host_ = h; }
+    uint32_t lastSvc() const { return last_svc_; }
 
     uint64_t run(uint64_t maxSteps) {
         uint64_t done = 0;
@@ -105,20 +113,20 @@ public:
             uint32_t imm = (insn >> 5) & 0xFFFF;
             if (imm == 0) { stopped_ = true; exit_code_ = 0; }
             else if (imm == 1 && !kernel_) { stopped_ = true; exit_code_ = regs_[0] & 0xFF; }
-            else if (kernel_) {
+            else if (svc_host_) {
                 // Chamada HOS: X0-X7 entram, OK devolve out em X0/X1,
                 // erro devolve o código em X0 (convenção nossa, documentada).
-                hos::SvcArgs args;
-                for (int i = 0; i < 8; i++) args.x[i] = regs_[i];
-                hos::SvcResult r = kernel_->call(imm, args);
+                uint64_t xin[8], xout[2] = {0, 0};
+                for (int i = 0; i < 8; i++) xin[i] = regs_[i];
+                uint32_t r = svc_host_->svcCall(imm, xin, xout);
                 last_svc_ = r;
-                if (r == hos::RESULT_OK) {
-                    regs_[0] = args.out[0];
-                    regs_[1] = args.out[1];
+                if (r == 0) {
+                    regs_[0] = xout[0];
+                    regs_[1] = xout[1];
                 } else {
                     regs_[0] = static_cast<uint64_t>(r);
                 }
-                if (kernel_->exited()) { stopped_ = true; exit_code_ = 0; }
+                if (svc_host_->svcExited()) { stopped_ = true; exit_code_ = 0; }
             }
             else return false;
             pc_ += 4;
@@ -1088,8 +1096,8 @@ private:
     std::array<double, 32> fpregs_{};
     std::vector<uint8_t> mem_;
     Mmu* mmu_ = nullptr;
-    hos::Kernel* kernel_ = nullptr;
-    hos::SvcResult last_svc_ = hos::RESULT_OK;
+    SvcHost* svc_host_ = nullptr;
+    uint32_t last_svc_ = 0;
     uint64_t sp_ = 0;
     uint64_t pc_ = 0;
     uint64_t steps_ = 0;

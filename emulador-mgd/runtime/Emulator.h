@@ -25,7 +25,7 @@ public:
 
     // Aplica as chaves: MMU liga/desliga, barato segue a Mali, painter obedece.
     void applySwitches() {
-        cpu_.setKernel(&kernel_);
+        cpu_.setSvcHost(&kernel_);
         kernel_.setMmu(&mmu_);
         kernel_.setRam(cpu_.ram(), cpu_.ramSize());
         mmu_.clear();
