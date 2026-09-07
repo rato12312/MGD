@@ -572,6 +572,36 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE00C00) == 0xBAC00000 || (insn & 0xFFE00C00) == 0xFAC00000) {
+            // CCMP / CCMN Xn,Xm,#nzcv,cond (compara ou injeta flags)
+            bool isNeg = (insn & 0xFFE00C00) == 0xFAC00000;
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int cond = static_cast<int>((insn >> 12) & 0xF);
+            int nzcv = static_cast<int>(insn & 0xF);
+            if (condTrue(cond)) {
+                uint64_t nv = (n == 31) ? 0 : regs_[n];
+                uint64_t mv = (m == 31) ? 0 : regs_[m];
+                uint64_t res = isNeg ? (nv + mv) : (nv - mv);
+                flag_n_ = (res >> 63) != 0;
+                flag_z_ = (res == 0);
+                if (isNeg) {
+                    flag_c_ = res < nv;
+                } else {
+                    flag_c_ = nv >= mv;
+                }
+                bool sn = ((nv >> 63) != 0), sm = ((mv >> 63) != 0), sr = flag_n_;
+                flag_v_ = isNeg ? ((sn == sm) && (sr != sn)) : ((sn != sm) && (sr != sn));
+            } else {
+                flag_n_ = (nzcv & 8) != 0;
+                flag_z_ = (nzcv & 4) != 0;
+                flag_c_ = (nzcv & 2) != 0;
+                flag_v_ = (nzcv & 1) != 0;
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFFFF01F) == 0xD503201F) { // NOP e HINTs: aceita e segue
             pc_ += 4;
             steps_++;
