@@ -1016,6 +1016,45 @@ public:
             steps_++;
             return true;
         }
+        if (((insn & 0xFFE00C00) == 0xF8000000) || ((insn & 0xFFE00C00) == 0xF8400000) ||
+            ((insn & 0xFFE00C00) == 0xB8000000) || ((insn & 0xFFE00C00) == 0xB8400000) ||
+            ((insn & 0xFFE00C00) == 0xB8800000)) {
+            // STUR/LDUR 64/32-bit + LDURSW (simm9 sem escala). Vem antes do
+            // top==0xF8 (LDUR64 divide o top com STR).
+            uint32_t ub = insn & 0xFFE00C00;
+            bool is64 = (ub & 0x40000000u) != 0;
+            int opc = static_cast<int>((insn >> 22) & 0x3);
+            int t = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int64_t off = static_cast<int64_t>((insn >> 12) & 0x1FF);
+            if (off & 0x100) off |= ~static_cast<int64_t>(0x1FF);
+            uint64_t bb = (n == 31) ? sp_ : regs_[n];
+            uint64_t addr = bb + static_cast<uint64_t>(off);
+            if (!is64 && opc == 2) { // LDURSW Xt (estende sinal de 32)
+                uint64_t pa = 0;
+                if (!phys(addr, 4, false, false, pa)) return false;
+                uint32_t w = 0;
+                __builtin_memcpy(&w, &mem_[static_cast<size_t>(pa)], 4);
+                if (t != 31)
+                    regs_[t] = static_cast<uint64_t>(static_cast<int64_t>(static_cast<int32_t>(w)));
+            } else {
+                int width = is64 ? 8 : 4;
+                bool isLoad = (opc == 1);
+                uint64_t pa = 0;
+                if (!phys(addr, width, !isLoad, false, pa)) return false;
+                if (isLoad) {
+                    uint64_t v = 0;
+                    __builtin_memcpy(&v, &mem_[static_cast<size_t>(pa)], static_cast<size_t>(width));
+                    if (t != 31) regs_[t] = v;
+                } else {
+                    uint64_t v = (t == 31) ? 0 : regs_[t];
+                    __builtin_memcpy(&mem_[static_cast<size_t>(pa)], &v, static_cast<size_t>(width));
+                }
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if (top == 0xF8 || top == 0xF9) { // STR / LDR Xt,[Xn,#imm*8]
             if (top == 0xF9 && ((insn >> 22) & 0x3) == 0x0) { // PRFM: aceita e segue
                 pc_ += 4;

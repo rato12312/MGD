@@ -2068,6 +2068,20 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(4) == 0xFFFFFFFFFFFFFFFFull, "half sinal sem escala");
     }
 
+    // LDUR/STUR 32/64-bit + LDURSW.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 0x100);
+        cpu.setReg(0, 0x1122334455667788ull);
+        ASSERT_MSG(cpu.step(0xF81F8020u), "stur x0,[x1,#-8]");
+        ASSERT_MSG(cpu.step(0xF85F8022u), "ldur x2,[x1,#-8]");
+        ASSERT_MSG(cpu.reg(2) == 0x1122334455667788ull, "64 sem escala");
+        cpu.setReg(4, 0xFFFFFFFFull);
+        ASSERT_MSG(cpu.step(0xB89F8024u), "stur w4,[x1,#-8]");
+        ASSERT_MSG(cpu.step(0xB89F8023u), "ldursw x3,[x1,#-8]");
+        ASSERT_MSG(cpu.reg(3) == 0xFFFFFFFFFFFFFFFFull, "sw estende");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
