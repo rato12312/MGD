@@ -8,6 +8,7 @@
 #include <unordered_map>
 
 #include "../ram/Mmu.h"
+#include "NvService.h"
 #include "ServiceManager.h"
 #include "Thread.h"
 
@@ -103,6 +104,23 @@ public:
         services_.publish("audren:u"); // áudio render
     }
 
+    // Bomba: um pedido pendente por sessão anda até o serviço dono.
+    // Retorna quantos pedidos foram atendidos.
+    uint32_t pumpServices() {
+        uint32_t done = 0;
+        for (const auto& kv : services_.allSessions()) {
+            std::string name = services_.serviceOf(kv.first);
+            IpcMessage req;
+            if (!kv.second->recvRequest(req)) continue;
+            IpcMessage rep;
+            bool understood = false;
+            if (name == "nvdrv:a") understood = nv_.dispatch(req, rep);
+            if (understood && kv.second->sendReply(rep)) done++;
+        }
+        return done;
+    }
+    NvService& nv() { return nv_; }
+
     SvcResult call(uint32_t num, SvcArgs& args) {
         switch (num) {
             case SVC_SET_HEAP_SIZE: {
@@ -195,6 +213,7 @@ private:
     emu::Mmu* mmu_ = nullptr;
     Scheduler sched_;
     ServiceManager services_;
+    NvService nv_;
 };
 
 } // namespace hos

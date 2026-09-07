@@ -1253,6 +1253,33 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(!nv.dispatch(ioctl, irep), "ioctl futuro nega");
     }
 
+    // Bomba: pedido na sessão chega na GPU sozinho.
+    {
+        hos::Kernel kernel;
+        kernel.bootServices();
+        hos::IpcMessage get;
+        get.cmd = 1;
+        const char* nm = "nvdrv:a";
+        get.payload = std::vector<uint8_t>(nm, nm + 7);
+        hos::IpcMessage got;
+        ASSERT_MSG(kernel.services().dispatch(get, got) && got.cmd == 1, "sessao gpu");
+        uint32_t id = static_cast<uint32_t>(got.payload[0]) |
+                      (static_cast<uint32_t>(got.payload[1]) << 8) |
+                      (static_cast<uint32_t>(got.payload[2]) << 16) |
+                      (static_cast<uint32_t>(got.payload[3]) << 24);
+        std::shared_ptr<hos::Session> cli;
+        ASSERT_MSG(kernel.services().session(id, cli), "ponta cliente");
+        hos::IpcMessage open;
+        open.cmd = 1;
+        open.payload = {0x3D};
+        ASSERT_MSG(cli->sendRequest(open), "cliente pede open");
+        ASSERT_MSG(kernel.pumpServices() == 1, "bomba atendeu 1");
+        ASSERT_MSG(kernel.nv().channelCount() == 1, "canal abriu sozinho");
+        hos::IpcMessage back;
+        ASSERT_MSG(cli->recvReply(back) && back.cmd == 1, "resposta voltou");
+        ASSERT_MSG(kernel.pumpServices() == 0, "fila vazia, bomba parada");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
