@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <vector>
 
+#include <chrono>
+
 #include "../cpu/Cpu.h"
 #include "../loader/NroLoader.h"
 #include "../loader/NsoLoader.h"
@@ -46,12 +48,21 @@ public:
     }
 
     // Um frame do sistema: serviços andam, GPU drena, mundo pinta.
+    // Mede o próprio tempo (ms): base honesta do fps.
     bool frame(const char* path, uint32_t npolys = 8) {
+        auto t0 = std::chrono::steady_clock::now();
         kernel_.pumpServices();
         kernel_.nv().drain(64);
         bootWorld(npolys);
-        return present(path);
+        bool ok = present(path);
+        auto t1 = std::chrono::steady_clock::now();
+        last_frame_ms_ =
+            std::chrono::duration<double, std::milli>(t1 - t0).count();
+        frames_++;
+        return ok;
     }
+    double lastFrameMs() const { return last_frame_ms_; }
+    uint64_t frameCount() const { return frames_; }
 
     // Deposita programa (u32 little-endian) na RAM da CPU.
     bool loadProgram(const std::vector<uint32_t>& prog, uint64_t base = 0) {
@@ -97,6 +108,8 @@ private:
     hos::Kernel kernel_;
     odyssey::OdysseyWorld world_;
     MgdSwitches switches_;
+    double last_frame_ms_ = 0.0;
+    uint64_t frames_ = 0;
 };
 
 } // namespace emu

@@ -1520,6 +1520,8 @@ bool run_emulator_machine_tests() {
         emu.kernel().bootServices();
         ASSERT_MSG(emu.frame("frame_boot.ppm", 8), "frame saiu");
         ASSERT_MSG(emu.frame("frame_idle.ppm", 8), "frame parado saiu");
+        ASSERT_MSG(emu.frameCount() == 2, "2 frames");
+        ASSERT_MSG(emu.lastFrameMs() >= 0.0, "tempo medido");
     }
 
     // Boot de NRO pelo Emulador: heap via SVC, saída limpa.
