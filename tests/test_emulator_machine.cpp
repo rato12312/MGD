@@ -733,6 +733,22 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == 10, "2*3+4");
     }
 
+    // FCSEL com FCMP.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 3);
+        cpu.setReg(1, 4);
+        ASSERT_MSG(cpu.step(0x1E660000u), "d0=3.0");
+        ASSERT_MSG(cpu.step(0x1E660021u), "d1=4.0");
+        ASSERT_MSG(cpu.step(0x1E612020u), "fcmp d0,d1");
+        ASSERT_MSG(cpu.step(0x1E614402u), "fcsel d2,d0,d1,mi");
+        ASSERT_MSG(cpu.step(0x1E620043u), "scvtf x3,d2");
+        ASSERT_MSG(cpu.reg(3) == 3, "mi pega menor");
+        ASSERT_MSG(cpu.step(0x1E615403u), "fcsel d3,d0,d1,pl");
+        ASSERT_MSG(cpu.step(0x1E620063u), "scvtf x3,d3");
+        ASSERT_MSG(cpu.reg(3) == 4, "pl pega maior");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

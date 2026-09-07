@@ -362,6 +362,16 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE00C00) == 0x1E600C00) { // FCSEL Dd,Dn,Dm,cond
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int cond = static_cast<int>((insn >> 12) & 0xF);
+            fpregs_[d] = condTrue(cond) ? fpregs_[n] : fpregs_[m];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFC0FC00) == 0x1E604000) { // FMOV Dd,Dn
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
