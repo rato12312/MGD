@@ -1997,6 +1997,19 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.pc() == pc + 8, "eq tomou");
     }
 
+    // Shifts registrados 32-bit.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 1);
+        cpu.setReg(2, 3);
+        ASSERT_MSG(cpu.step(0x1AC22020u), "lslv w0,w1,w2");
+        ASSERT_MSG(cpu.reg(0) == 8, "1<<3");
+        cpu.setReg(1, 0x80000000ull);
+        cpu.setReg(2, 4);
+        ASSERT_MSG(cpu.step(0x1AC22823u), "asrv w3,w1,w2");
+        ASSERT_MSG(cpu.reg(3) == 0xF8000000ull, "asr 32 propaga");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

@@ -979,6 +979,25 @@ public:
             }
             return memAccess(dec, 8, top == 0xF9);
         }
+        if ((insn & 0xFFE0FC00) == 0x1AC02000 || (insn & 0xFFE0FC00) == 0x1AC02400 ||
+            (insn & 0xFFE0FC00) == 0x1AC02800 || (insn & 0xFFE0FC00) == 0x1AC02C00) {
+            // LSLV / LSRV / ASRV / RORV Wd,Wn,Wm (shift = Wm % 32)
+            int op = static_cast<int>((insn >> 10) & 0x3);
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            uint32_t nv = (n == 31) ? 0 : static_cast<uint32_t>(regs_[n]);
+            uint32_t sh = ((m == 31) ? 0 : static_cast<uint32_t>(regs_[m])) % 32;
+            uint32_t res = nv;
+            if (op == 0) res = (sh == 0) ? nv : (nv << sh);
+            else if (op == 1) res = (sh == 0) ? nv : (nv >> sh);
+            else if (op == 2) res = (sh == 0) ? nv : static_cast<uint32_t>(static_cast<int32_t>(nv) >> sh);
+            else res = (sh == 0) ? nv : ((nv >> sh) | (nv << (32 - sh)));
+            if (d != 31) regs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFE0FC00) == 0x9AC02000 || (insn & 0xFFE0FC00) == 0x9AC02400 ||
             (insn & 0xFFE0FC00) == 0x9AC02800 || (insn & 0xFFE0FC00) == 0x9AC02C00) {
             // LSLV / LSRV / ASRV / RORV Xd,Xn,Xm (shift = Xm % 64)
