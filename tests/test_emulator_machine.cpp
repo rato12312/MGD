@@ -10,6 +10,7 @@
 #include "emulador-mgd/runtime/Emulator.h"
 #include "emulador-mgd/loader/NroLoader.h"
 #include "emulador-mgd/hos/Kernel.h"
+#include "emulador-mgd/hos/Thread.h"
 #include "emulador-mgd/ram/Mmu.h"
 #include "core/query/RegionPolygonCache.h"
 
@@ -834,6 +835,37 @@ bool run_emulator_machine_tests() {
         bridge::RuntimeFrameStats s = emu.bootWorld(8);
         ASSERT_MSG(s.polygons_fed == 8 && s.pixels_written > 0, "mundo pintou");
         ASSERT_MSG(emu.present("sistema_boot.ppm"), "sistema apresenta");
+    }
+
+    // Duas threads intercalam contadores (round-robin).
+    {
+        emu::Cpu cpu;
+        // thread A em 0x0: loop X0++ 3x e SVC#0; thread B em 0x40: loop X1++ 2x e SVC#0
+        auto poke = [&](uint64_t addr, uint32_t insn) {
+            for (int i = 0; i < 4; i++)
+                cpu.ram()[addr + i] = static_cast<uint8_t>(insn >> (8 * i));
+        };
+        // A: X0=3, grava na RAM e sai ; B: X1=2 e sai
+        poke(0x00, 0x91000400u);
+        poke(0x04, 0x91000400u);
+        poke(0x08, 0x91000400u);
+        poke(0x0C, 0xD2804002u); // MOVZ X2, #0x200
+        poke(0x10, 0xF8000040u); // STR X0, [X2]
+        poke(0x14, 0xD4000001u); // SVC#0
+        poke(0x40, 0x91000421u);
+        poke(0x44, 0x91000421u);
+        poke(0x48, 0xD4000001u);
+        hos::Scheduler sched;
+        ASSERT_MSG(sched.spawn(0x0, 0x8000) == 1, "thread 1");
+        ASSERT_MSG(sched.spawn(0x40, 0x9000) == 2, "thread 2");
+        uint64_t done = sched.run(cpu, 64, 2);
+        ASSERT_MSG(done == 9, "9 instr no total");
+        ASSERT_MSG(sched.pending() == 0, "fila esvaziou");
+        uint64_t ramv = 0;
+        for (int i = 0; i < 8; i++)
+            ramv |= static_cast<uint64_t>(cpu.ram()[0x200 + i]) << (8 * i);
+        ASSERT_MSG(ramv == 3, "A contou 3");
+        ASSERT_MSG(cpu.reg(1) == 2, "B contou 2");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;

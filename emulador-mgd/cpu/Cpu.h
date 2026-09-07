@@ -55,6 +55,29 @@ public:
     bool stopped() const { return stopped_; }
     uint64_t exitCode() const { return exit_code_; }
 
+    struct State {
+        std::array<uint64_t, REG_COUNT> regs{};
+        std::array<double, 32> fpregs{};
+        uint64_t sp = 0, pc = 0, steps = 0, tpidr = 0;
+        bool n = false, z = false, c = false, v = false;
+    };
+    State save() const {
+        State s;
+        s.regs = regs_;
+        s.fpregs = fpregs_;
+        s.sp = sp_; s.pc = pc_; s.steps = steps_; s.tpidr = tpidr_;
+        s.n = flag_n_; s.z = flag_z_; s.c = flag_c_; s.v = flag_v_;
+        return s;
+    }
+    void load(const State& s) {
+        regs_ = s.regs;
+        fpregs_ = s.fpregs;
+        sp_ = s.sp; pc_ = s.pc; steps_ = s.steps; tpidr_ = s.tpidr;
+        flag_n_ = s.n; flag_z_ = s.z; flag_c_ = s.c; flag_v_ = s.v;
+        stopped_ = false; // contexto novo, vida nova
+        exit_code_ = 0;
+    }
+
     void setMmu(Mmu* mmu) { mmu_ = mmu; }
     void setKernel(hos::Kernel* k) { kernel_ = k; }
     hos::SvcResult lastSvc() const { return last_svc_; }
