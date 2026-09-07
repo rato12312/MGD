@@ -2145,6 +2145,17 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(0) == 11, "eq pega w1");
     }
 
+    // RBIT / REV 32-bit.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 0xF0);
+        ASSERT_MSG(cpu.step(0x5AC00020u), "rbit w0,w1");
+        ASSERT_MSG(cpu.reg(0) == 0x0F000000ull, "rbit 32 certo");
+        cpu.setReg(1, 0x01020304ull);
+        ASSERT_MSG(cpu.step(0x5AC00C22u), "rev w2,w1");
+        ASSERT_MSG(cpu.reg(2) == 0x04030201ull, "rev 32 certo");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

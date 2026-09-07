@@ -648,6 +648,30 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE0FC00) == 0x5AC00000) { // RBIT Wd,Wn
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            uint32_t v = (n == 31) ? 0 : static_cast<uint32_t>(regs_[n]);
+            uint32_t res = 0;
+            for (int i = 0; i < 32; i++)
+                if ((v >> i) & 1u) res |= 1u << (31 - i);
+            if (d != 31) regs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFE0FC00) == 0x5AC00C00) { // REV Wd,Wn (4 bytes)
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            uint32_t v = (n == 31) ? 0 : static_cast<uint32_t>(regs_[n]);
+            uint32_t res = 0;
+            for (int i = 0; i < 4; i++)
+                res |= ((v >> (8 * i)) & 0xFFu) << (8 * (3 - i));
+            if (d != 31) regs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFE0FC00) == 0xDAC00C00 || (insn & 0xFFE0FC00) == 0xDAC00800 ||
             (insn & 0xFFE0FC00) == 0xDAC00400) {
             // REV / REV32 / REV16 Xd,Xn
