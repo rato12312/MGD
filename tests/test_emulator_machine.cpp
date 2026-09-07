@@ -2156,6 +2156,19 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(2) == 0x04030201ull, "rev 32 certo");
     }
 
+    // CLZ / REV16 32-bit.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 0x00F00000ull);
+        ASSERT_MSG(cpu.step(0x5AC01020u), "clz w0,w1");
+        ASSERT_MSG(cpu.reg(0) == 8, "8 zeros 32");
+        ASSERT_MSG(cpu.step(0x5AC013E2u), "clz w2,wzr");
+        ASSERT_MSG(cpu.reg(2) == 32, "zero -> 32");
+        cpu.setReg(1, 0x01020304ull);
+        ASSERT_MSG(cpu.step(0x5AC00423u), "rev16 w3,w1");
+        ASSERT_MSG(cpu.reg(3) == 0x02010403ull, "rev16 certo");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

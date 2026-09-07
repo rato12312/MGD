@@ -672,6 +672,31 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE0FC00) == 0x5AC01000) { // CLZ Wd,Wn (0 -> 32)
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            uint32_t v = (n == 31) ? 0 : static_cast<uint32_t>(regs_[n]);
+            uint32_t c = 0;
+            for (int i = 31; i >= 0; i--) {
+                if ((v >> i) & 1u) break;
+                c++;
+            }
+            if (d != 31) regs_[d] = c;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFE0FC00) == 0x5AC00400) { // REV16 Wd,Wn (cada par)
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            uint32_t v = (n == 31) ? 0 : static_cast<uint32_t>(regs_[n]);
+            uint32_t res = ((v & 0xFFu) << 8) | ((v >> 8) & 0xFFu) |
+                           ((v & 0xFF0000u) << 8) | ((v >> 8) & 0xFF0000u);
+            if (d != 31) regs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFE0FC00) == 0xDAC00C00 || (insn & 0xFFE0FC00) == 0xDAC00800 ||
             (insn & 0xFFE0FC00) == 0xDAC00400) {
             // REV / REV32 / REV16 Xd,Xn
