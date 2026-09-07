@@ -19,6 +19,7 @@
 #include "emulador-mgd/hos/ViService.h"
 #include "emulador-mgd/hos/AudService.h"
 #include "emulador-mgd/hos/ApmService.h"
+#include "emulador-mgd/hos/FatalService.h"
 #include "emulador-mgd/hos/FsService.h"
 #include "emulador-mgd/hos/Event.h"
 #include "emulador-mgd/hos/Mutex.h"
@@ -1641,6 +1642,18 @@ bool run_emulator_machine_tests() {
         g.cmd = 2;
         hos::IpcMessage rr;
         ASSERT_MSG(set.dispatch(g, rr) && rr.payload[0] == 1, "americas");
+    }
+
+    // Fatal registra em vez de sumir.
+    {
+        hos::FatalService fatal;
+        hos::IpcMessage t;
+        hos::IpcMessage r;
+        t.cmd = 1;
+        t.payload = {0xEF, 0xBE, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        ASSERT_MSG(fatal.dispatch(t, r) && r.cmd == 1, "registrou");
+        ASSERT_MSG(fatal.fatalCount() == 1, "contou 1");
+        ASSERT_MSG(fatal.lastFatal() == 0xBEEF, "codigo certo");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;

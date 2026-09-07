@@ -11,6 +11,7 @@
 #include "../ram/Mmu.h"
 #include "ApmService.h"
 #include "AudService.h"
+#include "FatalService.h"
 #include "FsService.h"
 #include "HidService.h"
 #include "LblService.h"
@@ -138,6 +139,7 @@ public:
         services_.publish("psm");     // bateria
         services_.publish("lbl:u");   // brilho
         services_.publish("set:sys"); // idioma/região
+        services_.publish("fatal:u"); // erros registrados
     }
 
     // Bomba: um pedido pendente por sessão anda até o serviço dono.
@@ -160,6 +162,7 @@ public:
             else if (name == "psm") understood = psm_.dispatch(req, rep);
             else if (name == "lbl:u") understood = lbl_.dispatch(req, rep);
             else if (name == "set:sys") understood = set_.dispatch(req, rep);
+            else if (name == "fatal:u") understood = fatal_.dispatch(req, rep);
             if (understood && kv.second->sendReply(rep)) done++;
         }
         return done;
@@ -174,6 +177,7 @@ public:
     PsmService& psm() { return psm_; }
     LblService& lbl() { return lbl_; }
     SetService& set() { return set_; }
+    FatalService& fatal() { return fatal_; }
 
     SvcResult call(uint32_t num, SvcArgs& args) {
         switch (num) {
@@ -279,6 +283,7 @@ private:
     PsmService psm_;
     LblService lbl_;
     SetService set_;
+    FatalService fatal_;
 };
 
 } // namespace hos
