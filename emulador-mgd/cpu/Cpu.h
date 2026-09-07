@@ -585,6 +585,41 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFC0FC00) == 0x6E201C00) { // ORR Vd.16B,Vn,Vm (move 128)
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            uint64_t a0 = fp_.q[n][0] | fp_.q[m][0];
+            uint64_t a1 = fp_.q[n][1] | fp_.q[m][1];
+            fp_.q[d][0] = a0;
+            fp_.q[d][1] = a1;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFE0FC00) == 0x1E600C00) { // FCMP Dn,Dm (flags; NaN = unordered)
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            double a = fp_.d[n], b = fp_.d[m];
+            bool nan = (a != a) || (b != b);
+            flag_n_ = !nan && (a < b);
+            flag_z_ = !nan && (a == b);
+            flag_c_ = nan || (a >= b);
+            flag_v_ = nan;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFE00C00) == 0x1E600C00) { // FCSEL Dd,Dn,Dm,cond
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int cond = static_cast<int>((insn >> 12) & 0xF);
+            fp_.d[d] = condTrue(cond) ? fp_.d[n] : fp_.d[m];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFC0FC00) == 0x1E604000) { // FMOV Dd,Dn
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
