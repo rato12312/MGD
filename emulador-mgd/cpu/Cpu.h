@@ -1279,7 +1279,7 @@ public:
             int64_t off = static_cast<int64_t>((insn >> 15) & 0x7F);
             if (off & 0x40) off |= ~static_cast<int64_t>(0x7F);
             uint64_t base = (n == 31) ? sp_ : regs_[n];
-            uint64_t addr = base + (preIndex ? static_cast<uint64_t>(off * 8) : 0);
+            uint64_t addr = postIndex ? base : base + static_cast<uint64_t>(off * 8);
             uint64_t pa = 0;
             if (!phys(addr, 16, !isLoad, false, pa)) return false;
             auto ld = [&](uint64_t a) {
@@ -1320,7 +1320,7 @@ public:
             int64_t off = static_cast<int64_t>((insn >> 15) & 0x7F);
             if (off & 0x40) off |= ~static_cast<int64_t>(0x7F);
             uint64_t base = (n == 31) ? sp_ : regs_[n];
-            uint64_t addr = base + (preIndex ? static_cast<uint64_t>(off * 4) : 0);
+            uint64_t addr = postIndex ? base : base + static_cast<uint64_t>(off * 4);
             auto ldw = [&](uint64_t a, bool& ok) {
                 uint64_t pa = 0;
                 ok = phys(a, 4, false, false, pa);
@@ -1413,7 +1413,7 @@ public:
             int64_t off = static_cast<int64_t>((insn >> 15) & 0x7F);
             if (off & 0x40) off |= ~static_cast<int64_t>(0x7F);
             uint64_t base = (n == 31) ? sp_ : regs_[n];
-            uint64_t addr = base + (preIndex ? static_cast<uint64_t>(off * 16) : 0);
+            uint64_t addr = postIndex ? base : base + static_cast<uint64_t>(off * 16);
             uint64_t pa = 0;
             if (!phys(addr, 32, !isLoad, false, pa)) return false;
             if (isLoad) {
@@ -1446,7 +1446,7 @@ public:
             int64_t off = static_cast<int64_t>((insn >> 15) & 0x7F);
             if (off & 0x40) off |= ~static_cast<int64_t>(0x7F);
             uint64_t base = (n == 31) ? sp_ : regs_[n];
-            uint64_t addr = base + (preIndex ? static_cast<uint64_t>(off * 4) : 0);
+            uint64_t addr = postIndex ? base : base + static_cast<uint64_t>(off * 4);
             auto lds = [&](uint64_t a, bool& ok) {
                 uint64_t pa = 0;
                 ok = phys(a, 4, false, false, pa);
@@ -1614,7 +1614,7 @@ public:
             int64_t off = static_cast<int64_t>((insn >> 15) & 0x7F);
             if (off & 0x40) off |= ~static_cast<int64_t>(0x7F); // sign 7
             uint64_t base = (n == 31) ? sp_ : regs_[n];
-            uint64_t addr = base + (preIndex ? static_cast<uint64_t>(off * 8) : 0);
+            uint64_t addr = postIndex ? base : base + static_cast<uint64_t>(off * 8);
             if (isLoad) {
                 bool ok1 = true, ok2 = true;
                 uint64_t v1 = load64(addr, ok1), v2 = load64(addr + 8, ok2);
