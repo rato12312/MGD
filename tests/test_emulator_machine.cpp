@@ -12,6 +12,7 @@
 #include "emulador-mgd/hos/Kernel.h"
 #include "emulador-mgd/hos/Session.h"
 #include "emulador-mgd/hos/PortRegistry.h"
+#include "emulador-mgd/hos/ServiceManager.h"
 #include "emulador-mgd/hos/Thread.h"
 
 static void poke32(emu::Cpu& cpu, uint64_t addr, uint32_t insn) {
@@ -1187,6 +1188,35 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cli->sendRequest(req), "cliente pede");
         hos::IpcMessage got;
         ASSERT_MSG(srv->recvRequest(got) && got.cmd == 99, "servidor recebe");
+    }
+
+    // sm: GetService entrega sessão do serviço publicado.
+    {
+        hos::ServiceManager sm;
+        ASSERT_MSG(sm.publish("nvdrv:a"), "publicou nvdrv");
+        hos::IpcMessage req;
+        req.cmd = 1;
+        const char* nm = "nvdrv:a";
+        req.payload = std::vector<uint8_t>(nm, nm + 7);
+        hos::IpcMessage rep;
+        ASSERT_MSG(sm.dispatch(req, rep), "entendeu cmd 1");
+        ASSERT_MSG(rep.cmd == 1 && rep.payload.size() == 4, "devolveu id");
+        uint32_t id = static_cast<uint32_t>(rep.payload[0]) |
+                      (static_cast<uint32_t>(rep.payload[1]) << 8) |
+                      (static_cast<uint32_t>(rep.payload[2]) << 16) |
+                      (static_cast<uint32_t>(rep.payload[3]) << 24);
+        std::shared_ptr<hos::Session> cli;
+        ASSERT_MSG(sm.session(id, cli), "sessao existe");
+        hos::IpcMessage bad;
+        bad.cmd = 1;
+        const char* bn = "nope:x";
+        bad.payload = std::vector<uint8_t>(bn, bn + 6);
+        hos::IpcMessage badrep;
+        ASSERT_MSG(sm.dispatch(bad, badrep) && badrep.cmd == 0, "inexistente = 0");
+        hos::IpcMessage weird;
+        weird.cmd = 77;
+        hos::IpcMessage wrep;
+        ASSERT_MSG(!sm.dispatch(weird, wrep), "cmd estranho nega");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
