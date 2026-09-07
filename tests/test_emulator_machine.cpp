@@ -9,6 +9,7 @@
 #include "emulador-mgd/handoff/CaptureStub.h"
 #include "emulador-mgd/runtime/Emulator.h"
 #include "emulador-mgd/loader/Lz4.h"
+#include "emulador-mgd/loader/NsoLoader.h"
 #include "emulador-mgd/loader/NroLoader.h"
 #include "emulador-mgd/hos/Kernel.h"
 #include "emulador-mgd/hos/Session.h"
@@ -1553,6 +1554,33 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(!emu::lz4::decompressBlock(bad, sizeof(bad), out), "truncado nega");
         const uint8_t badoff[] = {0x10, 'A', 0x05, 0x00};
         ASSERT_MSG(!emu::lz4::decompressBlock(badoff, sizeof(badoff), out), "offset ruim nega");
+    }
+
+    // NSO sintético: .text comprimido roda do entry.
+    {
+        std::vector<uint8_t> blob(0x100, 0);
+        blob[0] = 'N'; blob[1] = 'S'; blob[2] = 'O'; blob[3] = '0';
+        blob[0x0C] = 1; // text comprimido
+        // text: file 0x80, mem 0, decomp 8
+        blob[0x10] = 0x80;
+        blob[0x18] = 8;
+        blob[0x60] = 9; // comp 9
+        // bloco LZ4: token 0x80 + MOVZ X0,#7 + SVC#0
+        blob[0x80] = 0x80;
+        blob[0x81] = 0xE0; blob[0x82] = 0x00; blob[0x83] = 0x80; blob[0x84] = 0xD2;
+        blob[0x85] = 0x01; blob[0x86] = 0x00; blob[0x87] = 0x00; blob[0x88] = 0xD4;
+        emu::NsoImage img = emu::parseNso(blob.data(), blob.size());
+        ASSERT_MSG(img.valid && img.comp_text, "nso valido");
+        emu::Cpu cpu;
+        uint64_t entry = 0;
+        ASSERT_MSG(emu::loadNsoInto(img, blob.data(), cpu.ram(), cpu.ramSize(), 0, entry),
+                   "nso mapeado");
+        ASSERT_MSG(entry == 0, "entry no text");
+        cpu.setPc(entry);
+        ASSERT_MSG(cpu.run(8) == 2, "roda text descomprimido");
+        ASSERT_MSG(cpu.reg(0) == 7 && cpu.stopped(), "x0=7 e parou");
+        emu::NsoImage bad = emu::parseNso(blob.data(), 16);
+        ASSERT_MSG(!bad.valid, "curto invalido");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
