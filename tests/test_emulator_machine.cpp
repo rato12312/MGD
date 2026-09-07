@@ -1,3 +1,4 @@
+#include <cstring>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -22,6 +23,8 @@
 #include "emulador-mgd/hos/Event.h"
 #include "emulador-mgd/hos/Mutex.h"
 #include "emulador-mgd/hos/HidService.h"
+#include "emulador-mgd/hos/LblService.h"
+#include "emulador-mgd/hos/PsmService.h"
 #include "emulador-mgd/hos/TimeService.h"
 #include "emulador-mgd/hos/ServiceManager.h"
 #include "emulador-mgd/hos/Thread.h"
@@ -1603,6 +1606,26 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(apm.dispatch(g, r) && r.cmd == 1, "modo veio");
         ASSERT_MSG(!r.payload.empty() && r.payload[0] == 0, "handheld");
         ASSERT_MSG(!apm.docked(), "sem dock");
+    }
+
+    // Bateria 100 e brilho 1.0.
+    {
+        hos::PsmService psm;
+        hos::LblService lbl;
+        hos::IpcMessage m;
+        hos::IpcMessage r;
+        m.cmd = 1;
+        ASSERT_MSG(psm.dispatch(m, r) && r.payload[0] == 100, "bateria 100");
+        m.cmd = 1;
+        hos::IpcMessage lr;
+        ASSERT_MSG(lbl.dispatch(m, lr) && lr.cmd == 1, "brilho veio");
+        uint32_t u = static_cast<uint32_t>(lr.payload[0]) |
+                     (static_cast<uint32_t>(lr.payload[1]) << 8) |
+                     (static_cast<uint32_t>(lr.payload[2]) << 16) |
+                     (static_cast<uint32_t>(lr.payload[3]) << 24);
+        float b = 0;
+        std::memcpy(&b, &u, 4);
+        ASSERT_MSG(b == 1.0f, "brilho 1.0");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;

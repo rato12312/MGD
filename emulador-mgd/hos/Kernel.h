@@ -13,6 +13,8 @@
 #include "AudService.h"
 #include "FsService.h"
 #include "HidService.h"
+#include "LblService.h"
+#include "PsmService.h"
 #include "TimeService.h"
 #include "NvService.h"
 #include "ViService.h"
@@ -132,6 +134,8 @@ public:
         services_.publish("hid:u");   // input
         services_.publish("time:u");  // relógio
         services_.publish("apm");     // performance (handheld)
+        services_.publish("psm");     // bateria
+        services_.publish("lbl:u");   // brilho
     }
 
     // Bomba: um pedido pendente por sessão anda até o serviço dono.
@@ -151,6 +155,8 @@ public:
             else if (name == "hid:u") understood = hid_.dispatch(req, rep);
             else if (name == "time:u") understood = time_.dispatch(req, rep);
             else if (name == "apm") understood = apm_.dispatch(req, rep);
+            else if (name == "psm") understood = psm_.dispatch(req, rep);
+            else if (name == "lbl:u") understood = lbl_.dispatch(req, rep);
             if (understood && kv.second->sendReply(rep)) done++;
         }
         return done;
@@ -162,6 +168,8 @@ public:
     HidService& hid() { return hid_; }
     TimeService& time() { return time_; }
     ApmService& apm() { return apm_; }
+    PsmService& psm() { return psm_; }
+    LblService& lbl() { return lbl_; }
 
     SvcResult call(uint32_t num, SvcArgs& args) {
         switch (num) {
@@ -264,6 +272,8 @@ private:
     HidService hid_;
     TimeService time_;
     ApmService apm_;
+    PsmService psm_;
+    LblService lbl_;
 };
 
 } // namespace hos
