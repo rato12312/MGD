@@ -16,6 +16,7 @@
 #include "emulador-mgd/hos/ViService.h"
 #include "emulador-mgd/hos/AudService.h"
 #include "emulador-mgd/hos/FsService.h"
+#include "emulador-mgd/hos/Event.h"
 #include "emulador-mgd/hos/HidService.h"
 #include "emulador-mgd/hos/TimeService.h"
 #include "emulador-mgd/hos/ServiceManager.h"
@@ -1422,6 +1423,20 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(kernel.killProcess(applet), "applet morreu");
         ASSERT_MSG(!kernel.getProcess(applet, p), "morto nega");
         ASSERT_MSG(kernel.processCount() == 1, "resta o jogo");
+    }
+
+    // Eventos: espera falha, sinaliza, espera passa e consome.
+    {
+        hos::EventTable ev;
+        uint32_t e = ev.create();
+        ASSERT_MSG(!ev.wait(e), "sem sinal nega");
+        ASSERT_MSG(ev.signal(e), "sinalizou");
+        ASSERT_MSG(ev.wait(e), "passou");
+        ASSERT_MSG(!ev.wait(e), "consumiu (auto-clear)");
+        ASSERT_MSG(ev.signal(e) && ev.clear(e), "limpou");
+        ASSERT_MSG(!ev.wait(e, false), "limpo nega");
+        ASSERT_MSG(!ev.signal(999), "inexistente nega");
+        ASSERT_MSG(ev.close(e) && ev.count() == 0, "fechou");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
