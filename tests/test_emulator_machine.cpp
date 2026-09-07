@@ -2115,6 +2115,14 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(2) == 0x5A, "ldtrb leu");
     }
 
+    // MSR imediato (DAIF) aceita e segue.
+    {
+        emu::Cpu cpu;
+        uint64_t pc = cpu.pc();
+        ASSERT_MSG(cpu.step(0xD50043FFu), "msr daifset,#15");
+        ASSERT_MSG(cpu.pc() == pc + 4, "seguiu");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

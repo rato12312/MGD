@@ -773,6 +773,13 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFF8F01F) == 0xD500401F) { // MSR (imm) DAIFSet/DAIFClr/SPSel
+            // Aceita e segue (single-thread sem IRQ: sem efeito real).
+            // Bits: op1[18:16], CRm[11:8]=0001(DAIFSet)/0010(DAIFClr), op2[7:5].
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFFFF01F) == 0xD503201F) { // NOP e HINTs: aceita e segue
             pc_ += 4;
             steps_++;
