@@ -1834,6 +1834,21 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(vi.events().wait(e, false), "vsync acordou");
     }
 
+    // NEON: D alimenta V (alias), FADD soma 2 lanes, ORR move 128.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 3);
+        cpu.setReg(1, 4);
+        ASSERT_MSG(cpu.step(0x1E660000u), "d0=3.0 (v0[0])");
+        ASSERT_MSG(cpu.step(0x1E660021u), "d1=4.0 (v1[0])");
+        ASSERT_MSG(cpu.step(0x6E61D402u), "fadd v2.2d,v0.2d,v1.2d");
+        ASSERT_MSG(cpu.step(0x1E620043u), "scvtf x3,d2");
+        ASSERT_MSG(cpu.reg(3) == 7, "lane0=7");
+        ASSERT_MSG(cpu.step(0x6E221C43u), "orr v3.16b,v2.16b,v2.16b");
+        ASSERT_MSG(cpu.step(0x1E620063u), "scvtf x3,d3");
+        ASSERT_MSG(cpu.reg(3) == 7, "moveu 128");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

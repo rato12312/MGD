@@ -80,14 +80,14 @@ public:
     State save() const {
         State s;
         s.regs = regs_;
-        s.fpregs = fpregs_;
+        s.fpregs = fp_.d;
         s.sp = sp_; s.pc = pc_; s.steps = steps_; s.tpidr = tpidr_;
         s.n = flag_n_; s.z = flag_z_; s.c = flag_c_; s.v = flag_v_;
         return s;
     }
     void load(const State& s) {
         regs_ = s.regs;
-        fpregs_ = s.fpregs;
+        fp_.d = s.fpregs;
         sp_ = s.sp; pc_ = s.pc; steps_ = s.steps; tpidr_ = s.tpidr;
         flag_n_ = s.n; flag_z_ = s.z; flag_c_ = s.c; flag_v_ = s.v;
         stopped_ = false; // contexto novo, vida nova
@@ -382,7 +382,7 @@ public:
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             int m = static_cast<int>((insn >> 16) & 0x1F);
-            double a = fpregs_[n], b = fpregs_[m];
+            double a = fp_.d[n], b = fp_.d[m];
             double res = 0;
             if (base == 0x1EE02000) res = a + b;
             else if (base == 0x1EE03000) res = a - b;
@@ -390,7 +390,7 @@ public:
             else if (base == 0x1EE04000) res = (a >= b) ? a : b;
             else if (base == 0x1EE05000) res = (a <= b) ? a : b;
             else res = a / b;
-            fpregs_[d] = res;
+            fp_.d[d] = res;
             pc_ += 4;
             steps_++;
             return true;
@@ -398,7 +398,7 @@ public:
         if ((insn & 0xFFE0FC00) == 0x1E602000) { // FCMP Dn,Dm (flags; NaN = unordered)
             int n = static_cast<int>(dec.rn);
             int m = static_cast<int>((insn >> 16) & 0x1F);
-            double a = fpregs_[n], b = fpregs_[m];
+            double a = fp_.d[n], b = fp_.d[m];
             bool nan = (a != a) || (b != b);
             flag_n_ = !nan && (a < b);
             flag_z_ = !nan && (a == b);
@@ -414,11 +414,11 @@ public:
             uint32_t base = insn & 0xFFC0FC00;
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
-            double v = fpregs_[n];
+            double v = fp_.d[n];
             double res = (base == 0x1E61C000) ? __builtin_sqrt(v)
                        : (base == 0x1E614000) ? -v
                        : (v < 0 ? -v : v);
-            fpregs_[d] = res;
+            fp_.d[d] = res;
             pc_ += 4;
             steps_++;
             return true;
@@ -430,14 +430,14 @@ public:
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             int m = static_cast<int>((insn >> 16) & 0x1F);
-            float a = static_cast<float>(fpregs_[n]);
-            float b = static_cast<float>(fpregs_[m]);
+            float a = static_cast<float>(fp_.d[n]);
+            float b = static_cast<float>(fp_.d[m]);
             float res = 0;
             if (base == 0x1E202000) res = a + b;
             else if (base == 0x1E203000) res = a - b;
             else if (base == 0x1E200000) res = a * b;
             else res = a / b;
-            fpregs_[d] = static_cast<double>(res);
+            fp_.d[d] = static_cast<double>(res);
             pc_ += 4;
             steps_++;
             return true;
@@ -445,7 +445,7 @@ public:
         if ((insn & 0xFFC0FC00) == 0x1E624000) { // FCVT Sd,Dn (double->float)
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
-            fpregs_[d] = static_cast<double>(static_cast<float>(fpregs_[n]));
+            fp_.d[d] = static_cast<double>(static_cast<float>(fp_.d[n]));
             pc_ += 4;
             steps_++;
             return true;
@@ -453,7 +453,7 @@ public:
         if ((insn & 0xFFC0FC00) == 0x1E22C000) { // FCVT Dd,Sn (float->double)
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
-            fpregs_[d] = fpregs_[n]; // já guardado como double do float
+            fp_.d[d] = fp_.d[n]; // já guardado como double do float
             pc_ += 4;
             steps_++;
             return true;
@@ -465,8 +465,8 @@ public:
             int n = static_cast<int>(dec.rn);
             int m = static_cast<int>((insn >> 16) & 0x1F);
             int a = static_cast<int>((insn >> 10) & 0x1F);
-            double res = fpregs_[n] * fpregs_[m] + (isSub ? -fpregs_[a] : fpregs_[a]);
-            fpregs_[d] = res;
+            double res = fp_.d[n] * fp_.d[m] + (isSub ? -fp_.d[a] : fp_.d[a]);
+            fp_.d[d] = res;
             pc_ += 4;
             steps_++;
             return true;
@@ -476,7 +476,39 @@ public:
             int n = static_cast<int>(dec.rn);
             int m = static_cast<int>((insn >> 16) & 0x1F);
             int cond = static_cast<int>((insn >> 12) & 0xF);
-            fpregs_[d] = condTrue(cond) ? fpregs_[n] : fpregs_[m];
+            fp_.d[d] = condTrue(cond) ? fp_.d[n] : fp_.d[m];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFE0FC00) == 0x6E60D400 || (insn & 0xFFE0FC00) == 0x6E60DC00 ||
+            (insn & 0xFFE0FC00) == 0x6E60CC00 || (insn & 0xFFE0FC00) == 0x6E60FC00) {
+            // FADD / FSUB / FMUL / FDIV Vd.2D,Vn.2D,Vm.2D (opcodes [15:10])
+            uint32_t base = insn & 0xFFE0FC00;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            for (int lane = 0; lane < 2; lane++) {
+                double a = u2d(fp_.q[n][lane]), b = u2d(fp_.q[m][lane]);
+                double r = 0;
+                if (base == 0x6E60D400) r = a + b;
+                else if (base == 0x6E60DC00) r = a - b;
+                else if (base == 0x6E60CC00) r = a * b;
+                else r = a / b;
+                fp_.q[d][lane] = d2u(r);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFC0FC00) == 0x6E201C00) { // ORR Vd.16B,Vn,Vm (move 128)
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            uint64_t a0 = fp_.q[n][0] | fp_.q[m][0];
+            uint64_t a1 = fp_.q[n][1] | fp_.q[m][1];
+            fp_.q[d][0] = a0;
+            fp_.q[d][1] = a1;
             pc_ += 4;
             steps_++;
             return true;
@@ -484,7 +516,7 @@ public:
         if ((insn & 0xFFC0FC00) == 0x1E604000) { // FMOV Dd,Dn
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
-            fpregs_[d] = fpregs_[n];
+            fp_.d[d] = fp_.d[n];
             pc_ += 4;
             steps_++;
             return true;
@@ -494,7 +526,7 @@ public:
             bool isSigned = (insn & 0xFFC0FC00) == 0x1E620000;
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
-            double v = fpregs_[n];
+            double v = fp_.d[n];
             uint64_t res = isSigned ? static_cast<uint64_t>(static_cast<int64_t>(v))
                                     : static_cast<uint64_t>(v);
             if (d != 31) regs_[d] = res;
@@ -508,7 +540,7 @@ public:
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             uint64_t nv = (n == 31) ? 0 : regs_[n];
-            fpregs_[d] = isSigned ? static_cast<double>(static_cast<int64_t>(nv))
+            fp_.d[d] = isSigned ? static_cast<double>(static_cast<int64_t>(nv))
                                   : static_cast<double>(nv);
             pc_ += 4;
             steps_++;
@@ -852,9 +884,9 @@ public:
             if (isLoad) {
                 uint64_t v = 0;
                 __builtin_memcpy(&v, &mem_[static_cast<size_t>(pa)], 8);
-                fpregs_[t] = u2d(v);
+                fp_.d[t] = u2d(v);
             } else {
-                uint64_t v = d2u(fpregs_[t]);
+                uint64_t v = d2u(fp_.d[t]);
                 __builtin_memcpy(&mem_[static_cast<size_t>(pa)], &v, 8);
             }
             pc_ += 4;
@@ -887,11 +919,11 @@ public:
                 __builtin_memcpy(&mem_[static_cast<size_t>(a)], &v, 8);
             };
             if (isLoad) {
-                fpregs_[t1] = u2d(ld(pa));
-                fpregs_[t2] = u2d(ld(pa + 8));
+                fp_.d[t1] = u2d(ld(pa));
+                fp_.d[t2] = u2d(ld(pa + 8));
             } else {
-                st(pa, d2u(fpregs_[t1]));
-                st(pa + 8, d2u(fpregs_[t2]));
+                st(pa, d2u(fp_.d[t1]));
+                st(pa + 8, d2u(fp_.d[t2]));
             }
             if (preIndex || postIndex) {
                 uint64_t nb = base + static_cast<uint64_t>(off * 8);
@@ -1254,8 +1286,19 @@ private:
         return d;
     }
 
+    // Arquivo FP/NEON: D[n] é a metade baixa de V[n] (alias real do ARM).
+    union FpFile {
+        std::array<double, 32> d;
+        std::array<std::array<uint64_t, 2>, 32> q;
+        FpFile() {
+            for (size_t i = 0; i < 32; i++) {
+                q[i][0] = 0;
+                q[i][1] = 0;
+            }
+        }
+    };
     std::array<uint64_t, REG_COUNT> regs_{};
-    std::array<double, 32> fpregs_{};
+    FpFile fp_;
     std::vector<uint8_t> mem_;
     std::array<uint32_t, 16> unknown_log_{};
     size_t unknown_pos_ = 0;
