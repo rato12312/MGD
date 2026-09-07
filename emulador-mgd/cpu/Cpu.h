@@ -807,16 +807,21 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFC00000) == 0x6D000000 || (insn & 0xFFC00000) == 0x6D400000) {
-            // STP / LDP Dd1,Dd2,[Xn,#imm*8] (par double, offset)
-            bool isLoad = (insn & 0xFFC00000) == 0x6D400000;
+        if ((insn & 0xFFC00000) == 0x6D000000 || (insn & 0xFFC00000) == 0x6D400000 ||
+            (insn & 0xFFC00000) == 0x6D800000 || (insn & 0xFFC00000) == 0x6DC00000 ||
+            (insn & 0xFFC00000) == 0x6C800000 || (insn & 0xFFC00000) == 0x6CC00000) {
+            // STP / LDP Dd1,Dd2,[Xn,#imm] offset, pré e pós-index
+            uint32_t fam = insn & 0xFFC00000;
+            bool isLoad = (fam == 0x6D400000 || fam == 0x6DC00000 || fam == 0x6CC00000);
+            bool preIndex = (fam == 0x6D800000 || fam == 0x6DC00000);
+            bool postIndex = (fam == 0x6C800000 || fam == 0x6CC00000);
             int t1 = static_cast<int>(insn & 0x1F);
             int n = static_cast<int>((insn >> 5) & 0x1F);
             int t2 = static_cast<int>((insn >> 10) & 0x1F);
             int64_t off = static_cast<int64_t>((insn >> 15) & 0x7F);
             if (off & 0x40) off |= ~static_cast<int64_t>(0x7F);
             uint64_t base = (n == 31) ? sp_ : regs_[n];
-            uint64_t addr = base + static_cast<uint64_t>(off * 8);
+            uint64_t addr = base + (preIndex ? static_cast<uint64_t>(off * 8) : 0);
             uint64_t pa = 0;
             if (!phys(addr, 16, !isLoad, false, pa)) return false;
             auto ld = [&](uint64_t a) {
@@ -835,6 +840,11 @@ public:
             } else {
                 st(pa, d2u(fpregs_[t1]));
                 st(pa + 8, d2u(fpregs_[t2]));
+            }
+            if (preIndex || postIndex) {
+                uint64_t nb = base + static_cast<uint64_t>(off * 8);
+                if (n == 31) sp_ = nb;
+                else regs_[n] = nb;
             }
             pc_ += 4;
             steps_++;

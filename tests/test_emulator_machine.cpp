@@ -976,6 +976,26 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(1) == 0xCC, "novo na ram");
     }
 
+    // Pilha FP: STP pré + LDP pós de par double.
+    {
+        emu::Cpu cpu;
+        cpu.setSp(0x1000);
+        cpu.setReg(0, 5);
+        ASSERT_MSG(cpu.step(0x1E660000u), "d8? d0=5.0");
+        ASSERT_MSG(cpu.step(0x1E604008u), "fmov d8,d0");
+        cpu.setReg(0, 9);
+        ASSERT_MSG(cpu.step(0x1E660000u), "d0=9.0");
+        ASSERT_MSG(cpu.step(0x1E604009u), "fmov d9,d0");
+        ASSERT_MSG(cpu.step(0x6DBF27E8u), "stp d8,d9,[sp,#-16]!");
+        ASSERT_MSG(cpu.sp() == 0xFF0, "sp desceu");
+        ASSERT_MSG(cpu.step(0x6CC12FEAu), "ldp d10,d11,[sp],#16");
+        ASSERT_MSG(cpu.sp() == 0x1000, "sp voltou");
+        ASSERT_MSG(cpu.step(0x1E62014Bu), "scvtf x11,d10");
+        ASSERT_MSG(cpu.reg(11) == 5, "fp da pilha 5");
+        ASSERT_MSG(cpu.step(0x1E62016Bu), "scvtf x11,d11");
+        ASSERT_MSG(cpu.reg(11) == 9, "fp da pilha 9");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
