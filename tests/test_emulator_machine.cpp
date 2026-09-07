@@ -1045,6 +1045,31 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(2) == 0xFF, "lsr w");
     }
 
+    // Fibonacci(10)=55: loop, branch, flags, call nada — só CPU.
+    {
+        emu::Cpu cpu;
+        std::vector<uint32_t> prog = {
+            0xD2800140u, // MOVZ X0, #10
+            0xD2800020u, // MOVZ X1, #0
+            0xD2800022u, // MOVZ X2, #1
+            0xB40000C0u, // CBZ X0, done
+            0xF1000400u, // SUBS X0, X0, #1
+            0x8B020023u, // ADD X3, X1, X2
+            0xAA0203E1u, // ORR X1, XZR, X2
+            0xAA0303E2u, // ORR X2, XZR, X3
+            0x17FFFFFBu, // B loop
+            0xAA0103E0u, // done: ORR X0, XZR, X1
+            0xD4000001u, // SVC #0
+        };
+        for (size_t i = 0; i < prog.size(); ++i)
+            for (int b = 0; b < 4; b++)
+                cpu.ram()[i * 4 + b] = static_cast<uint8_t>(prog[i] >> (8 * b));
+        uint64_t done = cpu.run(256);
+        ASSERT_MSG(cpu.stopped(), "fib parou limpo");
+        ASSERT_MSG(cpu.reg(0) == 55, "fib(10)=55");
+        ASSERT_MSG(done == 66, "3 movz + 10x6 loop + cbz+orr+svc");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
