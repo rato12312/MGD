@@ -1902,6 +1902,33 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(r64(0x200) == 18.0 && r64(0x208) == 25.0, "fmla certo");
     }
 
+    // FMAX vetorial.
+    {
+        emu::Cpu cpu;
+        auto wdb = [&](uint64_t addr, double d) {
+            uint64_t u = 0;
+            __builtin_memcpy(&u, &d, 8);
+            for (int i = 0; i < 8; i++)
+                cpu.ram()[addr + i] = static_cast<uint8_t>(u >> (8 * i));
+        };
+        wdb(0x100, 3.0); wdb(0x108, 9.0);
+        wdb(0x110, 7.0); wdb(0x118, 1.0);
+        cpu.setReg(1, 0x100);
+        ASSERT_MSG(cpu.step(0x3DC00020u), "ldr q0");
+        ASSERT_MSG(cpu.step(0x3DC00421u), "ldr q1");
+        ASSERT_MSG(cpu.step(0x6E610402u), "fmax v2.2d,v0.2d,v1.2d");
+        ASSERT_MSG(cpu.step(0xD2804003u), "movz x3,#0x200");
+        ASSERT_MSG(cpu.step(0x3D800062u), "str q2");
+        auto rdb = [&](uint64_t addr) {
+            uint64_t v = 0;
+            for (int i = 0; i < 8; i++) v |= static_cast<uint64_t>(cpu.ram()[addr + i]) << (8 * i);
+            double d = 0;
+            __builtin_memcpy(&d, &v, 8);
+            return d;
+        };
+        ASSERT_MSG(rdb(0x200) == 7.0 && rdb(0x208) == 9.0, "fmax certo");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

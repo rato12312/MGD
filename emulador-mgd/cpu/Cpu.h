@@ -531,6 +531,24 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE0FC00) == 0x6E600400 || (insn & 0xFFE0FC00) == 0x6E601400) {
+            // FMAX / FMIN Vd.2D,Vn.2D,Vm.2D (NaN: fica o outro, estilo maxNum)
+            bool isMax = (insn & 0xFFE0FC00) == 0x6E600400;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            for (int lane = 0; lane < 2; lane++) {
+                double a = u2d(fp_.q[n][lane]), b = u2d(fp_.q[m][lane]);
+                double r;
+                if (a != a) r = b;
+                else if (b != b) r = a;
+                else r = isMax ? ((a >= b) ? a : b) : ((a <= b) ? a : b);
+                fp_.q[d][lane] = d2u(r);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFC0FC00) == 0x6E201C00) { // ORR Vd.16B,Vn,Vm (move 128)
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
