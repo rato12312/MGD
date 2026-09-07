@@ -516,6 +516,21 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE0FC00) == 0x6E20CC00 || (insn & 0xFFE0FC00) == 0x6E20D000) {
+            // FMLA / FMLS Vd.2D,Vn.2D,Vm.2D (d +=/-= n*m por lane)
+            bool isSub = (insn & 0xFFE0FC00) == 0x6E20D000;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            for (int lane = 0; lane < 2; lane++) {
+                double r = u2d(fp_.q[d][lane]) + (isSub ? -1.0 : 1.0) * u2d(fp_.q[n][lane]) *
+                                                        u2d(fp_.q[m][lane]);
+                fp_.q[d][lane] = d2u(r);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFC0FC00) == 0x6E201C00) { // ORR Vd.16B,Vn,Vm (move 128)
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);

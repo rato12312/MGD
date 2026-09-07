@@ -1868,6 +1868,40 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.ram()[0x208] == 22, "lane1=22");
     }
 
+    // FMLA vetorial: d += n*m por lane.
+    {
+        emu::Cpu cpu;
+        auto w64 = [&](uint64_t addr, uint64_t v) {
+            for (int i = 0; i < 8; i++)
+                cpu.ram()[addr + i] = static_cast<uint8_t>(v >> (8 * i));
+        };
+        // doubles como bits: 2.0=0x4000000000000000 etc. usa inteiros que cabem exato
+        auto dbits = [](uint64_t iv) {
+            double d = static_cast<double>(iv);
+            uint64_t u = 0;
+            __builtin_memcpy(&u, &d, 8);
+            return u;
+        };
+        w64(0x100, dbits(2)); w64(0x108, dbits(3));
+        w64(0x110, dbits(4)); w64(0x118, dbits(5));
+        w64(0x120, dbits(10)); w64(0x128, dbits(10));
+        cpu.setReg(1, 0x100);
+        ASSERT_MSG(cpu.step(0x3DC00020u), "ldr q0");
+        ASSERT_MSG(cpu.step(0x3DC00421u), "ldr q1");
+        ASSERT_MSG(cpu.step(0x3DC00822u), "ldr q2");
+        ASSERT_MSG(cpu.step(0x6E21CC02u), "fmla v2.2d,v0.2d,v1.2d");
+        ASSERT_MSG(cpu.step(0xD2804003u), "movz x3,#0x200");
+        ASSERT_MSG(cpu.step(0x3D800062u), "str q2");
+        auto r64 = [&](uint64_t addr) {
+            uint64_t v = 0;
+            for (int i = 0; i < 8; i++) v |= static_cast<uint64_t>(cpu.ram()[addr + i]) << (8 * i);
+            double d = 0;
+            __builtin_memcpy(&d, &v, 8);
+            return d;
+        };
+        ASSERT_MSG(r64(0x200) == 18.0 && r64(0x208) == 25.0, "fmla certo");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
