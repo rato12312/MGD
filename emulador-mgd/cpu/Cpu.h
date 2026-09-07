@@ -1258,6 +1258,84 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFC00000) == 0xBD000000 || (insn & 0xFFC00000) == 0xBD400000) {
+            // STR / LDR St,[Xn,#imm*4] (float bit-exato). size=10 -> top 0xBD
+            // (0xB5 seria CBNZ! colisão checada.)
+            bool isLoad = (insn & 0xFFC00000) == 0xBD400000;
+            int t = static_cast<int>(insn & 0x1F);
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            uint64_t base = (n == 31) ? sp_ : regs_[n];
+            uint64_t addr = base + static_cast<uint64_t>((insn >> 10) & 0xFFF) * 4u;
+            uint64_t pa = 0;
+            if (!phys(addr, 4, !isLoad, false, pa)) return false;
+            if (isLoad) {
+                uint32_t w = 0;
+                __builtin_memcpy(&w, &mem_[static_cast<size_t>(pa)], 4);
+                float f = 0;
+                __builtin_memcpy(&f, &w, 4);
+                fp_.d[t] = static_cast<double>(f);
+            } else {
+                float f = static_cast<float>(fp_.d[t]);
+                uint32_t w = 0;
+                __builtin_memcpy(&w, &f, 4);
+                __builtin_memcpy(&mem_[static_cast<size_t>(pa)], &w, 4);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFC00000) == 0x2D000000 || (insn & 0xFFC00000) == 0x2D400000 ||
+            (insn & 0xFFC00000) == 0x2D800000 || (insn & 0xFFC00000) == 0x2DC00000 ||
+            (insn & 0xFFC00000) == 0x2C800000 || (insn & 0xFFC00000) == 0x2CC00000) {
+            // STP / LDP St1,St2 (float 32), offset/pre/pos
+            uint32_t fam = insn & 0xFFC00000;
+            bool isLoad = (fam == 0x2D400000 || fam == 0x2DC00000 || fam == 0x2CC00000);
+            bool preIndex = (fam == 0x2D800000 || fam == 0x2DC00000);
+            bool postIndex = (fam == 0x2C800000 || fam == 0x2CC00000);
+            int t1 = static_cast<int>(insn & 0x1F);
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            int t2 = static_cast<int>((insn >> 10) & 0x1F);
+            int64_t off = static_cast<int64_t>((insn >> 15) & 0x7F);
+            if (off & 0x40) off |= ~static_cast<int64_t>(0x7F);
+            uint64_t base = (n == 31) ? sp_ : regs_[n];
+            uint64_t addr = base + (preIndex ? static_cast<uint64_t>(off * 4) : 0);
+            auto lds = [&](uint64_t a, bool& ok) {
+                uint64_t pa = 0;
+                ok = phys(a, 4, false, false, pa);
+                if (!ok) return 0.0;
+                uint32_t w = 0;
+                __builtin_memcpy(&w, &mem_[static_cast<size_t>(pa)], 4);
+                float f = 0;
+                __builtin_memcpy(&f, &w, 4);
+                return static_cast<double>(f);
+            };
+            auto sts = [&](uint64_t a, double v) {
+                uint64_t pa = 0;
+                if (!phys(a, 4, true, false, pa)) return false;
+                float f = static_cast<float>(v);
+                uint32_t w = 0;
+                __builtin_memcpy(&w, &f, 4);
+                __builtin_memcpy(&mem_[static_cast<size_t>(pa)], &w, 4);
+                return true;
+            };
+            if (isLoad) {
+                bool ok1 = true, ok2 = true;
+                double v1 = lds(addr, ok1), v2 = lds(addr + 4, ok2);
+                if (!ok1 || !ok2) return false;
+                fp_.d[t1] = v1;
+                fp_.d[t2] = v2;
+            } else {
+                if (!sts(addr, fp_.d[t1]) || !sts(addr + 4, fp_.d[t2])) return false;
+            }
+            if (preIndex || postIndex) {
+                uint64_t nb = base + static_cast<uint64_t>(off * 4);
+                if (n == 31) sp_ = nb;
+                else regs_[n] = nb;
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if (top == 0xB8 || top == 0xB9) { // STRW / LDRW / LDRSW
             int opc = static_cast<int>((insn >> 22) & 0x3);
             if (top == 0xB8 && opc == 0x2) { // LDRSW Xt (estende sinal)

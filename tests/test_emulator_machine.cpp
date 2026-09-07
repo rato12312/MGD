@@ -2082,6 +2082,20 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == 0xFFFFFFFFFFFFFFFFull, "sw estende");
     }
 
+    // LDR/STR S + STP/LDP S (float 32).
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 7);
+        cpu.setReg(1, 0x100);
+        ASSERT_MSG(cpu.step(0x1E660000u), "d0=7.0");
+        ASSERT_MSG(cpu.step(0x1E624001u), "fcvt s1,d0");
+        ASSERT_MSG(cpu.step(0xBD000021u), "str s1,[x1]");
+        ASSERT_MSG(cpu.step(0xBD400022u), "ldr s2,[x1]");
+        ASSERT_MSG(cpu.step(0x1E22C042u), "fcvt d2,s2");
+        ASSERT_MSG(cpu.step(0x1E620043u), "scvtf x3,d2");
+        ASSERT_MSG(cpu.reg(3) == 7, "float 32 voltou");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
