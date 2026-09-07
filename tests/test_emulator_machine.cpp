@@ -769,6 +769,19 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(1) == 0x10000, "w certo");
     }
 
+    // ALU registrada 32-bit.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 3);
+        cpu.setReg(2, 4);
+        ASSERT_MSG(cpu.step(0x0B020420u), "addw w0,w1,w2,lsl#1");
+        ASSERT_MSG(cpu.reg(0) == 11, "3+4*2");
+        cpu.setReg(1, 0xF0);
+        cpu.setReg(2, 0x3C);
+        ASSERT_MSG(cpu.step(0x0A020023u), "andw w3,w1,w2");
+        ASSERT_MSG(cpu.reg(3) == 0x30, "and 32");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
