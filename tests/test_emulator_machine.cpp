@@ -1522,6 +1522,7 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(emu.frame("frame_idle.ppm", 8), "frame parado saiu");
         ASSERT_MSG(emu.frameCount() == 2, "2 frames");
         ASSERT_MSG(emu.lastFrameMs() >= 0.0, "tempo medido");
+        ASSERT_MSG(emu.fps() > 0.0, "fps existe");
     }
 
     // Boot de NRO pelo Emulador: heap via SVC, saída limpa.

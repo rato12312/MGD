@@ -59,10 +59,13 @@ public:
         last_frame_ms_ =
             std::chrono::duration<double, std::milli>(t1 - t0).count();
         frames_++;
+        avg_ms_ = (frames_ == 1) ? last_frame_ms_ : avg_ms_ * 0.9 + last_frame_ms_ * 0.1;
         return ok;
     }
     double lastFrameMs() const { return last_frame_ms_; }
     uint64_t frameCount() const { return frames_; }
+    // FPS honesto: média móvel do tempo medido (0 = sem dado).
+    double fps() const { return avg_ms_ > 0.0 ? 1000.0 / avg_ms_ : 0.0; }
 
     // Deposita programa (u32 little-endian) na RAM da CPU.
     bool loadProgram(const std::vector<uint32_t>& prog, uint64_t base = 0) {
@@ -109,6 +112,7 @@ private:
     odyssey::OdysseyWorld world_;
     MgdSwitches switches_;
     double last_frame_ms_ = 0.0;
+    double avg_ms_ = 0.0;
     uint64_t frames_ = 0;
 };
 
