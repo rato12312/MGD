@@ -704,6 +704,21 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(11) == 9, "d11=9.0");
     }
 
+    // FMAX / FMIN.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 3);
+        cpu.setReg(1, 7);
+        ASSERT_MSG(cpu.step(0x1E660000u), "d0=3.0");
+        ASSERT_MSG(cpu.step(0x1E660021u), "d1=7.0");
+        ASSERT_MSG(cpu.step(0x1EE14002u), "fmax d2,d0,d1");
+        ASSERT_MSG(cpu.step(0x1E620043u), "scvtf x3,d2");
+        ASSERT_MSG(cpu.reg(3) == 7, "max=7");
+        ASSERT_MSG(cpu.step(0x1EE15004u), "fmin d4,d0,d1");
+        ASSERT_MSG(cpu.step(0x1E620085u), "scvtf x5,d4");
+        ASSERT_MSG(cpu.reg(5) == 3, "min=3");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

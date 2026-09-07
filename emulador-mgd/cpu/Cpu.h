@@ -266,17 +266,21 @@ public:
             return true;
         }
         if ((insn & 0xFFE03C00) == 0x1EE00000 || (insn & 0xFFE03C00) == 0x1EE02000 ||
-            (insn & 0xFFE03C00) == 0x1EE03000 || (insn & 0xFFE03C00) == 0x1EE01000) {
-            // FMUL / FADD / FSUB / FDIV Dd,Dn,Dm (família 0x1EE, opcode [15:12])
+            (insn & 0xFFE03C00) == 0x1EE03000 || (insn & 0xFFE03C00) == 0x1EE01000 ||
+            (insn & 0xFFE03C00) == 0x1EE04000 || (insn & 0xFFE03C00) == 0x1EE05000) {
+            // FMUL / FADD / FSUB / FDIV / FMAX / FMIN Dd,Dn,Dm
             uint32_t base = insn & 0xFFE03C00;
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             int m = static_cast<int>((insn >> 16) & 0x1F);
+            double a = fpregs_[n], b = fpregs_[m];
             double res = 0;
-            if (base == 0x1EE02000) res = fpregs_[n] + fpregs_[m];
-            else if (base == 0x1EE03000) res = fpregs_[n] - fpregs_[m];
-            else if (base == 0x1EE00000) res = fpregs_[n] * fpregs_[m];
-            else res = fpregs_[n] / fpregs_[m];
+            if (base == 0x1EE02000) res = a + b;
+            else if (base == 0x1EE03000) res = a - b;
+            else if (base == 0x1EE00000) res = a * b;
+            else if (base == 0x1EE04000) res = (a >= b) ? a : b;
+            else if (base == 0x1EE05000) res = (a <= b) ? a : b;
+            else res = a / b;
             fpregs_[d] = res;
             pc_ += 4;
             steps_++;
