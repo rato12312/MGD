@@ -16,6 +16,7 @@
 #include "emulador-mgd/hos/ViService.h"
 #include "emulador-mgd/hos/AudService.h"
 #include "emulador-mgd/hos/FsService.h"
+#include "emulador-mgd/hos/HidService.h"
 #include "emulador-mgd/hos/ServiceManager.h"
 #include "emulador-mgd/hos/Thread.h"
 
@@ -1363,6 +1364,32 @@ bool run_emulator_machine_tests() {
         missing.payload = {'x'};
         hos::IpcMessage mrep;
         ASSERT_MSG(fs.dispatch(missing, mrep) && mrep.cmd == 0, "inexistente = 0");
+    }
+
+    // Input: aperta A+B, lê, solta A.
+    {
+        hos::HidService hid;
+        hos::IpcMessage p;
+        hos::IpcMessage r;
+        p.cmd = 1;
+        uint64_t ab = hos::BTN_A | hos::BTN_B;
+        p.payload.resize(8);
+        for (int i = 0; i < 8; i++) p.payload[i] = static_cast<uint8_t>(ab >> (8 * i));
+        ASSERT_MSG(hid.dispatch(p, r) && r.cmd == 1, "apertou");
+        hos::IpcMessage g;
+        g.cmd = 3;
+        hos::IpcMessage s;
+        ASSERT_MSG(hid.dispatch(g, s) && s.cmd == 1, "leu");
+        uint64_t m = 0;
+        for (int i = 0; i < 8; i++) m |= static_cast<uint64_t>(s.payload[i]) << (8 * i);
+        ASSERT_MSG(m == ab, "mascara certa");
+        hos::IpcMessage rel;
+        rel.cmd = 2;
+        rel.payload.resize(8);
+        for (int i = 0; i < 8; i++)
+            rel.payload[i] = static_cast<uint8_t>(hos::BTN_A >> (8 * i));
+        ASSERT_MSG(hid.dispatch(rel, r), "soltou A");
+        ASSERT_MSG(hid.buttons() == hos::BTN_B, "resta B");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;

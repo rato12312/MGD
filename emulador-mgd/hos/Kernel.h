@@ -10,6 +10,7 @@
 #include "../ram/Mmu.h"
 #include "AudService.h"
 #include "FsService.h"
+#include "HidService.h"
 #include "NvService.h"
 #include "ViService.h"
 #include "ServiceManager.h"
@@ -106,6 +107,7 @@ public:
         services_.publish("vi:u");    // vídeo/display
         services_.publish("audren:u"); // áudio render
         services_.publish("fsp-srv"); // filesystem
+        services_.publish("hid:u");   // input
     }
 
     // Bomba: um pedido pendente por sessão anda até o serviço dono.
@@ -122,6 +124,7 @@ public:
             else if (name == "vi:u") understood = vi_.dispatch(req, rep);
             else if (name == "audren:u") understood = aud_.dispatch(req, rep);
             else if (name == "fsp-srv") understood = fs_.dispatch(req, rep);
+            else if (name == "hid:u") understood = hid_.dispatch(req, rep);
             if (understood && kv.second->sendReply(rep)) done++;
         }
         return done;
@@ -130,6 +133,7 @@ public:
     ViService& vi() { return vi_; }
     AudService& aud() { return aud_; }
     FsService& fs() { return fs_; }
+    HidService& hid() { return hid_; }
 
     SvcResult call(uint32_t num, SvcArgs& args) {
         switch (num) {
@@ -227,6 +231,7 @@ private:
     ViService vi_;
     AudService aud_;
     FsService fs_;
+    HidService hid_;
 };
 
 } // namespace hos
