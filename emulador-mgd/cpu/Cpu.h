@@ -129,11 +129,24 @@ public:
             return true;
         }
         uint8_t top = static_cast<uint8_t>(insn >> 24);
-        if ((top & 0xFC) == 0xD2) { // MOVZ 64-bit
+        if ((top & 0xFC) == 0xD2 || (top & 0xFC) == 0x52) { // MOVZ 64/32-bit
+            bool is64 = (top & 0xFC) == 0xD2;
             int d = static_cast<int>(dec.rd);
             uint16_t imm = static_cast<uint16_t>((dec.hex >> 5) & 0xFFFF);
-            int shift = static_cast<int>(dec.hw) * 16;
-            setReg(d, static_cast<uint64_t>(imm) << shift);
+            int shift = static_cast<int>(((dec.hex >> 21) & 0x3)) * 16;
+            uint64_t v = static_cast<uint64_t>(imm) << shift;
+            if (d != 31) regs_[d] = is64 ? v : (v & 0xFFFFFFFFull);
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((top & 0xFC) == 0x92 || (top & 0xFC) == 0x12) { // MOVN 64/32-bit
+            bool is64 = (top & 0xFC) == 0x92;
+            int d = static_cast<int>(dec.rd);
+            uint16_t imm = static_cast<uint16_t>((dec.hex >> 5) & 0xFFFF);
+            int shift = static_cast<int>(((dec.hex >> 21) & 0x3)) * 16;
+            uint64_t v = ~(static_cast<uint64_t>(imm) << shift);
+            if (d != 31) regs_[d] = is64 ? v : (v & 0xFFFFFFFFull);
             pc_ += 4;
             steps_++;
             return true;

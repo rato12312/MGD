@@ -760,6 +760,15 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(1) == 0xFFFFFFFDull, "5-8 wrap zero-extend");
     }
 
+    // MOVN + MOVZ 32-bit.
+    {
+        emu::Cpu cpu;
+        ASSERT_MSG(cpu.step(0x92800000u), "movn x0,#0");
+        ASSERT_MSG(cpu.reg(0) == 0xFFFFFFFFFFFFFFFFull, "~0");
+        ASSERT_MSG(cpu.step(0x52A00021u), "movz w1,#1,lsl#16");
+        ASSERT_MSG(cpu.reg(1) == 0x10000, "w certo");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
