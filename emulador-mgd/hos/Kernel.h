@@ -275,6 +275,8 @@ private:
     uint32_t next_handle_ = 1;
     std::unordered_map<uint32_t, uint32_t> handles_;
     emu::Mmu* mmu_ = nullptr;
+    uint8_t* ram_ = nullptr;
+    uint64_t ram_size_ = 0;
     Scheduler sched_;
     ServiceManager services_;
     NvService nv_;

@@ -23,12 +23,12 @@ struct SvcHost {
 
 union ArmInsn {
     uint32_t hex;
-    mgd::Field<0, 5, uint32_t> rd;
-    mgd::Field<5, 5, uint32_t> rn;
-    mgd::Field<10, 12, uint32_t> imm12;
-    mgd::Field<16, 5, uint32_t> rm;
-    mgd::Field<21, 2, uint32_t> hw;
-    mgd::Field<0, 26, int32_t> off26;
+    ::port::mgd::Field<0, 5, uint32_t> rd;
+    ::port::mgd::Field<5, 5, uint32_t> rn;
+    ::port::mgd::Field<10, 12, uint32_t> imm12;
+    ::port::mgd::Field<16, 5, uint32_t> rm;
+    ::port::mgd::Field<21, 2, uint32_t> hw;
+    ::port::mgd::Field<0, 26, int32_t> off26;
 };
 
 class Cpu {
@@ -122,10 +122,11 @@ public:
         }
         ArmInsn dec;
         dec.hex = insn;
+        uint8_t top = static_cast<uint8_t>(insn >> 24);
         if ((insn & 0xFFE0001F) == 0xD4000001) { // SVC #imm
             uint32_t imm = (insn >> 5) & 0xFFFF;
             if (imm == 0) { stopped_ = true; exit_code_ = 0; }
-            else if (imm == 1 && !kernel_) { stopped_ = true; exit_code_ = regs_[0] & 0xFF; }
+            else if (imm == 1 && !svc_host_) { stopped_ = true; exit_code_ = regs_[0] & 0xFF; }
             else if (svc_host_) {
                 // Chamada HOS: X0-X7 entram, OK devolve out em X0/X1,
                 // erro devolve o código em X0 (convenção nossa, documentada).
@@ -172,7 +173,6 @@ public:
             steps_++;
             return true;
         }
-        uint8_t top = static_cast<uint8_t>(insn >> 24);
         if ((top & 0xFC) == 0xD2 || (top & 0xFC) == 0x52) { // MOVZ 64/32-bit
             bool is64 = (top & 0xFC) == 0xD2;
             int d = static_cast<int>(dec.rd);
@@ -327,7 +327,7 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFE0FC00) == 0xC85FFC00 || (insn & 0xFFE0FC00) == 0xC85F7C00) {
+        if ((insn & 0xFFFFFC00) == 0xC85FFC00 || (insn & 0xFFFFFC00) == 0xC85F7C00) {
             // LDAR / LDAXR Xt,[Xn] (single-thread: mesma coisa)
             int t = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
@@ -340,7 +340,7 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFE0FC00) == 0xC800FC00) { // STLR Xt,[Xn]
+        if ((insn & 0xFFFFFC00) == 0xC81FFC00) { // STLR Xt,[Xn]
             int t = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             uint64_t base = (n == 31) ? sp_ : regs_[n];
@@ -349,7 +349,7 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFE0FC00) == 0xC8EBFC00) { // SWPAL Xt,Xs,[Xn]
+        if ((insn & 0xFFE0FC00) == 0xC8A0BC00) { // SWPAL Xt,Xs,[Xn]
             int t = static_cast<int>(dec.rd);
             int s = static_cast<int>((insn >> 16) & 0x1F);
             int n = static_cast<int>(dec.rn);
@@ -374,12 +374,12 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFE03C00) == 0x1EE00000 || (insn & 0xFFE03C00) == 0x1EE02000 ||
-            (insn & 0xFFE03C00) == 0x1EE03000 || (insn & 0xFFE03C00) == 0x1EE01000 ||
-            (insn & 0xFFE03C00) == 0x1EE04000 || (insn & 0xFFE03C00) == 0x1EE05000 ||
-            (insn & 0xFFE03C00) == 0x1EE08000) {
+        if ((insn & 0xFFE0FC00) == 0x1EE00000 || (insn & 0xFFE0FC00) == 0x1EE02000 ||
+            (insn & 0xFFE0FC00) == 0x1EE03000 || (insn & 0xFFE0FC00) == 0x1EE01000 ||
+            (insn & 0xFFE0FC00) == 0x1EE04000 || (insn & 0xFFE0FC00) == 0x1EE05000 ||
+            (insn & 0xFFE0FC00) == 0x1EE08000) {
             // FMUL / FADD / FSUB / FDIV / FMAX / FMIN / FNMUL Dd,Dn,Dm
-            uint32_t base = insn & 0xFFE03C00;
+            uint32_t base = insn & 0xFFE0FC00;
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             int m = static_cast<int>((insn >> 16) & 0x1F);
@@ -410,10 +410,10 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFC0FC00) == 0x1E61C000 || (insn & 0xFFC0FC00) == 0x1E614000 ||
-            (insn & 0xFFC0FC00) == 0x1E60C000) {
+        if ((insn & 0xFFFFFC00) == 0x1E61C000 || (insn & 0xFFFFFC00) == 0x1E614000 ||
+            (insn & 0xFFFFFC00) == 0x1E60C000) {
             // FSQRT / FNEG / FABS Dd,Dn
-            uint32_t base = insn & 0xFFC0FC00;
+            uint32_t base = insn & 0xFFFFFC00;
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             double v = fp_.d[n];
@@ -428,7 +428,7 @@ public:
         if ((insn & 0xFFE03C00) == 0x1E200000 || (insn & 0xFFE03C00) == 0x1E202000 ||
             (insn & 0xFFE03C00) == 0x1E203000 || (insn & 0xFFE03C00) == 0x1E201000) {
             // FMUL / FADD / FSUB / FDIV Sd,Sn,Sm (float, precisão simples)
-            uint32_t base = insn & 0xFFE03C00;
+            uint32_t base = insn & 0xFFE0FC00;
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             int m = static_cast<int>((insn >> 16) & 0x1F);
@@ -444,7 +444,7 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFC0FC00) == 0x1E624000) { // FCVT Sd,Dn (double->float)
+        if ((insn & 0xFFFFFC00) == 0x1E624000) { // FCVT Sd,Dn (double->float)
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             fp_.d[d] = static_cast<double>(static_cast<float>(fp_.d[n]));
@@ -452,7 +452,7 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFC0FC00) == 0x1E22C000) { // FCVT Dd,Sn (float->double)
+        if ((insn & 0xFFFFFC00) == 0x1E22C000) { // FCVT Dd,Sn (float->double)
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             fp_.d[d] = fp_.d[n]; // já guardado como double do float
@@ -572,7 +572,7 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFC0FC00) == 0x6E601C00) { // BSL Vd,Vn,Vm: d=(n&m)|(d&~m)
+        if ((insn & 0xFFE0FC00) == 0x6E601C00) { // BSL Vd,Vn,Vm: d=(n&m)|(d&~m)
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             int m = static_cast<int>((insn >> 16) & 0x1F);
@@ -584,7 +584,7 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFC0FC00) == 0x6E201C00) { // ORR Vd.16B,Vn,Vm (move 128)
+        if ((insn & 0xFFE0FC00) == 0x6E201C00) { // ORR Vd.16B,Vn,Vm (move 128)
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             int m = static_cast<int>((insn >> 16) & 0x1F);
@@ -596,9 +596,9 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFC0FC00) == 0x1E580000 || (insn & 0xFFC0FC00) == 0x1E590000) {
+        if ((insn & 0xFFFFFC00) == 0x1E580000 || (insn & 0xFFFFFC00) == 0x1E590000) {
             // FCVTZS / FCVTZU Wd,Dn (double -> int32, trunca)
-            bool isSigned = (insn & 0xFFC0FC00) == 0x1E580000;
+            bool isSigned = (insn & 0xFFFFFC00) == 0x1E580000;
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             double v = fp_.d[n];
@@ -618,7 +618,7 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFC0FC00) == 0x1E680000) { // FMOV Xd,Dn (bits)
+        if ((insn & 0xFFFFFC00) == 0x1E680000) { // FMOV Xd,Dn (bits)
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             if (d != 31) regs_[d] = fp_.q[n][0];
@@ -634,9 +634,9 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFC0FC00) == 0x1E620000 || (insn & 0xFFC0FC00) == 0x1E630000) {
+        if ((insn & 0xFFFFFC00) == 0x1E620000 || (insn & 0xFFFFFC00) == 0x1E630000) {
             // SCVTF / UCVTF Xd,Dn (double -> int64/uint64)
-            bool isSigned = (insn & 0xFFC0FC00) == 0x1E620000;
+            bool isSigned = (insn & 0xFFFFFC00) == 0x1E620000;
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             double v = fp_.d[n];
@@ -647,9 +647,9 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFC0FC00) == 0x1E660000 || (insn & 0xFFC0FC00) == 0x1E670000) {
+        if ((insn & 0xFFFFFC00) == 0x1E660000 || (insn & 0xFFFFFC00) == 0x1E670000) {
             // SCVTF / UCVTF Dd,Xn (int -> double)
-            bool isSigned = (insn & 0xFFC0FC00) == 0x1E660000;
+            bool isSigned = (insn & 0xFFFFFC00) == 0x1E660000;
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             uint64_t nv = (n == 31) ? 0 : regs_[n];

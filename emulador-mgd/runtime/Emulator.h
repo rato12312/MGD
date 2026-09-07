@@ -9,6 +9,7 @@
 #include <chrono>
 
 #include "../cpu/Cpu.h"
+#include "../hos/Kernel.h"
 #include "../loader/NroLoader.h"
 #include "../loader/NsoLoader.h"
 #include "../odyssey/OdysseyWorld.h"

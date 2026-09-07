@@ -37,14 +37,15 @@
 #include "emulador-mgd/hos/ServiceManager.h"
 #include "emulador-mgd/hos/Thread.h"
 
-static void poke32(emu::Cpu& cpu, uint64_t addr, uint32_t insn) {
-    for (int i = 0; i < 4; i++)
-        cpu.ram()[addr + i] = static_cast<uint8_t>(insn >> (8 * i));
-}
 #include "emulador-mgd/ram/Mmu.h"
 #include "core/query/RegionPolygonCache.h"
 
 using namespace mgd;
+
+static void poke32(mgd::emu::Cpu& cpu, uint64_t addr, uint32_t insn) {
+    for (int i = 0; i < 4; i++)
+        cpu.ram()[addr + i] = static_cast<uint8_t>(insn >> (8 * i));
+}
 
 bool run_emulator_machine_tests() {
     // CPU: MOVZ X0,#7 + ADD X1,X0,#3 + STR/LDR round-trip pela RAM.
@@ -987,21 +988,20 @@ bool run_emulator_machine_tests() {
         emu::Cpu cpu;
         cpu.setReg(1, 0x100);
         cpu.setReg(0, 0x5A);
-        ASSERT_MSG(cpu.step(0xC800FC20u), "stlr x0,[x1]");
+        ASSERT_MSG(cpu.step(0xC81FFC20u), "stlr x0,[x1]");
         ASSERT_MSG(cpu.step(0xC85F7C22u), "ldaxr x2,[x1]");
         ASSERT_MSG(cpu.reg(2) == 0x5A, "aquire certo");
     }
 
-    // SWPAL troca.
+    // SWPAL troca (Rs=Xs varia; máscara exclui [20:16]).
     {
         emu::Cpu cpu;
         cpu.setReg(2, 0x100);
-        cpu.setReg(1, 0xAA);
-        cpu.setReg(0, 0xBB);
-        ASSERT_MSG(cpu.step(0xF8000041u), "str x1,[x2] base");
-        cpu.setReg(1, 0xCC);
-        ASSERT_MSG(cpu.step(0xC8ECFC40u), "swpal x0,x1,[x2]");
-        ASSERT_MSG(cpu.reg(0) == 0xAA, "velho em x0");
+        cpu.setReg(0, 0xAA);
+        ASSERT_MSG(cpu.step(0xF8000040u), "str x0,[x2] base");
+        cpu.setReg(0, 0xCC);
+        ASSERT_MSG(cpu.step(0xC8A0BC41u), "swpal x1,x0,[x2]");
+        ASSERT_MSG(cpu.reg(1) == 0xAA, "velho em x1");
         ASSERT_MSG(cpu.step(0xF9400041u), "ldr x1,[x2]");
         ASSERT_MSG(cpu.reg(1) == 0xCC, "novo na ram");
     }

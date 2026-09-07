@@ -77,7 +77,6 @@ public:
                 rep.cmd = 0;
                 return true;
             }
-            uint32_t f = rd32(req.payload, 0);
             // Simula wait: avança fence até o pedido
             for (auto& p : pending_) {
                 if (p.fence <= rd32(req.payload, 0)) {

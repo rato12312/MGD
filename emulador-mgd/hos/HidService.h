@@ -3,6 +3,13 @@
 // hid:u (input) — botões como bitmask que o jogo lê.
 // O aparelho real escreve aqui; o jogo só consulta.
 
+#include <cstdint>
+
+#include "Session.h"
+
+namespace mgd {
+namespace hos {
+
 // Botões do Switch (resumo honesto).
 enum HidButton : uint64_t {
     BTN_A = 1ull << 0,
@@ -16,13 +23,6 @@ enum HidButton : uint64_t {
 // cmd 1 = Press: payload u64 OR.
 // cmd 2 = Release: payload u64 AND NOT.
 // cmd 3 = GetState: responde u64 mask.
-
-#include <cstdint>
-
-#include "Session.h"
-
-namespace mgd {
-namespace hos {
 
 class HidService {
 public:
