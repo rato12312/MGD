@@ -13,6 +13,7 @@
 #include "emulador-mgd/hos/Session.h"
 #include "emulador-mgd/hos/PortRegistry.h"
 #include "emulador-mgd/hos/NvService.h"
+#include "emulador-mgd/hos/ViService.h"
 #include "emulador-mgd/hos/ServiceManager.h"
 #include "emulador-mgd/hos/Thread.h"
 
@@ -1278,6 +1279,36 @@ bool run_emulator_machine_tests() {
         hos::IpcMessage back;
         ASSERT_MSG(cli->recvReply(back) && back.cmd == 1, "resposta voltou");
         ASSERT_MSG(kernel.pumpServices() == 0, "fila vazia, bomba parada");
+    }
+
+    // Display: abre, cria layer, apresenta via bomba.
+    {
+        hos::Kernel kernel;
+        kernel.bootServices();
+        hos::IpcMessage get;
+        get.cmd = 1;
+        const char* nm = "vi:u";
+        get.payload = std::vector<uint8_t>(nm, nm + 4);
+        hos::IpcMessage got;
+        ASSERT_MSG(kernel.services().dispatch(get, got) && got.cmd == 1, "sessao vi");
+        uint32_t id = static_cast<uint32_t>(got.payload[0]) |
+                      (static_cast<uint32_t>(got.payload[1]) << 8) |
+                      (static_cast<uint32_t>(got.payload[2]) << 16) |
+                      (static_cast<uint32_t>(got.payload[3]) << 24);
+        std::shared_ptr<hos::Session> cli;
+        ASSERT_MSG(kernel.services().session(id, cli), "ponta cliente");
+        hos::IpcMessage mk;
+        mk.cmd = 2;
+        ASSERT_MSG(cli->sendRequest(mk), "pede layer");
+        ASSERT_MSG(kernel.pumpServices() == 1, "bomba criou");
+        hos::IpcMessage layerrep;
+        ASSERT_MSG(cli->recvReply(layerrep) && layerrep.cmd == 1, "layer id veio");
+        hos::IpcMessage present;
+        present.cmd = 3;
+        present.payload = layerrep.payload;
+        ASSERT_MSG(cli->sendRequest(present), "pede present");
+        ASSERT_MSG(kernel.pumpServices() == 1, "bomba apresentou");
+        ASSERT_MSG(kernel.vi().presented() == 1, "1 frame contado");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;

@@ -9,6 +9,7 @@
 
 #include "../ram/Mmu.h"
 #include "NvService.h"
+#include "ViService.h"
 #include "ServiceManager.h"
 #include "Thread.h"
 
@@ -115,11 +116,13 @@ public:
             IpcMessage rep;
             bool understood = false;
             if (name == "nvdrv:a") understood = nv_.dispatch(req, rep);
+            else if (name == "vi:u") understood = vi_.dispatch(req, rep);
             if (understood && kv.second->sendReply(rep)) done++;
         }
         return done;
     }
     NvService& nv() { return nv_; }
+    ViService& vi() { return vi_; }
 
     SvcResult call(uint32_t num, SvcArgs& args) {
         switch (num) {
@@ -214,6 +217,7 @@ private:
     Scheduler sched_;
     ServiceManager services_;
     NvService nv_;
+    ViService vi_;
 };
 
 } // namespace hos
