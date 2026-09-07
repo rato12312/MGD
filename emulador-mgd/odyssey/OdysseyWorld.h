@@ -36,7 +36,11 @@ class OdysseyWorld {
 public:
     OdysseyWorld() : rt_(64, 32) {}
 
-    void cheap(const CheapMode& c) { cheap_ = c; }
+    void cheap(const CheapMode& c) {
+        cheap_ = c;
+        // Barato = LOD perto; Edge aperta ainda mais o longe.
+        rt_.setLod(true, 20.0f, cheap_.lod_aggressive ? 45.0f : 60.0f);
+    }
     const CheapMode& cheap() const { return cheap_; }
 
     // Boot: alimenta o mapa mental com N polígonos do reino. Retorna stats.

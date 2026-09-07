@@ -31,10 +31,16 @@ public:
     MentalMapRuntime(int fbW, int fbH) : consultant_(&cache_, nullptr), pipe_(fbW, fbH) {}
 
     void resize(int fbW, int fbH) { pipe_.resize(fbW, fbH); }
+    void setLod(bool on, float nearDist = 20.0f, float farDist = 60.0f) {
+        use_lod_ = on;
+        lod_near_ = nearDist;
+        lod_far_ = farDist;
+    }
 
     RuntimeFrameStats step(const HandoffFrame& frame,
                            const std::vector<Polygon>& polys) {
         RuntimeFrameStats stats;
+        last_camera_ = frame.camera.position;
         // 1-2. Cache por região a partir do handoff.
         for (const auto& p : polys) {
             RegionID r = ChunkManager::worldToRegionId(p.position);
@@ -53,7 +59,8 @@ public:
             built_ = true;
         }
         std::vector<PolygonID> empty;
-        dna::DnaFrameStats fs = pipe_.renderFrame(empty);
+        dna::DnaFrameStats fs = use_lod_ ? pipe_.renderFrameLod(empty, last_camera_, true, lod_near_, lod_far_)
+                                         : pipe_.renderFrame(empty);
         stats.rebuilt = fs.rebuilt_polys;
         stats.reused = fs.reused_polys;
         stats.pixels_written = fs.pixels_written;
@@ -70,6 +77,9 @@ private:
     MentalMap map_;
     dna::DnaPipeline pipe_{64, 32};
     bool built_ = false;
+    bool use_lod_ = false;
+    float lod_near_ = 20.0f, lod_far_ = 60.0f;
+    Vec3 last_camera_{};
 };
 
 } // namespace bridge
