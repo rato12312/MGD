@@ -173,8 +173,8 @@ public:
             steps_++;
             return true;
         }
-        if ((top & 0xFC) == 0xD2 || (top & 0xFC) == 0x52) { // MOVZ 64/32-bit
-            bool is64 = (top & 0xFC) == 0xD2;
+        if (top == 0xD2 || top == 0x52) { // MOVZ 64/32-bit
+            bool is64 = top == 0xD2;
             int d = static_cast<int>(dec.rd);
             uint16_t imm = static_cast<uint16_t>((dec.hex >> 5) & 0xFFFF);
             int shift = static_cast<int>(((dec.hex >> 21) & 0x3)) * 16;
@@ -184,8 +184,8 @@ public:
             steps_++;
             return true;
         }
-        if ((top & 0xFC) == 0x92 || (top & 0xFC) == 0x12) { // MOVN 64/32-bit
-            bool is64 = (top & 0xFC) == 0x92;
+        if (top == 0x92 || top == 0x12) { // MOVN 64/32-bit
+            bool is64 = top == 0x92;
             int d = static_cast<int>(dec.rd);
             uint16_t imm = static_cast<uint16_t>((dec.hex >> 5) & 0xFFFF);
             int shift = static_cast<int>(((dec.hex >> 21) & 0x3)) * 16;
@@ -252,7 +252,7 @@ public:
             steps_++;
             return true;
         }
-        if ((top & 0xFC) == 0xF2) { // MOVK 64-bit (mantém o resto)
+        if (top == 0xF2) { // MOVK 64-bit (mantém o resto)
             int d = static_cast<int>(dec.rd);
             uint64_t imm = static_cast<uint64_t>((dec.hex >> 5) & 0xFFFF);
             int shift = static_cast<int>(((dec.hex >> 21) & 0x3)) * 16;
