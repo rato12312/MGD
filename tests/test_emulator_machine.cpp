@@ -1248,6 +1248,26 @@ bool run_emulator_machine_tests() {
         hos::IpcMessage opened;
         ASSERT_MSG(nv.dispatch(open, opened) && opened.cmd == 1, "canal abriu");
         ASSERT_MSG(nv.channelCount() == 1, "1 canal");
+        // submit enfileira e devolve fence
+        hos::IpcMessage sub;
+        sub.cmd = 3;
+        sub.payload = opened.payload;
+        sub.payload.insert(sub.payload.end(), {0xDE, 0xAD, 0xBE, 0xEF});
+        hos::IpcMessage subrep;
+        ASSERT_MSG(nv.dispatch(sub, subrep) && subrep.cmd == 1, "submit ok");
+        ASSERT_MSG(nv.pendingCount() == 1, "1 pendente");
+        hos::IpcMessage q;
+        q.cmd = 4;
+        q.payload = subrep.payload;
+        hos::IpcMessage qrep;
+        ASSERT_MSG(nv.dispatch(q, qrep) && qrep.cmd == 0, "fence ainda na fila");
+        uint32_t f = static_cast<uint32_t>(subrep.payload[0]) |
+                     (static_cast<uint32_t>(subrep.payload[1]) << 8) |
+                     (static_cast<uint32_t>(subrep.payload[2]) << 16) |
+                     (static_cast<uint32_t>(subrep.payload[3]) << 24);
+        nv.completeUpTo(f);
+        ASSERT_MSG(nv.pendingCount() == 0, "fila andou");
+        ASSERT_MSG(nv.dispatch(q, qrep) && qrep.cmd == 1, "fence pronto");
         hos::IpcMessage close;
         close.cmd = 2;
         close.payload = opened.payload;
