@@ -15,8 +15,10 @@ namespace hos {
 enum SvcNumber : uint32_t {
     SVC_SET_HEAP_SIZE = 0x01,
     SVC_SET_MEMORY_PERMISSION = 0x02, // X0=addr X1=size X2=perm(rwx bits)
-    SVC_QUERY_MEMORY = 0x05,
-    SVC_EXIT_PROCESS = 0x06,
+    SVC_MAP_MEMORY = 0x04,            // X0=dst X1=src X2=size
+    SVC_UNMAP_MEMORY = 0x05,          // X0=addr X1=size (match exato)
+    SVC_QUERY_MEMORY = 0x06,
+    SVC_EXIT_PROCESS = 0x07,
     SVC_CREATE_THREAD = 0x08, // simplificada: X1=entry, X2=sp
     SVC_GET_INFO = 0x29,
 };
@@ -88,6 +90,25 @@ public:
                 bool ok = mmu_->protect(args.x[0], args.x[1],
                                         (p & 1) != 0, (p & 2) != 0, (p & 4) != 0);
                 return ok ? RESULT_OK : RESULT_INVALID_HANDLE;
+            }
+            case SVC_MAP_MEMORY: {
+                // Alias: dst enxerga o físico de src (mesma permissão).
+                if (!mmu_) return RESULT_INVALID_HANDLE;
+                uint64_t pa = 0;
+                if (!mmu_->translate(args.x[1], args.x[2], false, false, pa))
+                    return RESULT_INVALID_HANDLE;
+                const emu::MemRegion* r = mmu_->find(args.x[1]);
+                if (!r) return RESULT_INVALID_HANDLE;
+                mmu_->map(args.x[0], pa, args.x[2], r->r, r->w, r->x);
+                return RESULT_OK;
+            }
+            case SVC_UNMAP_MEMORY: {
+                if (!mmu_) return RESULT_INVALID_HANDLE;
+                const emu::MemRegion* r = mmu_->find(args.x[0]);
+                if (!r || r->va_base != args.x[0] || r->size != args.x[1])
+                    return RESULT_INVALID_HANDLE;
+                mmu_->unmap(args.x[0]);
+                return RESULT_OK;
             }
             case SVC_QUERY_MEMORY: {
                 // X0 = out (MemInfo no guest), X2 = endereço consultado.

@@ -523,7 +523,7 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(kernel.heapSize() == 0x2000000, "kernel guardou");
         ASSERT_MSG(cpu.step(0xD4000521u), "svc #0x29 = GetInfo");
         ASSERT_MSG(cpu.lastSvc() == hos::RESULT_OK, "info ok");
-        ASSERT_MSG(cpu.step(0xD40000C1u), "svc #6 = ExitProcess");
+        ASSERT_MSG(cpu.step(0xD40000E1u), "svc #7 = ExitProcess");
         ASSERT_MSG(cpu.stopped(), "exit parou a cpu");
     }
 
@@ -533,7 +533,7 @@ bool run_emulator_machine_tests() {
         std::vector<uint32_t> prog = {
             0xD2800021u, // MOVZ X1, #1
             0xD4000021u, // SVC #1 = SetHeapSize(1)
-            0xD40000C1u, // SVC #6 = ExitProcess
+            0xD40000E1u, // SVC #7 = ExitProcess
         };
         ASSERT_MSG(emu.loadProgram(prog, 0), "programa hos cabe");
         emu.runCpu(8);
@@ -810,7 +810,7 @@ bool run_emulator_machine_tests() {
             0x1EE12002u, // FADD D2, D0, D1 (32.0)
             0xA9BF07E0u, // STP X0, X1, [SP, #-16]!
             0xA8C10FE2u, // LDP X2, X3, [SP], #16
-            0xD40000C1u, // SVC #6 ExitProcess
+            0xD40000E1u, // SVC #7 ExitProcess
         };
         std::vector<uint8_t> blob(0x80 + text.size() * 4, 0);
         blob[0x10] = 'N'; blob[0x11] = 'R'; blob[0x12] = 'O'; blob[0x13] = '0';
@@ -901,6 +901,30 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(!emu.cpu().step(0xF8000020u), "str sem w nega");
         ASSERT_MSG(emu.cpu().step(0xF9400020u), "ldr sem w passa");
         ASSERT_MSG(emu.cpu().reg(0) == 0, "leu zero");
+    }
+
+    // Map/Unmap: alias lê o mesmo físico; unmap derruba.
+    {
+        emu::Emulator emu; // identidade 0..64K
+        // escreve marcador em [0x10]
+        emu.cpu().setReg(0, 0x10);
+        emu.cpu().setReg(1, 0xABCD);
+        ASSERT_MSG(emu.cpu().step(0xF8000001u), "str x1,[x0]");
+        // MapMemory(dst=0x2000, src=0x0, size=0x1000): SVC #4
+        hos::SvcArgs m;
+        m.x[0] = 0x2000;
+        m.x[1] = 0x0;
+        m.x[2] = 0x1000;
+        ASSERT_MSG(emu.kernel().call(hos::SVC_MAP_MEMORY, m) == hos::RESULT_OK, "map ok");
+        emu.cpu().setReg(2, 0x2010);
+        ASSERT_MSG(emu.cpu().step(0xF9400040u), "ldr x0,[x2] via alias");
+        ASSERT_MSG(emu.cpu().reg(0) == 0xABCD, "alias le fisico");
+        // UnmapMemory: SVC #5
+        hos::SvcArgs u;
+        u.x[0] = 0x2000;
+        u.x[1] = 0x1000;
+        ASSERT_MSG(emu.kernel().call(hos::SVC_UNMAP_MEMORY, u) == hos::RESULT_OK, "unmap ok");
+        ASSERT_MSG(!emu.cpu().step(0xF9400040u), "alias caiu");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
