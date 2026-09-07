@@ -30,6 +30,7 @@
 #include "emulador-mgd/hos/Mutex.h"
 #include "emulador-mgd/hos/HidService.h"
 #include "emulador-mgd/hos/LblService.h"
+#include "emulador-mgd/hos/PmService.h"
 #include "emulador-mgd/hos/PsmService.h"
 #include "emulador-mgd/hos/SetService.h"
 #include "emulador-mgd/hos/TimeService.h"
@@ -1795,6 +1796,18 @@ bool run_emulator_machine_tests() {
         std::vector<uint8_t> lixo(0x400, 0);
         ASSERT_MSG(!emu::probeNca(lixo.data(), lixo.size()).valid, "lixo nega");
         ASSERT_MSG(!emu::probeNca(blob.data(), 16).valid, "curto nega");
+    }
+
+    // PM responde o PID.
+    {
+        hos::PmService pm;
+        hos::IpcMessage g;
+        hos::IpcMessage r;
+        g.cmd = 1;
+        ASSERT_MSG(pm.dispatch(g, r) && r.cmd == 1, "pid veio");
+        uint64_t pid = 0;
+        for (int i = 0; i < 8; i++) pid |= static_cast<uint64_t>(r.payload[i]) << (8 * i);
+        ASSERT_MSG(pid == 1, "pid do jogo");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;

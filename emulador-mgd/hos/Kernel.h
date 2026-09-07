@@ -15,6 +15,7 @@
 #include "FsService.h"
 #include "HidService.h"
 #include "LblService.h"
+#include "PmService.h"
 #include "PsmService.h"
 #include "SetService.h"
 #include "TimeService.h"
@@ -140,6 +141,7 @@ public:
         services_.publish("lbl:u");   // brilho
         services_.publish("set:sys"); // idioma/região
         services_.publish("fatal:u"); // erros registrados
+        services_.publish("pm:dmnt"); // processos
     }
 
     // Bomba: um pedido pendente por sessão anda até o serviço dono.
@@ -163,6 +165,7 @@ public:
             else if (name == "lbl:u") understood = lbl_.dispatch(req, rep);
             else if (name == "set:sys") understood = set_.dispatch(req, rep);
             else if (name == "fatal:u") understood = fatal_.dispatch(req, rep);
+            else if (name == "pm:dmnt") understood = pm_.dispatch(req, rep);
             if (understood && kv.second->sendReply(rep)) done++;
         }
         return done;
@@ -178,6 +181,7 @@ public:
     LblService& lbl() { return lbl_; }
     SetService& set() { return set_; }
     FatalService& fatal() { return fatal_; }
+    PmService& pm() { return pm_; }
 
     SvcResult call(uint32_t num, SvcArgs& args) {
         switch (num) {
@@ -284,6 +288,7 @@ private:
     LblService lbl_;
     SetService set_;
     FatalService fatal_;
+    PmService pm_;
 };
 
 } // namespace hos
