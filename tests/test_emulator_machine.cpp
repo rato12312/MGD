@@ -15,6 +15,7 @@
 #include "emulador-mgd/hos/NvService.h"
 #include "emulador-mgd/hos/ViService.h"
 #include "emulador-mgd/hos/AudService.h"
+#include "emulador-mgd/hos/FsService.h"
 #include "emulador-mgd/hos/ServiceManager.h"
 #include "emulador-mgd/hos/Thread.h"
 
@@ -1327,6 +1328,41 @@ bool run_emulator_machine_tests() {
         m.cmd = 3;
         m.payload.clear();
         ASSERT_MSG(aud.dispatch(m, r) && !aud.started(), "audio stop");
+    }
+
+    // FS virtual: adiciona, abre, lê, fecha.
+    {
+        hos::FsService fs;
+        hos::IpcMessage add;
+        add.cmd = 1;
+        add.payload = {'r', 'o', 'm', 0, 10, 20, 30, 40};
+        hos::IpcMessage r;
+        ASSERT_MSG(fs.dispatch(add, r) && r.cmd == 1, "arquivo entrou");
+        hos::IpcMessage open;
+        open.cmd = 2;
+        open.payload = {'r', 'o', 'm'};
+        hos::IpcMessage opened;
+        ASSERT_MSG(fs.dispatch(open, opened) && opened.cmd == 1, "abriu");
+        hos::IpcMessage read;
+        read.cmd = 3;
+        read.payload = opened.payload;
+        for (int i = 0; i < 8; i++) read.payload.push_back(0); // offset 0
+        read.payload.push_back(2);                             // size 2
+        for (int i = 0; i < 7; i++) read.payload.push_back(0);
+        hos::IpcMessage data;
+        ASSERT_MSG(fs.dispatch(read, data) && data.cmd == 1, "leu");
+        ASSERT_MSG(data.payload.size() == 2 && data.payload[0] == 10 && data.payload[1] == 20,
+                   "bytes certos");
+        hos::IpcMessage close;
+        close.cmd = 4;
+        close.payload = opened.payload;
+        hos::IpcMessage closed;
+        ASSERT_MSG(fs.dispatch(close, closed) && closed.cmd == 1, "fechou");
+        hos::IpcMessage missing;
+        missing.cmd = 2;
+        missing.payload = {'x'};
+        hos::IpcMessage mrep;
+        ASSERT_MSG(fs.dispatch(missing, mrep) && mrep.cmd == 0, "inexistente = 0");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
