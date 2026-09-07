@@ -1017,6 +1017,23 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == 0xAAAAAAAAull && cpu.reg(4) == 0xBBBBBBBBull, "par w certo");
     }
 
+    // SXTB / SXTH / SXTW.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 0xFF);
+        ASSERT_MSG(cpu.step(0x93401C20u), "sxtb x0,x1");
+        ASSERT_MSG(cpu.reg(0) == 0xFFFFFFFFFFFFFFFFull, "byte->-1");
+        cpu.setReg(1, 0xFFFF);
+        ASSERT_MSG(cpu.step(0x93403C22u), "sxth x2,x1");
+        ASSERT_MSG(cpu.reg(2) == 0xFFFFFFFFFFFFFFFFull, "half->-1");
+        cpu.setReg(1, 0xFFFFFFFFull);
+        ASSERT_MSG(cpu.step(0x93407C23u), "sxtw x3,x1");
+        ASSERT_MSG(cpu.reg(3) == 0xFFFFFFFFFFFFFFFFull, "word->-1");
+        cpu.setReg(1, 0x7F);
+        ASSERT_MSG(cpu.step(0x93401C20u), "sxtb positivo");
+        ASSERT_MSG(cpu.reg(0) == 0x7F, "mantem");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

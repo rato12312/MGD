@@ -642,6 +642,26 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFF800000) == 0x93000000 && (insn & 0x400000)) {
+            // SBFM 64-bit (cobre SXTB/SXTH/SXTW): extrai e estende sinal do bit S
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            uint64_t r = (insn >> 16) & 0x3F, s = (insn >> 10) & 0x3F;
+            auto ones = [](uint64_t k) { return k >= 64 ? ~0ull : ((1ull << k) - 1ull); };
+            auto ror = [](uint64_t x, uint64_t rot) {
+                rot %= 64;
+                return rot == 0 ? x : ((x >> rot) | (x << (64 - rot)));
+            };
+            uint64_t wmask = ror(ones(s + 1), r);
+            uint64_t src = (n == 31) ? 0 : regs_[n];
+            uint64_t tmp = ror(src, r) & wmask;
+            uint64_t res = tmp;
+            if (s < 63 && (tmp & (1ull << s))) res = tmp | (~ones(s + 1));
+            if (d != 31) regs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFF800000) == 0xD3000000 && (insn & 0x400000)) {
             // UBFM 64-bit (cobre LSL/LSR imediato): dst = ROR(src,R) & wmask
             int d = static_cast<int>(dec.rd);
