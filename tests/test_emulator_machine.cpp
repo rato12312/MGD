@@ -2024,6 +2024,20 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(0) == 0x7F, "mantem");
     }
 
+    // FCVTZS / FCVTZU (double -> int32, trunca).
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 15);
+        cpu.setReg(1, 2);
+        ASSERT_MSG(cpu.step(0x1E660000u), "d0=15.0");
+        ASSERT_MSG(cpu.step(0x1E660021u), "d1=2.0");
+        ASSERT_MSG(cpu.step(0x1EE11002u), "fdiv d2,d0,d1 (7.5)");
+        ASSERT_MSG(cpu.step(0x1E580040u), "fcvtzs w0,d2");
+        ASSERT_MSG(cpu.reg(0) == 7, "trunca 7.5 -> 7");
+        ASSERT_MSG(cpu.step(0x1E590042u), "fcvtzu w2,d2");
+        ASSERT_MSG(cpu.reg(2) == 7, "unsigned 7");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

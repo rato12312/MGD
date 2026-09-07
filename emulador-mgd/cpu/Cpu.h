@@ -620,6 +620,28 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFC0FC00) == 0x1E580000 || (insn & 0xFFC0FC00) == 0x1E590000) {
+            // FCVTZS / FCVTZU Wd,Dn (double -> int32, trunca)
+            bool isSigned = (insn & 0xFFC0FC00) == 0x1E580000;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            double v = fp_.d[n];
+            uint32_t res;
+            if (isSigned) {
+                int64_t t = (v != v) ? 0 : static_cast<int64_t>(v);
+                if (t > 0x7FFFFFFFLL) t = 0x7FFFFFFFLL;
+                if (t < (int64_t)0x80000000LL * -1LL) t = (int64_t)0x80000000LL * -1LL;
+                res = static_cast<uint32_t>(static_cast<int32_t>(t));
+            } else {
+                double t = v < 0 ? 0 : v;
+                if (t > 4294967295.0) t = 4294967295.0;
+                res = static_cast<uint32_t>(t);
+            }
+            if (d != 31) regs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFC0FC00) == 0x1E604000) { // FMOV Dd,Dn
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
