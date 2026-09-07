@@ -8,6 +8,7 @@
 #include "emulador-mgd/ram/GuestRam.h"
 #include "emulador-mgd/handoff/CaptureStub.h"
 #include "emulador-mgd/runtime/Emulator.h"
+#include "emulador-mgd/loader/Lz4.h"
 #include "emulador-mgd/loader/NroLoader.h"
 #include "emulador-mgd/hos/Kernel.h"
 #include "emulador-mgd/hos/Session.h"
@@ -1536,6 +1537,22 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(emu.kernel().exited(), "exit marcado");
         std::vector<uint8_t> lixo = {1, 2, 3};
         ASSERT_MSG(!emu.bootNro(lixo.data(), lixo.size()), "lixo nega boot");
+    }
+
+    // LZ4: só-literais e com match, mais truncado que nega.
+    {
+        std::vector<uint8_t> out;
+        const uint8_t lit[] = {0x30, 'H', 'i', '!'};
+        ASSERT_MSG(emu::lz4::decompressBlock(lit, sizeof(lit), out), "literais ok");
+        ASSERT_MSG(out.size() == 3 && out[0] == 'H' && out[2] == '!', "Hi!");
+        const uint8_t m[] = {0x20, 'A', 'B', 0x02, 0x00};
+        ASSERT_MSG(emu::lz4::decompressBlock(m, sizeof(m), out), "match ok");
+        ASSERT_MSG(out.size() == 6, "ABABAB tem 6");
+        ASSERT_MSG(out[0] == 'A' && out[2] == 'A' && out[5] == 'B', "match certo");
+        const uint8_t bad[] = {0xF0, 'A'};
+        ASSERT_MSG(!emu::lz4::decompressBlock(bad, sizeof(bad), out), "truncado nega");
+        const uint8_t badoff[] = {0x10, 'A', 0x05, 0x00};
+        ASSERT_MSG(!emu::lz4::decompressBlock(badoff, sizeof(badoff), out), "offset ruim nega");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
