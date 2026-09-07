@@ -48,6 +48,19 @@ public:
 
     void clear() { regions_.clear(); }
 
+    // Troca permissão de região exata. false = não existe match exato.
+    bool protect(uint64_t va, uint64_t size, bool r, bool w, bool x) {
+        for (auto& rg : regions_) {
+            if (rg.va_base == va && rg.size == size) {
+                rg.r = r;
+                rg.w = w;
+                rg.x = x;
+                return true;
+            }
+        }
+        return false;
+    }
+
     const MemRegion* find(uint64_t va) const {
         for (const auto& r : regions_) {
             if (va >= r.va_base && va < r.va_base + r.size) return &r;

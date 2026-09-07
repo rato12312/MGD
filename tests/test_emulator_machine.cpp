@@ -888,6 +888,21 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(0) == 1, "x0=1 na thread");
     }
 
+    // SetMemoryPermission troca e o acesso obedece.
+    {
+        emu::Emulator emu; // tradução ligada: identidade 0..64K rw-
+        emu.cpu().setReg(0, 0);
+        emu.cpu().setReg(1, emu.cpu().ramSize());
+        emu.cpu().setReg(2, 1); // r--
+        ASSERT_MSG(emu.cpu().step(0xD4000041u), "svc #2 = SetMemoryPermission");
+        ASSERT_MSG(emu.cpu().lastSvc() == hos::RESULT_OK, "trocou");
+        emu.cpu().setReg(2, 0x100);
+        emu.cpu().setReg(0, 0x77);
+        ASSERT_MSG(!emu.cpu().step(0xF8000020u), "str sem w nega");
+        ASSERT_MSG(emu.cpu().step(0xF9400020u), "ldr sem w passa");
+        ASSERT_MSG(emu.cpu().reg(0) == 0, "leu zero");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

@@ -14,6 +14,7 @@ namespace hos {
 // Números SVC do Horizon OS (subset inicial).
 enum SvcNumber : uint32_t {
     SVC_SET_HEAP_SIZE = 0x01,
+    SVC_SET_MEMORY_PERMISSION = 0x02, // X0=addr X1=size X2=perm(rwx bits)
     SVC_QUERY_MEMORY = 0x05,
     SVC_EXIT_PROCESS = 0x06,
     SVC_CREATE_THREAD = 0x08, // simplificada: X1=entry, X2=sp
@@ -80,6 +81,13 @@ public:
                 args.out[0] = heap_base_;
                 if (mmu_ && heap_size_ > 0) mmu_->map(heap_base_, heap_base_, heap_size_, true, true, false);
                 return RESULT_OK;
+            }
+            case SVC_SET_MEMORY_PERMISSION: {
+                if (!mmu_) return RESULT_INVALID_HANDLE;
+                uint32_t p = static_cast<uint32_t>(args.x[2]);
+                bool ok = mmu_->protect(args.x[0], args.x[1],
+                                        (p & 1) != 0, (p & 2) != 0, (p & 4) != 0);
+                return ok ? RESULT_OK : RESULT_INVALID_HANDLE;
             }
             case SVC_QUERY_MEMORY: {
                 // X0 = out (MemInfo no guest), X2 = endereço consultado.
