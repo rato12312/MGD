@@ -15,6 +15,7 @@ namespace hos {
 struct Thread {
     uint64_t id = 0;
     emu::Cpu::State ctx;
+    uint32_t prio = 0; // menor = mais importante
     bool finished = false;
 };
 
@@ -22,21 +23,26 @@ class Scheduler {
 public:
     Scheduler() = default;
 
-    uint64_t spawn(uint64_t entry, uint64_t sp) {
+    uint64_t spawn(uint64_t entry, uint64_t sp, uint32_t prio = 0) {
         Thread t;
         t.id = ++next_id_;
         t.ctx.pc = entry;
         t.ctx.sp = sp;
+        t.prio = prio;
         queue_.push_back(t);
         return t.id;
     }
 
-    // Roda até maxSteps no total, quantum por thread. Retorna executadas.
+    // Roda até maxSteps no total, quantum por thread (menor prio primeiro).
     uint64_t run(emu::Cpu& cpu, uint64_t maxSteps, uint64_t quantum = 4) {
         uint64_t done = 0;
         while (done < maxSteps && !queue_.empty()) {
-            Thread t = queue_.front();
-            queue_.pop_front();
+            size_t pick = 0;
+            for (size_t i = 1; i < queue_.size(); i++) {
+                if (queue_[i].prio < queue_[pick].prio) pick = i;
+            }
+            Thread t = queue_[pick];
+            queue_.erase(queue_.begin() + pick);
             cpu.load(t.ctx);
             uint64_t got = cpu.run(quantum);
             done += got;

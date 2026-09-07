@@ -1453,6 +1453,29 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(!mx.lock(999, 1), "inexistente nega");
     }
 
+    // Prioridade: B (prio 0) roda antes de A (prio 1).
+    {
+        emu::Cpu cpu;
+        hos::Scheduler sched;
+        // A @0 escreve 0xA00 em [0x300]
+        poke32(cpu, 0x00, 0xD2814000u);
+        poke32(cpu, 0x04, 0xD2806001u);
+        poke32(cpu, 0x08, 0xF8000020u);
+        poke32(cpu, 0x0C, 0xD4000001u);
+        // B @0x40 escreve 0xB00 em [0x300]
+        poke32(cpu, 0x40, 0xD2816000u);
+        poke32(cpu, 0x44, 0xD2806001u);
+        poke32(cpu, 0x48, 0xF8000020u);
+        poke32(cpu, 0x4C, 0xD4000001u);
+        sched.spawn(0x0, 0x8000, 1);  // A: menos importante
+        sched.spawn(0x40, 0x9000, 0); // B: mais importante
+        sched.run(cpu, 32, 8);
+        uint64_t v = 0;
+        for (int i = 0; i < 8; i++)
+            v |= static_cast<uint64_t>(cpu.ram()[0x300 + i]) << (8 * i);
+        ASSERT_MSG(v == 0xA00, "A escreveu por último (B foi primeiro)");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
