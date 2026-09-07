@@ -719,6 +719,20 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(5) == 3, "min=3");
     }
 
+    // FMADD.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 2);
+        cpu.setReg(1, 3);
+        cpu.setReg(2, 4);
+        ASSERT_MSG(cpu.step(0x1E660000u), "d0=2.0");
+        ASSERT_MSG(cpu.step(0x1E660021u), "d1=3.0");
+        ASSERT_MSG(cpu.step(0x1E660042u), "d2=4.0");
+        ASSERT_MSG(cpu.step(0x1FE10803u), "fmadd d3,d0,d1,d2");
+        ASSERT_MSG(cpu.step(0x1E620063u), "scvtf x3,d3");
+        ASSERT_MSG(cpu.reg(3) == 10, "2*3+4");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

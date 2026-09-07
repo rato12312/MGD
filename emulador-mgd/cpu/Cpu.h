@@ -349,6 +349,19 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE08000) == 0x1FE00000 || (insn & 0xFFE08000) == 0x1FE08000) {
+            // FMADD / FMSUB Dd,Dn,Dm,Da (a*b +/- c, sem arredondar no meio)
+            bool isSub = (insn & 0xFFE08000) == 0x1FE08000;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int a = static_cast<int>((insn >> 10) & 0x1F);
+            double res = fpregs_[n] * fpregs_[m] + (isSub ? -fpregs_[a] : fpregs_[a]);
+            fpregs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFC0FC00) == 0x1E604000) { // FMOV Dd,Dn
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
