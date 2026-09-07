@@ -11,6 +11,7 @@
 #include "emulador-mgd/runtime/Emulator.h"
 #include "emulador-mgd/loader/Lz4.h"
 #include "emulador-mgd/loader/NsoLoader.h"
+#include "emulador-mgd/loader/Aes.h"
 #include "emulador-mgd/loader/Pfs0.h"
 #include "emulador-mgd/loader/RomFs.h"
 #include "emulador-mgd/loader/NroLoader.h"
@@ -1727,6 +1728,31 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(f1.size() == 2 && f1[0] == 5, "b intacto");
         std::vector<uint8_t> no;
         ASSERT_MSG(!pfs.readFile("z", no), "inexistente nega");
+    }
+
+    // AES: vetor NIST ECB + round-trip CTR.
+    {
+        uint8_t key[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+        uint8_t pt[16] = {0, 17, 34, 51, 68, 85, 102, 119, 136, 153, 170, 187, 204, 221, 238, 255};
+        uint8_t ct[16] = {0};
+        emu::aes::encryptEcb(key, pt, ct);
+        const uint8_t want[16] = {0x69, 0xC4, 0xE0, 0xD8, 0x6A, 0x7B, 0x04, 0x30,
+                                  0xD8, 0xCD, 0xB7, 0x80, 0x70, 0xB4, 0xC5, 0x55};
+        bool ok = true;
+        for (int i = 0; i < 16; i++) ok = ok && (ct[i] == want[i]);
+        ASSERT_MSG(ok, "NIST ECB bate");
+        uint8_t nonce[12] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+        uint8_t msg[40];
+        for (int i = 0; i < 40; i++) msg[i] = static_cast<uint8_t>(i * 7 + 1);
+        uint8_t enc[40] = {0}, dec[40] = {0};
+        emu::aes::cryptCtr(key, nonce, msg, enc, 40);
+        emu::aes::cryptCtr(key, nonce, enc, dec, 40);
+        bool rt = true;
+        for (int i = 0; i < 40; i++) rt = rt && (dec[i] == msg[i]);
+        ASSERT_MSG(rt, "CTR round-trip");
+        bool diff = false;
+        for (int i = 0; i < 40; i++) diff = diff || (enc[i] != msg[i]);
+        ASSERT_MSG(diff, "CTR embaralhou");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
