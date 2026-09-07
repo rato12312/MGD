@@ -60,6 +60,11 @@ public:
 
     bool stopped() const { return stopped_; }
     uint64_t exitCode() const { return exit_code_; }
+    // Diagnóstico: últimos opcodes desconhecidos (diz o que implementar).
+    uint64_t unknownCount() const { return unknown_total_; }
+    uint32_t lastUnknown(size_t i) const {
+        return i < unknown_log_.size() ? unknown_log_[i] : 0;
+    }
 
     struct State {
         std::array<uint64_t, REG_COUNT> regs{};
@@ -1069,6 +1074,7 @@ public:
             steps_++;
             return true;
         }
+        logUnknown(insn);
         return false;
     }
 
@@ -1159,9 +1165,18 @@ private:
     std::array<uint64_t, REG_COUNT> regs_{};
     std::array<double, 32> fpregs_{};
     std::vector<uint8_t> mem_;
+    std::array<uint32_t, 16> unknown_log_{};
+    size_t unknown_pos_ = 0;
+    uint64_t unknown_total_ = 0;
     Mmu* mmu_ = nullptr;
     SvcHost* svc_host_ = nullptr;
     uint32_t last_svc_ = 0;
+
+    void logUnknown(uint32_t insn) {
+        unknown_log_[unknown_pos_ % unknown_log_.size()] = insn;
+        unknown_pos_++;
+        unknown_total_++;
+    }
     uint64_t sp_ = 0;
     uint64_t pc_ = 0;
     uint64_t steps_ = 0;

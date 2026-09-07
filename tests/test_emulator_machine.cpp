@@ -996,6 +996,16 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(11) == 9, "fp da pilha 9");
     }
 
+    // Desconhecido é registrado, não sumido.
+    {
+        emu::Cpu cpu;
+        ASSERT_MSG(!cpu.step(0xFFFFFFFFu), "desconhecido nega");
+        ASSERT_MSG(cpu.unknownCount() == 1, "contou 1");
+        ASSERT_MSG(cpu.lastUnknown(0) == 0xFFFFFFFFu, "guardou opcode");
+        ASSERT_MSG(!cpu.step(0x12345678u), "outro nega");
+        ASSERT_MSG(cpu.unknownCount() == 2, "contou 2");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
