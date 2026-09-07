@@ -8,6 +8,7 @@
 #include <unordered_map>
 
 #include "../ram/Mmu.h"
+#include "ServiceManager.h"
 #include "Thread.h"
 
 namespace mgd {
@@ -90,8 +91,16 @@ public:
     bool exited() const { return exited_; }
     uint64_t sleptNs() const { return slept_ns_; }
     Scheduler& scheduler() { return sched_; }
+    ServiceManager& services() { return services_; }
     uint64_t runThreads(emu::Cpu& cpu, uint64_t maxSteps, uint64_t quantum = 4) {
         return sched_.run(cpu, maxSteps, quantum);
+    }
+
+    // Boot publica os serviços que o jogo procura primeiro.
+    void bootServices() {
+        services_.publish("nvdrv:a"); // GPU (stub, comandos vêm depois)
+        services_.publish("vi:u");    // vídeo/display
+        services_.publish("audren:u"); // áudio render
     }
 
     SvcResult call(uint32_t num, SvcArgs& args) {
@@ -185,6 +194,7 @@ private:
     std::unordered_map<uint32_t, uint32_t> handles_;
     emu::Mmu* mmu_ = nullptr;
     Scheduler sched_;
+    ServiceManager services_;
 };
 
 } // namespace hos

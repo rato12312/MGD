@@ -1219,6 +1219,18 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(!sm.dispatch(weird, wrep), "cmd estranho nega");
     }
 
+    // Boot publica serviços e GetService acha a GPU.
+    {
+        hos::Kernel kernel;
+        kernel.bootServices();
+        hos::IpcMessage req;
+        req.cmd = 1;
+        const char* nm = "nvdrv:a";
+        req.payload = std::vector<uint8_t>(nm, nm + 7);
+        hos::IpcMessage rep;
+        ASSERT_MSG(kernel.services().dispatch(req, rep) && rep.cmd == 1, "gpu achada");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
