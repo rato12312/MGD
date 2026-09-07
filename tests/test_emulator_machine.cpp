@@ -10,6 +10,7 @@
 #include "emulador-mgd/runtime/Emulator.h"
 #include "emulador-mgd/loader/NroLoader.h"
 #include "emulador-mgd/hos/Kernel.h"
+#include "emulador-mgd/hos/Session.h"
 #include "emulador-mgd/hos/Thread.h"
 
 static void poke32(emu::Cpu& cpu, uint64_t addr, uint32_t insn) {
@@ -1150,6 +1151,25 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(!kernel.getHandle(h1, tag), "fechado nega");
         ASSERT_MSG(!kernel.closeHandle(0xFFFF), "inexistente nega");
         ASSERT_MSG(kernel.handleCount() == 1, "resta 1");
+    }
+
+    // Sessão IPC: pedido e resposta nos dois sentidos.
+    {
+        hos::Session s;
+        hos::IpcMessage req;
+        req.cmd = 1;
+        req.payload = {10, 20, 30};
+        ASSERT_MSG(s.sendRequest(req), "pedido foi");
+        ASSERT_MSG(s.pendingRequests() == 1, "1 pendente");
+        hos::IpcMessage got;
+        ASSERT_MSG(s.recvRequest(got), "servidor leu");
+        ASSERT_MSG(got.cmd == 1 && got.payload.size() == 3, "pedido intacto");
+        hos::IpcMessage rep;
+        rep.cmd = 2;
+        ASSERT_MSG(s.sendReply(rep), "resposta foi");
+        hos::IpcMessage back;
+        ASSERT_MSG(s.recvReply(back) && back.cmd == 2, "cliente leu");
+        ASSERT_MSG(!s.recvReply(back), "fila vazia nega");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
