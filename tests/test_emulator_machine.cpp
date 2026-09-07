@@ -122,7 +122,7 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == 0xAABBCCDDull, "w round-trip");
         cpu.setReg(1, 0xCC);
         ASSERT_MSG(cpu.step(0x39000441u), "strb x1,[x2,#1]");
-        ASSERT_MSG(cpu.step(0x39400044u), "ldrb x4,[x2]");
+        ASSERT_MSG(cpu.step(0x39400444u), "ldrb x4,[x2,#1]");
         ASSERT_MSG(cpu.reg(4) == 0xCC, "byte certo");
         cpu.reset();
         ASSERT_MSG(cpu.step(0xD4000021u), "svc #1");
