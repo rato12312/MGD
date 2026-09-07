@@ -1303,6 +1303,7 @@ bool run_emulator_machine_tests() {
         ioctl.cmd = 99;
         hos::IpcMessage irep;
         ASSERT_MSG(!nv.dispatch(ioctl, irep), "ioctl futuro nega");
+    }
 
     // Bomba: pedido na sessão chega na GPU sozinho.
     {

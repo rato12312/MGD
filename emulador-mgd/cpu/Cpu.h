@@ -626,7 +626,7 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFC0FC00) == 0x1E604000) { // FMOV Dd,Dn
+        if ((insn & 0xFFE0FC00) == 0x1E604000) { // FMOV Dd,Dn
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             fp_.d[d] = fp_.d[n];
