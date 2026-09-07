@@ -5,11 +5,14 @@
 
 // cmd 1 = OpenDisplay: responde 1.
 // cmd 2 = CreateLayer: responde id da layer.
-// cmd 3 = Present: conta um frame apresentado.
+// cmd 3 = Present: conta um frame apresentado + sinaliza vsync.
+// cmd 4 = CreateVsyncEvent: responde id do evento.
 
 #include <cstdint>
 #include <unordered_map>
+#include <vector>
 
+#include "Event.h"
 #include "Session.h"
 
 namespace mgd {
@@ -50,7 +53,19 @@ public:
             }
             it->second++;
             presented_++;
+            // vsync: todo mundo esperando acorda
+            for (uint32_t e : vsync_events_) events_.signal(e);
             rep.cmd = 1;
+            return true;
+        }
+        if (req.cmd == 4) {
+            uint32_t e = events_.create(false);
+            vsync_events_.push_back(e);
+            rep.cmd = 1;
+            rep.payload = {static_cast<uint8_t>(e & 0xFF),
+                           static_cast<uint8_t>((e >> 8) & 0xFF),
+                           static_cast<uint8_t>((e >> 16) & 0xFF),
+                           static_cast<uint8_t>((e >> 24) & 0xFF)};
             return true;
         }
         return false;
@@ -58,9 +73,12 @@ public:
 
     uint64_t presented() const { return presented_; }
     size_t layerCount() const { return layers_.size(); }
+    EventTable& events() { return events_; }
 
 private:
     std::unordered_map<uint32_t, uint64_t> layers_;
+    std::vector<uint32_t> vsync_events_;
+    EventTable events_;
     uint32_t next_layer_ = 1;
     uint64_t presented_ = 0;
 };

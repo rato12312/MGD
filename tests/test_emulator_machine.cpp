@@ -1810,6 +1810,30 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(pid == 1, "pid do jogo");
     }
 
+    // Vsync: present acorda quem espera.
+    {
+        hos::ViService vi;
+        hos::IpcMessage c4;
+        hos::IpcMessage r4;
+        c4.cmd = 4;
+        ASSERT_MSG(vi.dispatch(c4, r4) && r4.cmd == 1, "evento criado");
+        uint32_t e = static_cast<uint32_t>(r4.payload[0]) |
+                     (static_cast<uint32_t>(r4.payload[1]) << 8) |
+                     (static_cast<uint32_t>(r4.payload[2]) << 16) |
+                     (static_cast<uint32_t>(r4.payload[3]) << 24);
+        ASSERT_MSG(!vi.events().wait(e, false), "sem frame, sem sinal");
+        hos::IpcMessage mk;
+        hos::IpcMessage mr;
+        mk.cmd = 2;
+        ASSERT_MSG(vi.dispatch(mk, mr), "layer criada");
+        hos::IpcMessage p;
+        hos::IpcMessage pr;
+        p.cmd = 3;
+        p.payload = mr.payload;
+        ASSERT_MSG(vi.dispatch(p, pr) && pr.cmd == 1, "present");
+        ASSERT_MSG(vi.events().wait(e, false), "vsync acordou");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
