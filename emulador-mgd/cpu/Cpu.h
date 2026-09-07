@@ -1388,6 +1388,39 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFC00000) == 0xAD000000 || (insn & 0xFFC00000) == 0xAD400000 ||
+            (insn & 0xFFC00000) == 0xAD800000 || (insn & 0xFFC00000) == 0xADC00000 ||
+            (insn & 0xFFC00000) == 0xAC800000 || (insn & 0xFFC00000) == 0xACC00000) {
+            // STP / LDP Qt1,Qt2 (128 bits), offset/pre/pos
+            uint32_t fam = insn & 0xFFC00000;
+            bool isLoad = (fam == 0xAD400000 || fam == 0xADC00000 || fam == 0xACC00000);
+            bool preIndex = (fam == 0xAD800000 || fam == 0xADC00000);
+            bool postIndex = (fam == 0xAC800000 || fam == 0xACC00000);
+            int t1 = static_cast<int>(insn & 0x1F);
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            int t2 = static_cast<int>((insn >> 10) & 0x1F);
+            int64_t off = static_cast<int64_t>((insn >> 15) & 0x7F);
+            if (off & 0x40) off |= ~static_cast<int64_t>(0x7F);
+            uint64_t base = (n == 31) ? sp_ : regs_[n];
+            uint64_t addr = base + (preIndex ? static_cast<uint64_t>(off * 16) : 0);
+            uint64_t pa = 0;
+            if (!phys(addr, 32, !isLoad, false, pa)) return false;
+            if (isLoad) {
+                __builtin_memcpy(&fp_.q[t1][0], &mem_[static_cast<size_t>(pa)], 16);
+                __builtin_memcpy(&fp_.q[t2][0], &mem_[static_cast<size_t>(pa) + 16], 16);
+            } else {
+                __builtin_memcpy(&mem_[static_cast<size_t>(pa)], &fp_.q[t1][0], 16);
+                __builtin_memcpy(&mem_[static_cast<size_t>(pa) + 16], &fp_.q[t2][0], 16);
+            }
+            if (preIndex || postIndex) {
+                uint64_t nb = base + static_cast<uint64_t>(off * 16);
+                if (n == 31) sp_ = nb;
+                else regs_[n] = nb;
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFC00000) == 0x2D000000 || (insn & 0xFFC00000) == 0x2D400000 ||
             (insn & 0xFFC00000) == 0x2D800000 || (insn & 0xFFC00000) == 0x2DC00000 ||
             (insn & 0xFFC00000) == 0x2C800000 || (insn & 0xFFC00000) == 0x2CC00000) {

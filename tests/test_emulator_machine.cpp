@@ -2180,6 +2180,23 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.pc() == pc + 8, "eq tomou 32");
     }
 
+    // STP / LDP Q (128 bits).
+    {
+        emu::Cpu cpu;
+        for (int i = 0; i < 32; i++) cpu.ram()[0x100 + i] = static_cast<uint8_t>(i);
+        cpu.setReg(1, 0x100);
+        cpu.setReg(2, 0x100);
+        ASSERT_MSG(cpu.step(0x3DC00020u), "ldr q0");
+        ASSERT_MSG(cpu.step(0x3DC00421u), "ldr q1");
+        ASSERT_MSG(cpu.step(0xAD010440u), "stp q0,q1,[x2,#16]");
+        ASSERT_MSG(cpu.step(0xAD411C42u), "ldp q2,q3,[x2,#16]");
+        ASSERT_MSG(cpu.step(0xD2804003u), "movz x3,#0x200");
+        ASSERT_MSG(cpu.step(0x3D800062u), "str q2,[x3]");
+        bool ok = true;
+        for (int i = 0; i < 16; i++) ok = ok && (cpu.ram()[0x200 + i] == static_cast<uint8_t>(i));
+        ASSERT_MSG(ok, "128 bits intactos");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
