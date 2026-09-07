@@ -43,6 +43,14 @@ public:
         return world_.present(path);
     }
 
+    // Um frame do sistema: serviços andam, GPU drena, mundo pinta.
+    bool frame(const char* path, uint32_t npolys = 8) {
+        kernel_.pumpServices();
+        kernel_.nv().drain(64);
+        bootWorld(npolys);
+        return present(path);
+    }
+
     // Deposita programa (u32 little-endian) na RAM da CPU.
     bool loadProgram(const std::vector<uint32_t>& prog, uint64_t base = 0) {
         for (size_t i = 0; i < prog.size(); ++i) {

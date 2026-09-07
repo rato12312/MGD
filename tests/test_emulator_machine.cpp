@@ -1506,6 +1506,14 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(v == 0xA00, "A escreveu por último (B foi primeiro)");
     }
 
+    // Frame inteiro: bomba + dreno + mundo + PPM.
+    {
+        emu::Emulator emu;
+        emu.kernel().bootServices();
+        ASSERT_MSG(emu.frame("frame_boot.ppm", 8), "frame saiu");
+        ASSERT_MSG(emu.frame("frame_idle.ppm", 8), "frame parado saiu");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
