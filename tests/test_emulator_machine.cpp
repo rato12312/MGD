@@ -181,7 +181,7 @@ bool run_emulator_machine_tests() {
         cpu.setReg(1, 22);
         cpu.setReg(2, 0x200);
         ASSERT_MSG(cpu.step(0xA9010440u), "stp x0,x1,[x2,#16]");
-        ASSERT_MSG(cpu.step(0xA9411023u), "ldp x3,x4,[x2,#16]");
+        ASSERT_MSG(cpu.step(0xA9411043u), "ldp x3,x4,[x2,#16]");
         ASSERT_MSG(cpu.reg(3) == 11 && cpu.reg(4) == 22, "par ok");
         cpu.setReg(0, 0);
         uint64_t pc = cpu.pc();
