@@ -120,7 +120,7 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.step(0xB9400043u), "ldrw x3,[x2]");
         ASSERT_MSG(cpu.reg(3) == 0xAABBCCDDull, "w round-trip");
         cpu.setReg(1, 0xCC);
-        ASSERT_MSG(cpu.step(0x38000441u), "strb x1,[x2,#1]");
+        ASSERT_MSG(cpu.step(0x39000441u), "strb x1,[x2,#1]");
         ASSERT_MSG(cpu.step(0x39400044u), "ldrb x4,[x2]");
         ASSERT_MSG(cpu.reg(4) == 0xCC, "byte certo");
         cpu.reset();
@@ -2036,6 +2036,22 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(0) == 7, "trunca 7.5 -> 7");
         ASSERT_MSG(cpu.step(0x1E590042u), "fcvtzu w2,d2");
         ASSERT_MSG(cpu.reg(2) == 7, "unsigned 7");
+    }
+
+    // LDRSB / LDRSH / STRH.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 0x100);
+        cpu.setReg(0, 0xFF);
+        ASSERT_MSG(cpu.step(0x39000020u), "strb x0,[x1]");
+        ASSERT_MSG(cpu.step(0x39800022u), "ldrsb x2,[x1]");
+        ASSERT_MSG(cpu.reg(2) == 0xFFFFFFFFFFFFFFFFull, "byte->-1 via ldrsb");
+        cpu.setReg(0, 0xFFFF);
+        ASSERT_MSG(cpu.step(0x79000420u), "strh w0,[x1,#2]");
+        ASSERT_MSG(cpu.step(0x79800422u), "ldrsh x2,[x1,#2]");
+        ASSERT_MSG(cpu.reg(2) == 0xFFFFFFFFFFFFFFFFull, "half->-1 via ldrsh");
+        ASSERT_MSG(cpu.step(0x79400423u), "ldrh x3,[x1,#2]");
+        ASSERT_MSG(cpu.reg(3) == 0xFFFFull, "ldrh zero-extend");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;

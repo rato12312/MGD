@@ -1238,8 +1238,42 @@ public:
             }
             return memAccess(dec, 4, top == 0xB9);
         }
-        if (top == 0x38 || top == 0x39) { // STRB / LDRB (byte)
-            return memAccess(dec, 1, top == 0x39);
+        if (top == 0x38 || top == 0x39 || top == 0x79) {
+            int opc = static_cast<int>((insn >> 22) & 0x3);
+            // top 0x39: opc 00=STRB, 01=LDRB, 10=LDRSB X, 11=LDRSB W
+            // top 0x79: opc 00=STRH, 01=LDRH, 10=LDRSH X, 11=LDRSH W
+            // (top 0x38 aceito por leniência como STRB)
+            if (top == 0x38 && opc == 0) return memAccess(dec, 1, false);
+            if (top == 0x39 && opc == 0) return memAccess(dec, 1, false);
+            if (top == 0x39 && opc == 1) return memAccess(dec, 1, true);
+            if (top == 0x79 && opc == 0) return memAccess(dec, 2, false);
+            if (top == 0x79 && opc == 1) return memAccess(dec, 2, true);
+            // loads com sinal: opc 2 = Xt (64), opc 3 = Wt (32)
+            bool isHalf = (top == 0x79);
+            int width = isHalf ? 2 : 1;
+            bool to64 = (opc == 2);
+            int t = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            uint64_t base = (n == 31) ? sp_ : regs_[n];
+            uint64_t addr = base + static_cast<uint64_t>(dec.imm12) * static_cast<uint64_t>(width);
+            uint64_t pa = 0;
+            if (!phys(addr, width, false, false, pa)) return false;
+            uint64_t raw = 0;
+            __builtin_memcpy(&raw, &mem_[static_cast<size_t>(pa)], static_cast<size_t>(width));
+            uint64_t res;
+            if (width == 1) {
+                int8_t sb = static_cast<int8_t>(raw & 0xFFu);
+                res = to64 ? static_cast<uint64_t>(static_cast<int64_t>(sb))
+                           : static_cast<uint64_t>(static_cast<uint32_t>(static_cast<int32_t>(sb)));
+            } else {
+                int16_t sh = static_cast<int16_t>(raw & 0xFFFFu);
+                res = to64 ? static_cast<uint64_t>(static_cast<int64_t>(sh))
+                           : static_cast<uint64_t>(static_cast<uint32_t>(static_cast<int32_t>(sh)));
+            }
+            if (t != 31) regs_[t] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
         }
         if ((insn & 0x9F000000) == 0x90000000) { // ADRP Xd, page
             int d = static_cast<int>(dec.rd);
