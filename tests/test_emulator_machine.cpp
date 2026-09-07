@@ -1138,6 +1138,20 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(mark == 0xB, "marcador do worker");
     }
 
+    // Handles: cria, lê, fecha, inválido nega.
+    {
+        hos::Kernel kernel;
+        uint32_t h1 = kernel.createHandle(0xA);
+        uint32_t h2 = kernel.createHandle(0xB);
+        ASSERT_MSG(h1 != h2, "handles únicos");
+        uint32_t tag = 0;
+        ASSERT_MSG(kernel.getHandle(h1, tag) && tag == 0xA, "etiqueta certa");
+        ASSERT_MSG(kernel.closeHandle(h1), "fechou");
+        ASSERT_MSG(!kernel.getHandle(h1, tag), "fechado nega");
+        ASSERT_MSG(!kernel.closeHandle(0xFFFF), "inexistente nega");
+        ASSERT_MSG(kernel.handleCount() == 1, "resta 1");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

@@ -5,6 +5,8 @@
 
 #include <cstdint>
 
+#include <unordered_map>
+
 #include "../ram/Mmu.h"
 #include "Thread.h"
 
@@ -54,6 +56,21 @@ struct SvcArgs {
 class Kernel : public emu::SvcHost {
 public:
     Kernel() = default;
+
+    // Handles: id opaco -> etiqueta (sessão, porta, thread...).
+    uint32_t createHandle(uint32_t tag) {
+        uint32_t h = next_handle_++;
+        handles_[h] = tag;
+        return h;
+    }
+    bool getHandle(uint32_t h, uint32_t& tag) const {
+        auto it = handles_.find(h);
+        if (it == handles_.end()) return false;
+        tag = it->second;
+        return true;
+    }
+    bool closeHandle(uint32_t h) { return handles_.erase(h) > 0; }
+    size_t handleCount() const { return handles_.size(); }
 
     void setMmu(emu::Mmu* mmu) { mmu_ = mmu; }
     void setRam(uint8_t* ram, uint64_t size) { ram_ = ram; ram_size_ = size; }
@@ -164,6 +181,8 @@ private:
     uint64_t heap_size_ = 0;
     bool exited_ = false;
     uint64_t slept_ns_ = 0;
+    uint32_t next_handle_ = 1;
+    std::unordered_map<uint32_t, uint32_t> handles_;
     emu::Mmu* mmu_ = nullptr;
     Scheduler sched_;
 };
