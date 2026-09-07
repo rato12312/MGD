@@ -78,5 +78,7 @@ private:
         return true;
     }
 
+}; // class ServiceManager
+
 } // namespace hos
 } // namespace mgd
