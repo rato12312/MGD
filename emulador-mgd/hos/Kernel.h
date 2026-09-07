@@ -9,6 +9,7 @@
 #include <unordered_map>
 
 #include "../ram/Mmu.h"
+#include "ApmService.h"
 #include "AudService.h"
 #include "FsService.h"
 #include "HidService.h"
@@ -130,6 +131,7 @@ public:
         services_.publish("fsp-srv"); // filesystem
         services_.publish("hid:u");   // input
         services_.publish("time:u");  // relógio
+        services_.publish("apm");     // performance (handheld)
     }
 
     // Bomba: um pedido pendente por sessão anda até o serviço dono.
@@ -148,6 +150,7 @@ public:
             else if (name == "fsp-srv") understood = fs_.dispatch(req, rep);
             else if (name == "hid:u") understood = hid_.dispatch(req, rep);
             else if (name == "time:u") understood = time_.dispatch(req, rep);
+            else if (name == "apm") understood = apm_.dispatch(req, rep);
             if (understood && kv.second->sendReply(rep)) done++;
         }
         return done;
@@ -158,6 +161,7 @@ public:
     FsService& fs() { return fs_; }
     HidService& hid() { return hid_; }
     TimeService& time() { return time_; }
+    ApmService& apm() { return apm_; }
 
     SvcResult call(uint32_t num, SvcArgs& args) {
         switch (num) {
@@ -259,6 +263,7 @@ private:
     FsService fs_;
     HidService hid_;
     TimeService time_;
+    ApmService apm_;
 };
 
 } // namespace hos

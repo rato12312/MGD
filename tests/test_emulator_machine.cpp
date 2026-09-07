@@ -17,6 +17,7 @@
 #include "emulador-mgd/hos/NvService.h"
 #include "emulador-mgd/hos/ViService.h"
 #include "emulador-mgd/hos/AudService.h"
+#include "emulador-mgd/hos/ApmService.h"
 #include "emulador-mgd/hos/FsService.h"
 #include "emulador-mgd/hos/Event.h"
 #include "emulador-mgd/hos/Mutex.h"
@@ -1591,6 +1592,17 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.step(0xD2800021u), "movz pc=4");
         ASSERT_MSG(cpu.tracePc(0) == 4 && cpu.tracePc(1) == 0, "trace ordem");
         cpu.traceEnable(false);
+    }
+
+    // Performance: handheld padrão.
+    {
+        hos::ApmService apm;
+        hos::IpcMessage g;
+        hos::IpcMessage r;
+        g.cmd = 1;
+        ASSERT_MSG(apm.dispatch(g, r) && r.cmd == 1, "modo veio");
+        ASSERT_MSG(!r.payload.empty() && r.payload[0] == 0, "handheld");
+        ASSERT_MSG(!apm.docked(), "sem dock");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
