@@ -1979,6 +1979,24 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(r64(0x200) == 0xAA && r64(0x208) == 0x22, "blend certo");
     }
 
+    // TST + CMP registrado.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 0xF0);
+        cpu.setReg(1, 0x3C);
+        ASSERT_MSG(cpu.step(0xEA01001Fu), "tst x0,x1");
+        ASSERT_MSG(cpu.reg(0) == 0xF0, "tst nao escreve");
+        uint64_t pc = cpu.pc();
+        ASSERT_MSG(cpu.step(0x54000041u), "b.ne (0x30!=0)");
+        ASSERT_MSG(cpu.pc() == pc + 8, "ne tomou");
+        cpu.setReg(0, 10);
+        cpu.setReg(1, 10);
+        ASSERT_MSG(cpu.step(0xEB01001Fu), "cmp x0,x1");
+        pc = cpu.pc();
+        ASSERT_MSG(cpu.step(0x54000040u), "b.eq (iguais)");
+        ASSERT_MSG(cpu.pc() == pc + 8, "eq tomou");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
