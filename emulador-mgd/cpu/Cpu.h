@@ -789,6 +789,29 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFF800000) == 0x13000000 && !(insn & 0x400000)) {
+            // SBFM 32-bit (SXTB/SXTH W): extrai e estende sinal do bit S
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            uint64_t r = (insn >> 16) & 0x1F, s = (insn >> 10) & 0x1F;
+            uint32_t src = (n == 31) ? 0 : static_cast<uint32_t>(regs_[n]);
+            uint32_t rot = (r == 0) ? src : (src >> r) | (src << (32 - r));
+            uint32_t wmask = (s >= 31 && r == 0) ? 0xFFFFFFFFu
+                             : static_cast<uint32_t>((((1ull << (s + 1)) - 1ull) >> (r % 32)) << (r % 32));
+            // forma simples e correta p/ os aliases comuns (R=0): campo [0..S]
+            uint32_t tmp;
+            if (r == 0) {
+                tmp = (s >= 31) ? src : (src & static_cast<uint32_t>((1ull << (s + 1)) - 1ull));
+            } else {
+                tmp = rot & wmask;
+            }
+            uint32_t res = tmp;
+            if (s < 31 && (tmp & (1u << s))) res = tmp | ~static_cast<uint32_t>((1ull << (s + 1)) - 1ull);
+            if (d != 31) regs_[d] = res;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFF800000) == 0x93000000 && (insn & 0x400000)) {
             // SBFM 64-bit (cobre SXTB/SXTH/SXTW): extrai e estende sinal do bit S
             int d = static_cast<int>(dec.rd);

@@ -2010,6 +2010,20 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == 0xF8000000ull, "asr 32 propaga");
     }
 
+    // SBFM 32-bit: SXTB/SXTH W.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 0xFF);
+        ASSERT_MSG(cpu.step(0x13401C20u), "sxtb w0,w1");
+        ASSERT_MSG(cpu.reg(0) == 0xFFFFFFFFull, "byte->-1 (32)");
+        cpu.setReg(1, 0xFFFF);
+        ASSERT_MSG(cpu.step(0x13403C22u), "sxth w2,w1");
+        ASSERT_MSG(cpu.reg(2) == 0xFFFFFFFFull, "half->-1 (32)");
+        cpu.setReg(1, 0x7F);
+        ASSERT_MSG(cpu.step(0x13401C20u), "sxtb w positivo");
+        ASSERT_MSG(cpu.reg(0) == 0x7F, "mantem");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
