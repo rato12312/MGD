@@ -952,6 +952,16 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.pc() == pc + 8, "injetou flags");
     }
 
+    // STLR / LDAXR.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 0x100);
+        cpu.setReg(0, 0x5A);
+        ASSERT_MSG(cpu.step(0xC800FC20u), "stlr x0,[x1]");
+        ASSERT_MSG(cpu.step(0xC85F7C22u), "ldaxr x2,[x1]");
+        ASSERT_MSG(cpu.reg(2) == 0x5A, "aquire certo");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

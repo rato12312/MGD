@@ -314,7 +314,8 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFE0FC00) == 0xC85FFC00) { // LDAXR Xt,[Xn]
+        if ((insn & 0xFFE0FC00) == 0xC85FFC00 || (insn & 0xFFE0FC00) == 0xC85F7C00) {
+            // LDAR / LDAXR Xt,[Xn] (single-thread: mesma coisa)
             int t = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             uint64_t base = (n == 31) ? sp_ : regs_[n];
@@ -322,6 +323,15 @@ public:
             uint64_t v = load64(base, ok);
             if (!ok) return false;
             if (t != 31) regs_[t] = v;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFE0FC00) == 0xC800FC00) { // STLR Xt,[Xn]
+            int t = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            uint64_t base = (n == 31) ? sp_ : regs_[n];
+            if (!store64(base, (t == 31) ? 0 : regs_[t])) return false;
             pc_ += 4;
             steps_++;
             return true;
