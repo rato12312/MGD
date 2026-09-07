@@ -8,6 +8,7 @@
 
 #include "../cpu/Cpu.h"
 #include "../loader/NroLoader.h"
+#include "../loader/NsoLoader.h"
 #include "../odyssey/OdysseyWorld.h"
 #include "../config/MgdSwitches.h"
 
@@ -75,6 +76,16 @@ public:
         if (!loadNroInto(img, blob, cpu_.ram(), cpu_.ramSize(), base, entry)) return false;
         cpu_.setSp(sp);
         cpu_.setPc(entry + 0x80); // pula o header (start sintético)
+        return true;
+    }
+
+    bool bootNso(const uint8_t* blob, size_t len, uint64_t base = 0, uint64_t sp = 0x8000) {
+        NsoImage img = parseNso(blob, len);
+        if (!img.valid) return false;
+        uint64_t entry = 0;
+        if (!loadNsoInto(img, blob, cpu_.ram(), cpu_.ramSize(), base, entry)) return false;
+        cpu_.setSp(sp);
+        cpu_.setPc(entry);
         return true;
     }
 

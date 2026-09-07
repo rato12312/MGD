@@ -65,6 +65,11 @@ public:
     uint32_t lastUnknown(size_t i) const {
         return i < unknown_log_.size() ? unknown_log_[i] : 0;
     }
+    // Trace: últimos PCs executados (debug de código real).
+    void traceEnable(bool on) { trace_on_ = on; }
+    uint64_t tracePc(size_t i) const {
+        return i < trace_.size() ? trace_[(trace_pos_ + trace_.size() - 1 - i) % trace_.size()] : 0;
+    }
 
     struct State {
         std::array<uint64_t, REG_COUNT> regs{};
@@ -112,6 +117,10 @@ public:
     // B, MOVZ, ADD/SUB imediato, ORR reg, LDR/STR (64/32/8-bit),
     // SVC mínimo (#0 sai com 0, #1 sai com X0).
     bool step(uint32_t insn) {
+        if (trace_on_) {
+            trace_[trace_pos_ % trace_.size()] = pc_;
+            trace_pos_++;
+        }
         ArmInsn dec;
         dec.hex = insn;
         if ((insn & 0xFFE0001F) == 0xD4000001) { // SVC #imm
@@ -1262,6 +1271,9 @@ private:
     std::array<uint32_t, 16> unknown_log_{};
     size_t unknown_pos_ = 0;
     uint64_t unknown_total_ = 0;
+    std::array<uint64_t, 64> trace_{};
+    size_t trace_pos_ = 0;
+    bool trace_on_ = false;
     Mmu* mmu_ = nullptr;
     SvcHost* svc_host_ = nullptr;
     uint32_t last_svc_ = 0;

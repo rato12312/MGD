@@ -1583,6 +1583,16 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(!bad.valid, "curto invalido");
     }
 
+    // Trace registra PCs na ordem.
+    {
+        emu::Cpu cpu;
+        cpu.traceEnable(true);
+        ASSERT_MSG(cpu.step(0xD28000E0u), "movz pc=0");
+        ASSERT_MSG(cpu.step(0xD2800021u), "movz pc=4");
+        ASSERT_MSG(cpu.tracePc(0) == 4 && cpu.tracePc(1) == 0, "trace ordem");
+        cpu.traceEnable(false);
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
