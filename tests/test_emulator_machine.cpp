@@ -11,6 +11,7 @@
 #include "emulador-mgd/runtime/Emulator.h"
 #include "emulador-mgd/loader/Lz4.h"
 #include "emulador-mgd/loader/NsoLoader.h"
+#include "emulador-mgd/loader/Pfs0.h"
 #include "emulador-mgd/loader/RomFs.h"
 #include "emulador-mgd/loader/NroLoader.h"
 #include "emulador-mgd/hos/Kernel.h"
@@ -1695,6 +1696,37 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(rom.readRootFile("a.txt", data), "leu arquivo");
         ASSERT_MSG(data.size() == 3 && data[0] == 7 && data[2] == 9, "bytes certos");
         ASSERT_MSG(!rom.readRootFile("nada", data), "inexistente nega");
+    }
+
+    // PFS0 sintético: 2 arquivos entram e saem intactos.
+    {
+        std::vector<uint8_t> blob(82, 0);
+        auto w32 = [&](size_t off, uint32_t v) {
+            for (int i = 0; i < 4; i++) blob[off + i] = static_cast<uint8_t>(v >> (8 * i));
+        };
+        auto w64 = [&](size_t off, uint64_t v) {
+            for (int i = 0; i < 8; i++) blob[off + i] = static_cast<uint8_t>(v >> (8 * i));
+        };
+        blob[0] = 'P'; blob[1] = 'F'; blob[2] = 'S'; blob[3] = '0';
+        w32(4, 2);   // 2 arquivos
+        w32(8, 12);  // strtab 12
+        w64(16, 0); w64(24, 4); w32(32, 0);   // f0: off 0, size 4, nome 0
+        w64(40, 4); w64(48, 2); w32(56, 6);   // f1: off 4, size 2, nome 6
+        const char* s = "a.nca\0b.nca\0";
+        for (int i = 0; i < 12; i++) blob[64 + i] = static_cast<uint8_t>(s[i]);
+        blob[76] = 1; blob[77] = 2; blob[78] = 3; blob[79] = 4;
+        blob[80] = 5; blob[81] = 6;
+        emu::Pfs0Reader pfs;
+        ASSERT_MSG(pfs.open(blob.data(), blob.size()), "pfs0 abriu");
+        ASSERT_MSG(pfs.fileCount() == 2, "2 arquivos");
+        ASSERT_MSG(pfs.fileName(1) == "b.nca", "nome certo");
+        std::vector<uint8_t> f0, f1;
+        ASSERT_MSG(pfs.readFile("a.nca", f0), "leu a");
+        ASSERT_MSG(pfs.readFile("b.nca", f1), "leu b");
+        ASSERT_MSG(f0.size() == 4 && f0[3] == 4, "a intacto");
+        ASSERT_MSG(f1.size() == 2 && f1[0] == 5, "b intacto");
+        std::vector<uint8_t> no;
+        ASSERT_MSG(!pfs.readFile("z", no), "inexistente nega");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
