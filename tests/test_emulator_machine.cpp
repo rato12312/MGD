@@ -12,6 +12,7 @@
 #include "emulador-mgd/hos/Kernel.h"
 #include "emulador-mgd/hos/Session.h"
 #include "emulador-mgd/hos/PortRegistry.h"
+#include "emulador-mgd/hos/NvService.h"
 #include "emulador-mgd/hos/ServiceManager.h"
 #include "emulador-mgd/hos/Thread.h"
 
@@ -1229,6 +1230,27 @@ bool run_emulator_machine_tests() {
         req.payload = std::vector<uint8_t>(nm, nm + 7);
         hos::IpcMessage rep;
         ASSERT_MSG(kernel.services().dispatch(req, rep) && rep.cmd == 1, "gpu achada");
+    }
+
+    // nvdrv abre e fecha canal.
+    {
+        hos::NvService nv;
+        hos::IpcMessage open;
+        open.cmd = 1;
+        open.payload = {0x3D}; // /dev/nvhost-ctrl-gpu (etiqueta nossa)
+        hos::IpcMessage opened;
+        ASSERT_MSG(nv.dispatch(open, opened) && opened.cmd == 1, "canal abriu");
+        ASSERT_MSG(nv.channelCount() == 1, "1 canal");
+        hos::IpcMessage close;
+        close.cmd = 2;
+        close.payload = opened.payload;
+        hos::IpcMessage closed;
+        ASSERT_MSG(nv.dispatch(close, closed) && closed.cmd == 1, "canal fechou");
+        ASSERT_MSG(nv.channelCount() == 0, "0 canais");
+        hos::IpcMessage ioctl;
+        ioctl.cmd = 99;
+        hos::IpcMessage irep;
+        ASSERT_MSG(!nv.dispatch(ioctl, irep), "ioctl futuro nega");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
