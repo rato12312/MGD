@@ -20,6 +20,7 @@ enum SvcNumber : uint32_t {
     SVC_QUERY_MEMORY = 0x06,
     SVC_EXIT_PROCESS = 0x07,
     SVC_CREATE_THREAD = 0x08, // simplificada: X1=entry, X2=sp
+    SVC_SLEEP_THREAD = 0x0B,  // número a confirmar contra TRM; semântica: X0=ns
     SVC_GET_INFO = 0x29,
 };
 
@@ -70,6 +71,7 @@ public:
     uint64_t heapBase() const { return heap_base_; }
     uint64_t heapSize() const { return heap_size_; }
     bool exited() const { return exited_; }
+    uint64_t sleptNs() const { return slept_ns_; }
     Scheduler& scheduler() { return sched_; }
     uint64_t runThreads(emu::Cpu& cpu, uint64_t maxSteps, uint64_t quantum = 4) {
         return sched_.run(cpu, maxSteps, quantum);
@@ -136,6 +138,11 @@ public:
                 args.out[0] = id;
                 return RESULT_OK;
             }
+            case SVC_SLEEP_THREAD: {
+                // Single-thread: não há quem acordar; só volta OK.
+                slept_ns_ += args.x[0];
+                return RESULT_OK;
+            }
             case SVC_EXIT_PROCESS: {
                 exited_ = true;
                 return RESULT_OK;
@@ -156,6 +163,7 @@ private:
     uint64_t heap_base_ = 0x08000000; // base típica do heap do app
     uint64_t heap_size_ = 0;
     bool exited_ = false;
+    uint64_t slept_ns_ = 0;
     emu::Mmu* mmu_ = nullptr;
     Scheduler sched_;
 };

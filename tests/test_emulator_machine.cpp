@@ -927,6 +927,16 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(!emu.cpu().step(0xF9400040u), "alias caiu");
     }
 
+    // SleepThread volta OK e acumula.
+    {
+        emu::Cpu cpu;
+        hos::Kernel kernel;
+        cpu.setSvcHost(&kernel);
+        cpu.setReg(0, 1000000);
+        ASSERT_MSG(cpu.step(0xD4000161u), "svc #0xB = SleepThread");
+        ASSERT_MSG(kernel.sleptNs() == 1000000, "somou ns");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
