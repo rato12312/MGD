@@ -1238,6 +1238,53 @@ public:
             }
             return memAccess(dec, 4, top == 0xB9);
         }
+        if (((insn & 0xFFE00C00) == 0x38000000) || ((insn & 0xFFE00C00) == 0x38400000) ||
+            ((insn & 0xFFE00C00) == 0x38800000) || ((insn & 0xFFE00C00) == 0x38C00000) ||
+            ((insn & 0xFFE00C00) == 0x78000000) || ((insn & 0xFFE00C00) == 0x78400000) ||
+            ((insn & 0xFFE00C00) == 0x78800000) || ((insn & 0xFFE00C00) == 0x78C00000)) {
+            // LDUR/STUR byte/half (simm9 sem escala), com e sem sinal
+            uint32_t ubase = insn & 0xFFE00C00;
+            bool isHalf = (ubase & 0x40000000u) != 0; // size bit30
+            int opc = static_cast<int>((insn >> 22) & 0x3);
+            int t = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int64_t off = static_cast<int64_t>((insn >> 12) & 0x1FF);
+            if (off & 0x100) off |= ~static_cast<int64_t>(0x1FF); // sign 9
+            uint64_t bb = (n == 31) ? sp_ : regs_[n];
+            uint64_t addr = bb + static_cast<uint64_t>(off);
+            int width = isHalf ? 2 : 1;
+            if (opc == 0) { // store
+                uint64_t pa = 0;
+                if (!phys(addr, width, true, false, pa)) return false;
+                uint64_t v = (t == 31) ? 0 : regs_[t];
+                __builtin_memcpy(&mem_[static_cast<size_t>(pa)], &v, static_cast<size_t>(width));
+            } else if (opc == 1) { // load zero-extend
+                uint64_t pa = 0;
+                if (!phys(addr, width, false, false, pa)) return false;
+                uint64_t v = 0;
+                __builtin_memcpy(&v, &mem_[static_cast<size_t>(pa)], static_cast<size_t>(width));
+                if (t != 31) regs_[t] = v;
+            } else { // load com sinal: opc 2 = X (64), opc 3 = W (32)
+                uint64_t pa = 0;
+                if (!phys(addr, width, false, false, pa)) return false;
+                uint64_t raw = 0;
+                __builtin_memcpy(&raw, &mem_[static_cast<size_t>(pa)], static_cast<size_t>(width));
+                uint64_t res;
+                if (width == 1) {
+                    int8_t sb = static_cast<int8_t>(raw & 0xFFu);
+                    res = (opc == 2) ? static_cast<uint64_t>(static_cast<int64_t>(sb))
+                                     : static_cast<uint64_t>(static_cast<uint32_t>(static_cast<int32_t>(sb)));
+                } else {
+                    int16_t sh = static_cast<int16_t>(raw & 0xFFFFu);
+                    res = (opc == 2) ? static_cast<uint64_t>(static_cast<int64_t>(sh))
+                                     : static_cast<uint64_t>(static_cast<uint32_t>(static_cast<int32_t>(sh)));
+                }
+                if (t != 31) regs_[t] = res;
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if (top == 0x38 || top == 0x39 || top == 0x79) {
             int opc = static_cast<int>((insn >> 22) & 0x3);
             // top 0x39: opc 00=STRB, 01=LDRB, 10=LDRSB X, 11=LDRSB W

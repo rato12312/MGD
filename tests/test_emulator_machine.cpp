@@ -2054,6 +2054,20 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == 0xFFFFull, "ldrh zero-extend");
     }
 
+    // LDUR/STUR com offset negativo.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(2, 0x100);
+        cpu.setReg(1, 0xAB);
+        ASSERT_MSG(cpu.step(0x381FF041u), "sturb w1,[x2,#-1]");
+        ASSERT_MSG(cpu.step(0x385FF043u), "ldurb x3,[x2,#-1]");
+        ASSERT_MSG(cpu.reg(3) == 0xAB, "byte sem escala");
+        cpu.setReg(0, 0xFFFF);
+        ASSERT_MSG(cpu.step(0x781FE040u), "sturh w0,[x2,#-2]");
+        ASSERT_MSG(cpu.step(0x789FE044u), "ldursh x4,[x2,#-2]");
+        ASSERT_MSG(cpu.reg(4) == 0xFFFFFFFFFFFFFFFFull, "half sinal sem escala");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
