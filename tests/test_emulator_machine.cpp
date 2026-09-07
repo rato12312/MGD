@@ -17,6 +17,7 @@
 #include "emulador-mgd/hos/AudService.h"
 #include "emulador-mgd/hos/FsService.h"
 #include "emulador-mgd/hos/HidService.h"
+#include "emulador-mgd/hos/TimeService.h"
 #include "emulador-mgd/hos/ServiceManager.h"
 #include "emulador-mgd/hos/Thread.h"
 
@@ -1390,6 +1391,24 @@ bool run_emulator_machine_tests() {
             rel.payload[i] = static_cast<uint8_t>(hos::BTN_A >> (8 * i));
         ASSERT_MSG(hid.dispatch(rel, r), "soltou A");
         ASSERT_MSG(hid.buttons() == hos::BTN_B, "resta B");
+    }
+
+    // Relógio: lê, ajusta, lê de novo.
+    {
+        hos::TimeService t;
+        hos::IpcMessage g;
+        hos::IpcMessage r;
+        g.cmd = 1;
+        ASSERT_MSG(t.dispatch(g, r) && r.cmd == 1, "hora veio");
+        uint64_t h0 = 0;
+        for (int i = 0; i < 8; i++) h0 |= static_cast<uint64_t>(r.payload[i]) << (8 * i);
+        ASSERT_MSG(h0 == 1700000000ull, "hora inicial");
+        hos::IpcMessage s;
+        hos::IpcMessage sr;
+        s.cmd = 2;
+        s.payload.resize(8);
+        for (int i = 0; i < 8; i++) s.payload[i] = static_cast<uint8_t>(1800000000ull >> (8 * i));
+        ASSERT_MSG(t.dispatch(s, sr) && t.now() == 1800000000ull, "hora ajustada");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;

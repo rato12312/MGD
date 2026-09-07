@@ -11,6 +11,7 @@
 #include "AudService.h"
 #include "FsService.h"
 #include "HidService.h"
+#include "TimeService.h"
 #include "NvService.h"
 #include "ViService.h"
 #include "ServiceManager.h"
@@ -108,6 +109,7 @@ public:
         services_.publish("audren:u"); // áudio render
         services_.publish("fsp-srv"); // filesystem
         services_.publish("hid:u");   // input
+        services_.publish("time:u");  // relógio
     }
 
     // Bomba: um pedido pendente por sessão anda até o serviço dono.
@@ -125,6 +127,7 @@ public:
             else if (name == "audren:u") understood = aud_.dispatch(req, rep);
             else if (name == "fsp-srv") understood = fs_.dispatch(req, rep);
             else if (name == "hid:u") understood = hid_.dispatch(req, rep);
+            else if (name == "time:u") understood = time_.dispatch(req, rep);
             if (understood && kv.second->sendReply(rep)) done++;
         }
         return done;
@@ -134,6 +137,7 @@ public:
     AudService& aud() { return aud_; }
     FsService& fs() { return fs_; }
     HidService& hid() { return hid_; }
+    TimeService& time() { return time_; }
 
     SvcResult call(uint32_t num, SvcArgs& args) {
         switch (num) {
@@ -232,6 +236,7 @@ private:
     AudService aud_;
     FsService fs_;
     HidService hid_;
+    TimeService time_;
 };
 
 } // namespace hos
