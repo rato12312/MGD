@@ -12,6 +12,7 @@
 #include "emulador-mgd/loader/Lz4.h"
 #include "emulador-mgd/loader/NsoLoader.h"
 #include "emulador-mgd/loader/Aes.h"
+#include "emulador-mgd/loader/NcaProbe.h"
 #include "emulador-mgd/loader/Sha256.h"
 #include "emulador-mgd/loader/Pfs0.h"
 #include "emulador-mgd/loader/RomFs.h"
@@ -1781,6 +1782,19 @@ bool run_emulator_machine_tests() {
         uint8_t empty[32] = {0};
         emu::sha::hash(nullptr, 0, empty);
         ASSERT_MSG(empty[0] == 0xE3 && empty[31] == 0x55, "sha256 vazio bate");
+    }
+
+    // Sonda NCA: identifica programa, nega lixo e curto.
+    {
+        std::vector<uint8_t> blob(0x400, 0);
+        blob[0x200] = 'N'; blob[0x201] = 'C'; blob[0x202] = 'A'; blob[0x203] = '3';
+        blob[0x205] = 0; // programa
+        emu::NcaProbe p = emu::probeNca(blob.data(), blob.size());
+        ASSERT_MSG(p.valid, "nca valido");
+        ASSERT_MSG(p.content_type == 0, "tipo programa");
+        std::vector<uint8_t> lixo(0x400, 0);
+        ASSERT_MSG(!emu::probeNca(lixo.data(), lixo.size()).valid, "lixo nega");
+        ASSERT_MSG(!emu::probeNca(blob.data(), 16).valid, "curto nega");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
