@@ -12,6 +12,7 @@
 #include "emulador-mgd/loader/Lz4.h"
 #include "emulador-mgd/loader/NsoLoader.h"
 #include "emulador-mgd/loader/Aes.h"
+#include "emulador-mgd/loader/Sha256.h"
 #include "emulador-mgd/loader/Pfs0.h"
 #include "emulador-mgd/loader/RomFs.h"
 #include "emulador-mgd/loader/NroLoader.h"
@@ -1753,6 +1754,23 @@ bool run_emulator_machine_tests() {
         bool diff = false;
         for (int i = 0; i < 40; i++) diff = diff || (enc[i] != msg[i]);
         ASSERT_MSG(diff, "CTR embaralhou");
+    }
+
+    // SHA-256: vetor NIST "abc".
+    {
+        const uint8_t abc[3] = {'a', 'b', 'c'};
+        uint8_t out[32] = {0};
+        emu::sha::hash(abc, 3, out);
+        const uint8_t want[32] = {0xBA, 0x78, 0x16, 0xBF, 0x8F, 0x01, 0xCF, 0xEA,
+                                  0x41, 0x41, 0x40, 0xDE, 0x5D, 0xAE, 0x22, 0x23,
+                                  0xB0, 0x03, 0x61, 0xA3, 0x96, 0x17, 0x7A, 0x9C,
+                                  0xB4, 0x10, 0xFF, 0x61, 0xF2, 0x00, 0x15, 0xAD};
+        bool ok = true;
+        for (int i = 0; i < 32; i++) ok = ok && (out[i] == want[i]);
+        ASSERT_MSG(ok, "NIST sha256 bate");
+        uint8_t empty[32] = {0};
+        emu::sha::hash(nullptr, 0, empty);
+        ASSERT_MSG(empty[0] == 0xE3 && empty[31] == 0x55, "sha256 vazio bate");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
