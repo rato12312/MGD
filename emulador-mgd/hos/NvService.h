@@ -72,7 +72,17 @@ public:
         return false;
     }
 
-    // (Futuro: o renderer consome e avança completed_fence_.)
+    // Renderer nulo: drena N pendentes (execução = descarta, por enquanto).
+    uint32_t drain(uint32_t n) {
+        uint32_t done = 0;
+        while (done < n && !pending_.empty()) {
+            completeUpTo(pending_.front().fence);
+            done++;
+        }
+        return done;
+    }
+
+    // (Futuro: o renderer de verdade consome e avança completed_fence_.)
     void completeUpTo(uint32_t f) {
         if (f > completed_fence_) completed_fence_ = f;
         while (!pending_.empty() && pending_.front().fence <= completed_fence_)

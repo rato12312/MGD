@@ -1268,6 +1268,17 @@ bool run_emulator_machine_tests() {
         nv.completeUpTo(f);
         ASSERT_MSG(nv.pendingCount() == 0, "fila andou");
         ASSERT_MSG(nv.dispatch(q, qrep) && qrep.cmd == 1, "fence pronto");
+        // dreno nulo: 3 submits, drena 2, resta 1
+        for (int i = 0; i < 3; i++) {
+            hos::IpcMessage s;
+            s.cmd = 3;
+            s.payload = opened.payload;
+            hos::IpcMessage sr;
+            ASSERT_MSG(nv.dispatch(s, sr) && sr.cmd == 1, "submit fila");
+        }
+        ASSERT_MSG(nv.drain(2) == 2, "drenou 2");
+        ASSERT_MSG(nv.pendingCount() == 1, "resta 1");
+        ASSERT_MSG(nv.drain(8) == 1, "drena o resto");
         hos::IpcMessage close;
         close.cmd = 2;
         close.payload = opened.payload;
@@ -1278,7 +1289,6 @@ bool run_emulator_machine_tests() {
         ioctl.cmd = 99;
         hos::IpcMessage irep;
         ASSERT_MSG(!nv.dispatch(ioctl, irep), "ioctl futuro nega");
-    }
 
     // Bomba: pedido na sessão chega na GPU sozinho.
     {
