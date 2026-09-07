@@ -1514,6 +1514,30 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(emu.frame("frame_idle.ppm", 8), "frame parado saiu");
     }
 
+    // Boot de NRO pelo Emulador: heap via SVC, saída limpa.
+    {
+        std::vector<uint32_t> text = {
+            0xD2800201u, // MOVZ X1, #16
+            0xD4000021u, // SVC #1 SetHeapSize
+            0xD40000E1u, // SVC #7 ExitProcess
+        };
+        std::vector<uint8_t> blob(0x80 + text.size() * 4, 0);
+        blob[0x10] = 'N'; blob[0x11] = 'R'; blob[0x12] = 'O'; blob[0x13] = '0';
+        blob[0x20] = 0x80;
+        blob[0x24] = static_cast<uint8_t>(text.size() * 4);
+        for (size_t i = 0; i < text.size(); ++i)
+            for (int b = 0; b < 4; b++)
+                blob[0x80 + i * 4 + b] = static_cast<uint8_t>(text[i] >> (8 * b));
+        emu::Emulator emu;
+        ASSERT_MSG(emu.bootNro(blob.data(), blob.size()), "nro bootou");
+        emu.runCpu(16);
+        ASSERT_MSG(emu.cpu().stopped(), "nro saiu limpo");
+        ASSERT_MSG(emu.kernel().heapSize() == 16, "heap do nro");
+        ASSERT_MSG(emu.kernel().exited(), "exit marcado");
+        std::vector<uint8_t> lixo = {1, 2, 3};
+        ASSERT_MSG(!emu.bootNro(lixo.data(), lixo.size()), "lixo nega boot");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

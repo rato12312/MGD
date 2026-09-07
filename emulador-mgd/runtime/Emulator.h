@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "../cpu/Cpu.h"
+#include "../loader/NroLoader.h"
 #include "../odyssey/OdysseyWorld.h"
 #include "../config/MgdSwitches.h"
 
@@ -65,6 +66,17 @@ public:
     }
 
     uint64_t runCpu(uint64_t maxSteps) { return cpu_.run(maxSteps); }
+
+    // Boot de NRO: mapeia, aponta SP, pula no entry. Retorna false se inválido.
+    bool bootNro(const uint8_t* blob, size_t len, uint64_t base = 0, uint64_t sp = 0x8000) {
+        NroImage img = parseNro(blob, len);
+        if (!img.valid) return false;
+        uint64_t entry = 0;
+        if (!loadNroInto(img, blob, cpu_.ram(), cpu_.ramSize(), base, entry)) return false;
+        cpu_.setSp(sp);
+        cpu_.setPc(entry + 0x80); // pula o header (start sintético)
+        return true;
+    }
 
     bridge::RuntimeFrameStats bootWorld(uint32_t n = 20) { return world_.boot(n); }
 
