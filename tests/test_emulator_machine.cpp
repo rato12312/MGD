@@ -1070,6 +1070,36 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(done == 66, "3 movz + 10x6 loop + cbz+orr+svc");
     }
 
+    // Fatorial(5)=120 recursivo: frame de pilha + BL + RET.
+    {
+        emu::Cpu cpu;
+        auto poke = [&](uint64_t addr, uint32_t insn) {
+            for (int i = 0; i < 4; i++)
+                cpu.ram()[addr + i] = static_cast<uint8_t>(insn >> (8 * i));
+        };
+        poke(0x00, 0xD28000A0u); // MOVZ X0, #5
+        poke(0x04, 0x94000007u); // BL fact
+        poke(0x08, 0xD4000001u); // SVC#0
+        poke(0x20, 0xA9BF7BFDu); // STP X29,X30,[SP,#-16]!
+        poke(0x24, 0x910003FDu); // ADD X29,SP,#0
+        poke(0x28, 0xF100041Fu); // SUBS XZR,X0,#1
+        poke(0x2C, 0x14000006u); // B.EQ base
+        poke(0x30, 0xAA0003E1u); // ORR X1,XZR,X0
+        poke(0x34, 0xD1000400u); // SUB X0,X0,#1
+        poke(0x38, 0x97FFFFFAu); // BL fact
+        poke(0x3Cu, 0x9B01FC00u); // MUL X0,X0,X1
+        poke(0x40, 0x14000002u); // B end
+        poke(0x44, 0xD2800020u); // base: MOVZ X0,#1
+        poke(0x48, 0xA8C17BFDu); // LDP X29,X30,[SP],#16
+        poke(0x4C, 0xD65F03C0u); // RET
+        cpu.setSp(0x8000);
+        uint64_t done = cpu.run(512);
+        ASSERT_MSG(cpu.stopped(), "fat parou limpo");
+        ASSERT_MSG(cpu.reg(0) == 120, "fat(5)=120");
+        ASSERT_MSG(cpu.sp() == 0x8000, "pilha zerada");
+        (void)done;
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
