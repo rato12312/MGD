@@ -222,18 +222,18 @@ bool run_emulator_machine_tests() {
         cpu.setMmu(&mmu);
         cpu.setReg(2, 0x1000);
         cpu.setReg(0, 0x1234);
-        ASSERT_MSG(cpu.step(0xF8000020u), "str via mmu ok");
+        ASSERT_MSG(cpu.step(0xF8000040u), "str via mmu ok");
         cpu.setReg(0, 0);
-        ASSERT_MSG(cpu.step(0xF9400020u), "ldr via mmu ok");
+        ASSERT_MSG(cpu.step(0xF9400040u), "ldr via mmu ok");
         ASSERT_MSG(cpu.reg(0) == 0x1234, "dado certo");
         // escrita em região r-- nega
         cpu.setReg(2, 0x2000);
-        ASSERT_MSG(!cpu.step(0xF8000020u), "str sem w nega");
+        ASSERT_MSG(!cpu.step(0xF8000040u), "str sem w nega");
         // remapeamento: VA 0x3000 enxerga o PA 0x1000
         mmu.map(0x3000, 0x1000, 0x1000, true, true, false);
         cpu.setReg(2, 0x3000);
         cpu.setReg(0, 0);
-        ASSERT_MSG(cpu.step(0xF9400020u), "ldr via alias ok");
+        ASSERT_MSG(cpu.step(0xF9400040u), "ldr via alias ok");
         ASSERT_MSG(cpu.reg(0) == 0x1234, "alias le o mesmo fisico");
         // fetch sem x para o run
         emu::Cpu cpu2;
@@ -254,7 +254,7 @@ bool run_emulator_machine_tests() {
         emu.applySwitches();
         emu.cpu().setReg(2, 0x100);
         emu.cpu().setReg(0, 0x55);
-        ASSERT_MSG(emu.cpu().step(0xF8000020u), "direto ok");
+        ASSERT_MSG(emu.cpu().step(0xF8000040u), "direto ok");
         // mali Edge: mundo 0.4x
         emu.switches().mgd_mali = emu::MaliLevel::Edge;
         emu.applySwitches();
@@ -929,8 +929,8 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(emu.cpu().lastSvc() == hos::RESULT_OK, "trocou");
         emu.cpu().setReg(2, 0x100);
         emu.cpu().setReg(0, 0x77);
-        ASSERT_MSG(!emu.cpu().step(0xF8000020u), "str sem w nega");
-        ASSERT_MSG(emu.cpu().step(0xF9400020u), "ldr sem w passa");
+        ASSERT_MSG(!emu.cpu().step(0xF8000040u), "str sem w nega");
+        ASSERT_MSG(emu.cpu().step(0xF9400040u), "ldr sem w passa");
         ASSERT_MSG(emu.cpu().reg(0) == 0, "leu zero");
     }
 
@@ -1145,7 +1145,7 @@ bool run_emulator_machine_tests() {
         poke32(cpu, 0x44, 0xD4000021u); // SVC #1 SetHeapSize
         poke32(cpu, 0x48, 0xD2802000u); // MOVZ X0, #0x100
         poke32(cpu, 0x4C, 0xD2800162u); // MOVZ X2, #0xB
-        poke32(cpu, 0x50, 0xF8000020u); // STR X2, [X0]
+        poke32(cpu, 0x50, 0xF8000002u); // STR X2, [X0]
         poke32(cpu, 0x54, 0xD4000001u); // SVC#0
         cpu.setSp(0x8000);
         kernel.setRam(cpu.ram(), cpu.ramSize());
