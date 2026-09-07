@@ -2105,6 +2105,16 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(1) == 0x401C000000000000ull, "bits de 7.0");
     }
 
+    // LDTRB (unprivileged) funciona via caminho LDUR.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 0x100);
+        cpu.setReg(0, 0x5A);
+        ASSERT_MSG(cpu.step(0x39000020u), "strb x0,[x1]");
+        ASSERT_MSG(cpu.step(0x38600022u), "ldtrb w2,[x1]");
+        ASSERT_MSG(cpu.reg(2) == 0x5A, "ldtrb leu");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

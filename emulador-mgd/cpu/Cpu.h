@@ -1367,7 +1367,9 @@ public:
             ((insn & 0xFFE00C00) == 0x38800000) || ((insn & 0xFFE00C00) == 0x38C00000) ||
             ((insn & 0xFFE00C00) == 0x78000000) || ((insn & 0xFFE00C00) == 0x78400000) ||
             ((insn & 0xFFE00C00) == 0x78800000) || ((insn & 0xFFE00C00) == 0x78C00000)) {
-            // LDUR/STUR byte/half (simm9 sem escala), com e sem sinal
+            // LDUR/STUR byte/half (simm9 sem escala), com e sem sinal.
+            // Nota: LDTR/STTR ([25:24]=10) caem aqui de propósito:
+            // single-thread EL0, semântica idêntica.
             uint32_t ubase = insn & 0xFFE00C00;
             bool isHalf = (ubase & 0x40000000u) != 0; // size bit30
             int opc = static_cast<int>((insn >> 22) & 0x3);
