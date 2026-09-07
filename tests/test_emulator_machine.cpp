@@ -11,6 +11,7 @@
 #include "emulador-mgd/runtime/Emulator.h"
 #include "emulador-mgd/loader/Lz4.h"
 #include "emulador-mgd/loader/NsoLoader.h"
+#include "emulador-mgd/loader/RomFs.h"
 #include "emulador-mgd/loader/NroLoader.h"
 #include "emulador-mgd/hos/Kernel.h"
 #include "emulador-mgd/hos/Session.h"
@@ -1657,6 +1658,43 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(fatal.dispatch(t, r) && r.cmd == 1, "registrou");
         ASSERT_MSG(fatal.fatalCount() == 1, "contou 1");
         ASSERT_MSG(fatal.lastFatal() == 0xBEEF, "codigo certo");
+    }
+
+    // RomFS sintético: lista raiz e lê arquivo.
+    {
+        std::vector<uint8_t> blob(0xA8, 0);
+        auto w32 = [&](size_t off, uint32_t v) {
+            for (int i = 0; i < 4; i++) blob[off + i] = static_cast<uint8_t>(v >> (8 * i));
+        };
+        auto w64 = [&](size_t off, uint64_t v) {
+            for (int i = 0; i < 8; i++) blob[off + i] = static_cast<uint8_t>(v >> (8 * i));
+        };
+        w32(0x0C, 0x50); // dir table
+        w32(0x10, 0x18);
+        w32(0x1C, 0x80); // file table
+        w32(0x20, 0x25);
+        w64(0x24, 0xA5); // dados
+        // root @0x50: file -> 0x80
+        w32(0x50 + 0x04, 0xFFFFFFFFu); // sibling
+        w32(0x50 + 0x08, 0xFFFFFFFFu); // child
+        w32(0x50 + 0x0C, 0x80);        // file
+        // file0 @0x80: "a.txt", dados em 0, tamanho 3
+        w32(0x80 + 0x00, 0x50); // parent
+        w32(0x80 + 0x04, 0xFFFFFFFFu);
+        w64(0x80 + 0x08, 0);
+        w64(0x80 + 0x10, 3);
+        w32(0x80 + 0x1C, 5);
+        blob[0xA0] = 'a'; blob[0xA1] = '.'; blob[0xA2] = 't';
+        blob[0xA3] = 'x'; blob[0xA4] = 't';
+        blob[0xA5] = 7; blob[0xA6] = 8; blob[0xA7] = 9;
+        emu::RomFsReader rom;
+        ASSERT_MSG(rom.open(blob.data(), blob.size()), "romfs abriu");
+        std::vector<std::string> names = rom.listRoot();
+        ASSERT_MSG(names.size() == 1 && names[0] == "a.txt", "lista raiz");
+        std::vector<uint8_t> data;
+        ASSERT_MSG(rom.readRootFile("a.txt", data), "leu arquivo");
+        ASSERT_MSG(data.size() == 3 && data[0] == 7 && data[2] == 9, "bytes certos");
+        ASSERT_MSG(!rom.readRootFile("nada", data), "inexistente nega");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
