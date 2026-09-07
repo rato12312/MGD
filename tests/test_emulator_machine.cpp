@@ -14,6 +14,7 @@
 #include "emulador-mgd/hos/PortRegistry.h"
 #include "emulador-mgd/hos/NvService.h"
 #include "emulador-mgd/hos/ViService.h"
+#include "emulador-mgd/hos/AudService.h"
 #include "emulador-mgd/hos/ServiceManager.h"
 #include "emulador-mgd/hos/Thread.h"
 
@@ -1309,6 +1310,23 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cli->sendRequest(present), "pede present");
         ASSERT_MSG(kernel.pumpServices() == 1, "bomba apresentou");
         ASSERT_MSG(kernel.vi().presented() == 1, "1 frame contado");
+    }
+
+    // Áudio: abre, start, enfileira, stop.
+    {
+        hos::AudService aud;
+        hos::IpcMessage m;
+        hos::IpcMessage r;
+        m.cmd = 1;
+        ASSERT_MSG(aud.dispatch(m, r) && r.cmd == 1, "audio abriu");
+        m.cmd = 2;
+        ASSERT_MSG(aud.dispatch(m, r) && aud.started(), "audio start");
+        m.cmd = 4;
+        m.payload = {1, 2, 3, 4};
+        ASSERT_MSG(aud.dispatch(m, r) && aud.queuedBytes() == 4, "4 bytes");
+        m.cmd = 3;
+        m.payload.clear();
+        ASSERT_MSG(aud.dispatch(m, r) && !aud.started(), "audio stop");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;

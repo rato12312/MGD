@@ -8,6 +8,7 @@
 #include <unordered_map>
 
 #include "../ram/Mmu.h"
+#include "AudService.h"
 #include "NvService.h"
 #include "ViService.h"
 #include "ServiceManager.h"
@@ -117,12 +118,14 @@ public:
             bool understood = false;
             if (name == "nvdrv:a") understood = nv_.dispatch(req, rep);
             else if (name == "vi:u") understood = vi_.dispatch(req, rep);
+            else if (name == "audren:u") understood = aud_.dispatch(req, rep);
             if (understood && kv.second->sendReply(rep)) done++;
         }
         return done;
     }
     NvService& nv() { return nv_; }
     ViService& vi() { return vi_; }
+    AudService& aud() { return aud_; }
 
     SvcResult call(uint32_t num, SvcArgs& args) {
         switch (num) {
@@ -218,6 +221,7 @@ private:
     ServiceManager services_;
     NvService nv_;
     ViService vi_;
+    AudService aud_;
 };
 
 } // namespace hos
