@@ -782,6 +782,20 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == 0x30, "and 32");
     }
 
+    // MADDW + SDIVW.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 3);
+        cpu.setReg(2, 4);
+        cpu.setReg(3, 5);
+        ASSERT_MSG(cpu.step(0x1B020C20u), "maddw w0,w1,w2,w3");
+        ASSERT_MSG(cpu.reg(0) == 17, "5+3*4");
+        cpu.setReg(1, 20);
+        cpu.setReg(2, 4);
+        ASSERT_MSG(cpu.step(0x1AC20C20u), "sdivw w0,w1,w2");
+        ASSERT_MSG(cpu.reg(0) == 5, "20/4");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
