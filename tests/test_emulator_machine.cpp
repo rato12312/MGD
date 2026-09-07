@@ -1954,6 +1954,31 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(r64(0x200) == ~0ull && r64(0x208) == 0ull, "mascara certa");
     }
 
+    // BSL blend por máscara.
+    {
+        emu::Cpu cpu;
+        auto w64 = [&](uint64_t addr, uint64_t v) {
+            for (int i = 0; i < 8; i++)
+                cpu.ram()[addr + i] = static_cast<uint8_t>(v >> (8 * i));
+        };
+        w64(0x100, ~0ull); w64(0x108, 0);     // V0 = máscara
+        w64(0x110, 0xAA); w64(0x118, 0xBB);   // V1 = novo
+        w64(0x120, 0x11); w64(0x128, 0x22);   // V2 = velho
+        cpu.setReg(1, 0x100);
+        ASSERT_MSG(cpu.step(0x3DC00020u), "ldr q0");
+        ASSERT_MSG(cpu.step(0x3DC00421u), "ldr q1");
+        ASSERT_MSG(cpu.step(0x3DC00822u), "ldr q2");
+        ASSERT_MSG(cpu.step(0x6E601C22u), "bsl v2,v1,v0");
+        ASSERT_MSG(cpu.step(0xD2804003u), "movz x3,#0x200");
+        ASSERT_MSG(cpu.step(0x3D800062u), "str q2");
+        auto r64 = [&](uint64_t addr) {
+            uint64_t v = 0;
+            for (int i = 0; i < 8; i++) v |= static_cast<uint64_t>(cpu.ram()[addr + i]) << (8 * i);
+            return v;
+        };
+        ASSERT_MSG(r64(0x200) == 0xAA && r64(0x208) == 0x22, "blend certo");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

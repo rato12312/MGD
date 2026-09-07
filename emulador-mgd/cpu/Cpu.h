@@ -561,6 +561,18 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFC0FC00) == 0x6E601C00) { // BSL Vd,Vn,Vm: d=(n&m)|(d&~m)
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            for (int lane = 0; lane < 2; lane++) {
+                uint64_t dd = fp_.q[d][lane];
+                fp_.q[d][lane] = (fp_.q[n][lane] & fp_.q[m][lane]) | (dd & ~fp_.q[m][lane]);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFC0FC00) == 0x6E201C00) { // ORR Vd.16B,Vn,Vm (move 128)
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
