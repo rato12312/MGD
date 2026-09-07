@@ -503,16 +503,25 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFE0FC00) == 0x6E208400 || (insn & 0xFFE0FC00) == 0x6E208C00) {
-            // ADD / SUB Vd.2D,Vn.2D,Vm.2D (inteiro, 2 lanes)
-            bool isAdd = (insn & 0xFFE0FC00) == 0x6E208400;
+        if ((insn & 0xFF9FFC00) == 0x6E008400 || (insn & 0xFF9FFC00) == 0x6E008C00) {
+            // ADD / SUB vetorial inteiro: size diz as lanes (8b/16b/32b/64b)
+            bool isAdd = (insn & 0xFF9FFC00) == 0x6E008400;
+            int sz = static_cast<int>((insn >> 21) & 0x3);
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             int m = static_cast<int>((insn >> 16) & 0x1F);
-            for (int lane = 0; lane < 2; lane++) {
-                uint64_t r = isAdd ? (fp_.q[n][lane] + fp_.q[m][lane])
-                                   : (fp_.q[n][lane] - fp_.q[m][lane]);
-                fp_.q[d][lane] = r;
+            int lanes = 16 >> sz;          // 16, 8, 4, 2
+            int bits = 8 << sz;            // 8, 16, 32, 64
+            uint64_t mask = bits == 64 ? ~0ull : ((1ull << bits) - 1ull);
+            uint64_t an[2] = {fp_.q[n][0], fp_.q[n][1]};
+            uint64_t bn[2] = {fp_.q[m][0], fp_.q[m][1]};
+            for (int lane = 0; lane < lanes; lane++) {
+                int half = lane / (64 / bits);
+                int shift = (lane * bits) % 64;
+                uint64_t a = (an[half] >> shift) & mask;
+                uint64_t b = (bn[half] >> shift) & mask;
+                uint64_t r = (isAdd ? (a + b) : (a - b)) & mask;
+                fp_.q[d][half] = (fp_.q[d][half] & ~(mask << shift)) | (r << shift);
             }
             pc_ += 4;
             steps_++;

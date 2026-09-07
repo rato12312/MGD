@@ -1849,7 +1849,7 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == 7, "moveu 128");
     }
 
-    // Vetor inteiro 2 lanes: carrega 128, soma, guarda.
+    // Vetor inteiro size-aware: .2D soma 64, .16B não vaza carry.
     {
         emu::Cpu cpu;
         auto w64 = [&](uint64_t addr, uint64_t v) {
@@ -1861,11 +1861,20 @@ bool run_emulator_machine_tests() {
         cpu.setReg(1, 0x100);
         ASSERT_MSG(cpu.step(0x3DC00020u), "ldr q0,[x1]");
         ASSERT_MSG(cpu.step(0x3DC00421u), "ldr q1,[x1,#16]");
-        ASSERT_MSG(cpu.step(0x6E218402u), "add v2.2d,v0.2d,v1.2d");
+        ASSERT_MSG(cpu.step(0x6E618402u), "add v2.2d,v0.2d,v1.2d");
         ASSERT_MSG(cpu.step(0xD2804003u), "movz x3,#0x200");
         ASSERT_MSG(cpu.step(0x3D800062u), "str q2,[x3]");
         ASSERT_MSG(cpu.ram()[0x200] == 11, "lane0=11");
         ASSERT_MSG(cpu.ram()[0x208] == 22, "lane1=22");
+        // 16B: 0xFF+1 zera o byte sem vazar
+        w64(0x100, 0xFF); w64(0x108, 0);
+        w64(0x110, 1); w64(0x118, 0);
+        ASSERT_MSG(cpu.step(0x3DC00020u), "ldr q0 de novo");
+        ASSERT_MSG(cpu.step(0x3DC00421u), "ldr q1 de novo");
+        ASSERT_MSG(cpu.step(0x6E018402u), "add v2.16b,v0.16b,v1.16b");
+        ASSERT_MSG(cpu.step(0x3D800062u), "str q2,[x3]");
+        ASSERT_MSG(cpu.ram()[0x200] == 0, "0xFF+1=0 no byte");
+        ASSERT_MSG(cpu.ram()[0x201] == 0, "sem vazamento");
     }
 
     // FMLA vetorial: d += n*m por lane.
