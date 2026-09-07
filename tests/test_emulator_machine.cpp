@@ -17,6 +17,7 @@
 #include "emulador-mgd/hos/AudService.h"
 #include "emulador-mgd/hos/FsService.h"
 #include "emulador-mgd/hos/Event.h"
+#include "emulador-mgd/hos/Mutex.h"
 #include "emulador-mgd/hos/HidService.h"
 #include "emulador-mgd/hos/TimeService.h"
 #include "emulador-mgd/hos/ServiceManager.h"
@@ -1437,6 +1438,19 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(!ev.wait(e, false), "limpo nega");
         ASSERT_MSG(!ev.signal(999), "inexistente nega");
         ASSERT_MSG(ev.close(e) && ev.count() == 0, "fechou");
+    }
+
+    // Mutex: dono entra, outro espera, destrava libera.
+    {
+        hos::MutexTable mx;
+        uint32_t m = mx.create();
+        ASSERT_MSG(mx.lock(m, 1), "thread 1 trava");
+        ASSERT_MSG(!mx.lock(m, 2), "thread 2 espera");
+        ASSERT_MSG(mx.lock(m, 1), "dono retrava");
+        ASSERT_MSG(!mx.unlock(m, 2), "outro nao destrava");
+        ASSERT_MSG(mx.unlock(m, 1), "dono destrava");
+        ASSERT_MSG(mx.lock(m, 2), "livre, thread 2 entra");
+        ASSERT_MSG(!mx.lock(999, 1), "inexistente nega");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
