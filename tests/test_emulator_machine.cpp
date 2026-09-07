@@ -1849,6 +1849,25 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == 7, "moveu 128");
     }
 
+    // Vetor inteiro 2 lanes: carrega 128, soma, guarda.
+    {
+        emu::Cpu cpu;
+        auto w64 = [&](uint64_t addr, uint64_t v) {
+            for (int i = 0; i < 8; i++)
+                cpu.ram()[addr + i] = static_cast<uint8_t>(v >> (8 * i));
+        };
+        w64(0x100, 10); w64(0x108, 20); // V0 = [10,20]
+        w64(0x110, 1); w64(0x118, 2);   // V1 = [1,2]
+        cpu.setReg(1, 0x100);
+        ASSERT_MSG(cpu.step(0x3DC00020u), "ldr q0,[x1]");
+        ASSERT_MSG(cpu.step(0x3DC00421u), "ldr q1,[x1,#16]");
+        ASSERT_MSG(cpu.step(0x6E218402u), "add v2.2d,v0.2d,v1.2d");
+        ASSERT_MSG(cpu.step(0xD2804003u), "movz x3,#0x200");
+        ASSERT_MSG(cpu.step(0x3D800062u), "str q2,[x3]");
+        ASSERT_MSG(cpu.ram()[0x200] == 11, "lane0=11");
+        ASSERT_MSG(cpu.ram()[0x208] == 22, "lane1=22");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

@@ -501,6 +501,21 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE0FC00) == 0x6E208400 || (insn & 0xFFE0FC00) == 0x6E208C00) {
+            // ADD / SUB Vd.2D,Vn.2D,Vm.2D (inteiro, 2 lanes)
+            bool isAdd = (insn & 0xFFE0FC00) == 0x6E208400;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            for (int lane = 0; lane < 2; lane++) {
+                uint64_t r = isAdd ? (fp_.q[n][lane] + fp_.q[m][lane])
+                                   : (fp_.q[n][lane] - fp_.q[m][lane]);
+                fp_.q[d][lane] = r;
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFC0FC00) == 0x6E201C00) { // ORR Vd.16B,Vn,Vm (move 128)
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
@@ -978,6 +993,24 @@ public:
                 uint64_t nb = base + static_cast<uint64_t>(off * 4);
                 if (n == 31) sp_ = nb;
                 else regs_[n] = nb;
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFC00000) == 0x3D800000 || (insn & 0xFFC00000) == 0x3DC00000) {
+            // STR / LDR Qt,[Xn,#imm*16] (128 bits)
+            bool isLoad = (insn & 0xFFC00000) == 0x3DC00000;
+            int t = static_cast<int>(insn & 0x1F);
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            uint64_t base = (n == 31) ? sp_ : regs_[n];
+            uint64_t addr = base + static_cast<uint64_t>((insn >> 10) & 0xFFF) * 16u;
+            uint64_t pa = 0;
+            if (!phys(addr, 16, !isLoad, false, pa)) return false;
+            if (isLoad) {
+                __builtin_memcpy(&fp_.q[t][0], &mem_[static_cast<size_t>(pa)], 16);
+            } else {
+                __builtin_memcpy(&mem_[static_cast<size_t>(pa)], &fp_.q[t][0], 16);
             }
             pc_ += 4;
             steps_++;
