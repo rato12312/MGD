@@ -2123,6 +2123,17 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.pc() == pc + 4, "seguiu");
     }
 
+    // CCMN/CCMP 32-bit.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 5);
+        cpu.setReg(1, 5);
+        ASSERT_MSG(cpu.step(0x3AC1E000u), "ccmp w0,w1,#0,al");
+        uint64_t pc = cpu.pc();
+        ASSERT_MSG(cpu.step(0x54000040u), "b.eq (z=1)");
+        ASSERT_MSG(cpu.pc() == pc + 8, "comparou igual 32");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

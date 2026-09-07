@@ -780,6 +780,36 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFE00C00) == 0x3AC00000 || (insn & 0xFFE00C00) == 0x7AC00000) {
+            // CCMN / CCMP Wn,Wm,#nzcv,cond (32-bit)
+            bool isNeg = (insn & 0xFFE00C00) == 0x7AC00000;
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int cond = static_cast<int>((insn >> 12) & 0xF);
+            int nzcv = static_cast<int>(insn & 0xF);
+            if (condTrue(cond)) {
+                uint32_t nv = (n == 31) ? 0 : static_cast<uint32_t>(regs_[n]);
+                uint32_t mv = (m == 31) ? 0 : static_cast<uint32_t>(regs_[m]);
+                uint32_t res = isNeg ? (nv + mv) : (nv - mv);
+                flag_n_ = (res >> 31) != 0;
+                flag_z_ = (res == 0);
+                if (isNeg) {
+                    flag_c_ = res < nv;
+                } else {
+                    flag_c_ = nv >= mv;
+                }
+                bool sn = ((nv >> 31) != 0), sm = ((mv >> 31) != 0), sr = flag_n_;
+                flag_v_ = isNeg ? ((sn == sm) && (sr != sn)) : ((sn != sm) && (sr != sn));
+            } else {
+                flag_n_ = (nzcv & 8) != 0;
+                flag_z_ = (nzcv & 4) != 0;
+                flag_c_ = (nzcv & 2) != 0;
+                flag_v_ = (nzcv & 1) != 0;
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFFFF01F) == 0xD503201F) { // NOP e HINTs: aceita e segue
             pc_ += 4;
             steps_++;
