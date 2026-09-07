@@ -1037,6 +1037,25 @@ public:
             steps_++;
             return true;
         }
+        if (((insn & 0xFF200000) == 0x6A000000) && ((insn >> 22) & 0x3) == 0x0) {
+            // ANDS 32-bit com LSL #n (cobre TST W): N/Z da conta, C=V=0
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>(dec.rm);
+            int sh = static_cast<int>((insn >> 10) & 0x1F);
+            uint32_t nv = (n == 31) ? 0 : static_cast<uint32_t>(regs_[n]);
+            uint32_t mv = (m == 31) ? 0 : static_cast<uint32_t>(regs_[m]);
+            uint32_t sv = (sh == 0) ? mv : (mv << sh);
+            uint32_t res = nv & sv;
+            if (d != 31) regs_[d] = res;
+            flag_n_ = (res >> 31) != 0;
+            flag_z_ = (res == 0);
+            flag_c_ = false;
+            flag_v_ = false;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if (((insn & 0xFF200000) == 0xEA000000) && ((insn >> 22) & 0x3) == 0x0) {
             // ANDS 64-bit com LSL #n (cobre TST): N/Z da conta, C=V=0
             int d = static_cast<int>(dec.rd);

@@ -2169,6 +2169,17 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(3) == 0x02010403ull, "rev16 certo");
     }
 
+    // ANDS 32-bit (TST W).
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 0xF0);
+        cpu.setReg(1, 0x0F);
+        ASSERT_MSG(cpu.step(0x6A20001Fu), "tst w0,w1");
+        uint64_t pc = cpu.pc();
+        ASSERT_MSG(cpu.step(0x54000040u), "b.eq (zero)");
+        ASSERT_MSG(cpu.pc() == pc + 8, "eq tomou 32");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
