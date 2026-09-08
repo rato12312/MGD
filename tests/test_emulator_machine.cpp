@@ -17,6 +17,7 @@
 #include "emulador-mgd/loader/Pfs0.h"
 #include "emulador-mgd/loader/RomFs.h"
 #include "emulador-mgd/loader/NroLoader.h"
+#include "emulador-mgd/loader/Reloc.h"
 #include "emulador-mgd/hos/Kernel.h"
 #include "emulador-mgd/hos/Session.h"
 #include "emulador-mgd/hos/PortRegistry.h"
@@ -2350,6 +2351,63 @@ bool run_emulator_machine_tests() {
             sorted = sorted && (v == want[i]);
         }
         ASSERT_MSG(sorted, "array ordenado");
+    }
+
+    // LZ4: match longo com byte de extensão + bloco vazio.
+    {
+        std::vector<uint8_t> out;
+        // "AB" + match de 29 (nib F + ext 10) no offset 2
+        const uint8_t m[] = {0x2F, 'A', 'B', 0x02, 0x00, 10};
+        ASSERT_MSG(emu::lz4::decompressBlock(m, sizeof(m), out), "match longo ok");
+        ASSERT_MSG(out.size() == 31, "2+29");
+        bool alt = true;
+        for (size_t i = 0; i < out.size(); i++)
+            alt = alt && (out[i] == (i % 2 == 0 ? 'A' : 'B'));
+        ASSERT_MSG(alt, "alterna AB");
+        const uint8_t e[] = {0x00};
+        ASSERT_MSG(emu::lz4::decompressBlock(e, sizeof(e), out), "vazio ok");
+        ASSERT_MSG(out.empty(), "vazio da vazio");
+    }
+
+    // AES-CTR: nonce diferente, keystream diferente.
+    {
+        uint8_t key[16] = {0};
+        uint8_t n1[12] = {0};
+        uint8_t n2[12] = {0};
+        n2[0] = 1;
+        uint8_t msg[16] = {9};
+        uint8_t c1[16] = {0}, c2[16] = {0};
+        emu::aes::cryptCtr(key, n1, msg, c1, 16);
+        emu::aes::cryptCtr(key, n2, msg, c2, 16);
+        bool diff = false;
+        for (int i = 0; i < 16; i++) diff = diff || (c1[i] != c2[i]);
+        ASSERT_MSG(diff, "nonce muda tudo");
+    }
+
+    // Reloc RELATIVE: base + addend no lugar certo.
+    {
+        std::vector<uint8_t> image(64, 0);
+        emu::Elf64Rela relas[2] = {};
+        relas[0].offset = 0x10;
+        relas[0].info = 1027;
+        relas[0].addend = 0x20;
+        relas[1].offset = 0x18;
+        relas[1].info = 1027;
+        relas[1].addend = -8;
+        uint64_t applied = 0;
+        ASSERT_MSG(emu::applyRelativeRelocs(image.data(), image.size(), relas, 2, 0x1000, &applied),
+                   "relocou");
+        ASSERT_MSG(applied == 2, "2 aplicadas");
+        uint64_t v0 = 0, v1 = 0;
+        std::memcpy(&v0, image.data() + 0x10, 8);
+        std::memcpy(&v1, image.data() + 0x18, 8);
+        ASSERT_MSG(v0 == 0x1020, "base+addend");
+        ASSERT_MSG(v1 == 0xFF8, "negativo certo");
+        emu::Elf64Rela bad = {};
+        bad.offset = 0;
+        bad.info = 999;
+        ASSERT_MSG(!emu::applyRelativeRelocs(image.data(), image.size(), &bad, 1, 0x1000, nullptr),
+                   "tipo estranho nega");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
