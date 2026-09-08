@@ -45,6 +45,8 @@ public:
         steps_ = 0;
         stopped_ = false;
         exit_code_ = 0;
+        fpcr_ = 0;
+        fpsr_ = 0;
         flag_n_ = flag_z_ = flag_c_ = flag_v_ = false;
     }
 
@@ -91,6 +93,7 @@ public:
         std::array<uint64_t, REG_COUNT> regs{};
         std::array<double, 32> fpregs{};
         uint64_t sp = 0, pc = 0, steps = 0, tpidr = 0;
+        uint64_t fpcr = 0, fpsr = 0;
         bool n = false, z = false, c = false, v = false;
     };
     State save() const {
@@ -98,6 +101,7 @@ public:
         s.regs = regs_;
         s.fpregs = fp_.d;
         s.sp = sp_; s.pc = pc_; s.steps = steps_; s.tpidr = tpidr_;
+        s.fpcr = fpcr_; s.fpsr = fpsr_;
         s.n = flag_n_; s.z = flag_z_; s.c = flag_c_; s.v = flag_v_;
         return s;
     }
@@ -105,6 +109,7 @@ public:
         regs_ = s.regs;
         fp_.d = s.fpregs;
         sp_ = s.sp; pc_ = s.pc; steps_ = s.steps; tpidr_ = s.tpidr;
+        fpcr_ = s.fpcr; fpsr_ = s.fpsr;
         flag_n_ = s.n; flag_z_ = s.z; flag_c_ = s.c; flag_v_ = s.v;
         stopped_ = false; // contexto novo, vida nova
         exit_code_ = 0;
@@ -347,6 +352,34 @@ public:
         if ((insn & 0xFFFFFFE0) == 0xD53BE000) { // MRS Xd,CNTFRQ_EL0 (19.2MHz)
             int d = static_cast<int>(dec.rd);
             if (d != 31) regs_[d] = 19200000ull;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFFE0) == 0xD53B4400) { // MRS Xd,FPCR (guardado)
+            int d = static_cast<int>(dec.rd);
+            if (d != 31) regs_[d] = fpcr_;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFFE0) == 0xD5134400) { // MSR FPCR,Xn (sem efeito real)
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            fpcr_ = (n == 31) ? 0 : regs_[n];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFFE0) == 0xD53B4420) { // MRS Xd,FPSR (guardado)
+            int d = static_cast<int>(dec.rd);
+            if (d != 31) regs_[d] = fpsr_;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFFE0) == 0xD5134420) { // MSR FPSR,Xn (sem efeito real)
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            fpsr_ = (n == 31) ? 0 : regs_[n];
             pc_ += 4;
             steps_++;
             return true;
@@ -2034,6 +2067,7 @@ private:
     uint64_t pc_ = 0;
     uint64_t steps_ = 0;
     uint64_t tpidr_ = 0;
+    uint64_t fpcr_ = 0, fpsr_ = 0;
     bool stopped_ = false;
     uint64_t exit_code_ = 0;
     bool flag_n_ = false, flag_z_ = false, flag_c_ = false, flag_v_ = false;

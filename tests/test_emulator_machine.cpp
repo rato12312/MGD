@@ -2517,6 +2517,20 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(got.buffers.size() == 1 && got.buffers[0].guest_ptr == 0x1000, "buffer intacto");
     }
 
+    // FPCR/FPSR guardam e devolvem.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 0x03000000);
+        ASSERT_MSG(cpu.step(0xD513441Fu), "msr fpcr,x0");
+        ASSERT_MSG(cpu.step(0xD53B4401u), "mrs x1,fpcr");
+        ASSERT_MSG(cpu.reg(1) == 0x03000000ull, "fpcr voltou");
+        ASSERT_MSG(cpu.step(0xD5134421u), "msr fpsr,x1? usa x0");
+        cpu.setReg(0, 5);
+        ASSERT_MSG(cpu.step(0xD5134420u), "msr fpsr,x0");
+        ASSERT_MSG(cpu.step(0xD53B4422u), "mrs x2,fpsr");
+        ASSERT_MSG(cpu.reg(2) == 5, "fpsr voltou");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
