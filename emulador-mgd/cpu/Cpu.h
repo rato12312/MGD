@@ -58,6 +58,7 @@ public:
     void setPc(uint64_t v) { pc_ = v; }
     uint64_t steps() const { return steps_; }
     uint8_t* ram() { return mem_.data(); }
+    const uint8_t* ram() const { return mem_.data(); }
     uint64_t ramSize() const { return static_cast<uint64_t>(mem_.size()); }
 
     bool stopped() const { return stopped_; }

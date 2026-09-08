@@ -3,10 +3,10 @@
 // Emulador MGD: amarra CPU + RAM + mundo Odyssey.
 // Fluxo: programa na RAM -> CPU executa -> handoff alimenta o mapa mental.
 
-#include <cstdint>
-#include <vector>
-
 #include <chrono>
+#include <cstdint>
+#include <cstring>
+#include <vector>
 
 #include "../cpu/Cpu.h"
 #include "../hos/Kernel.h"
@@ -84,6 +84,24 @@ public:
     uint64_t runCpu(uint64_t maxSteps) { return cpu_.run(maxSteps); }
     uint64_t runThreads(uint64_t maxSteps, uint64_t quantum = 4) {
         return kernel_.runThreads(cpu_, maxSteps, quantum);
+    }
+
+    // Save state: congela CPU + RAM (kernel/mundo ficam de fora, honesto).
+    struct Snapshot {
+        Cpu::State cpu;
+        std::vector<uint8_t> ram;
+    };
+    Snapshot snapshot() const {
+        Snapshot s;
+        s.cpu = cpu_.save();
+        s.ram.assign(cpu_.ram(), cpu_.ram() + cpu_.ramSize());
+        return s;
+    }
+    bool restore(const Snapshot& s) {
+        if (s.ram.size() != cpu_.ramSize()) return false;
+        cpu_.load(s.cpu);
+        std::memcpy(cpu_.ram(), s.ram.data(), s.ram.size());
+        return true;
     }
 
     // Boot de NRO: mapeia, aponta SP, pula no entry. Retorna false se inválido.

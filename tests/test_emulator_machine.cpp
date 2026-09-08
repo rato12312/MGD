@@ -2707,6 +2707,38 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(sched.pending() == 1, "B presa na fault (honesto)");
     }
 
+    // Save state: roda metade do fib, congela, termina, volta, termina igual.
+    {
+        emu::Emulator emu;
+        std::vector<uint32_t> prog = {
+            0xD2800140u, // MOVZ X0, #10
+            0xD2800020u, // MOVZ X1, #0
+            0xD2800022u, // MOVZ X2, #1
+            0xB40000C0u, // CBZ X0, done
+            0xF1000400u, // SUBS X0, X0, #1
+            0x8B020023u, // ADD X3, X1, X2
+            0xAA0203E1u, // ORR X1, XZR, X2
+            0xAA0303E2u, // ORR X2, XZR, X3
+            0x17FFFFFBu, // B loop
+            0xAA0103E0u, // done: ORR X0, XZR, X1
+            0xD4000001u, // SVC #0
+        };
+        ASSERT_MSG(emu.loadProgram(prog, 0), "fib cabe");
+        emu.runCpu(20); // meio do caminho
+        ASSERT_MSG(!emu.cpu().stopped(), "ainda rodando");
+        emu::Emulator::Snapshot snap = emu.snapshot();
+        emu.runCpu(512);
+        ASSERT_MSG(emu.cpu().stopped() && emu.cpu().reg(0) == 55, "terminou 55");
+        ASSERT_MSG(emu.restore(snap), "voltou");
+        ASSERT_MSG(!emu.cpu().stopped(), "desparou de novo");
+        emu.runCpu(512);
+        ASSERT_MSG(emu.cpu().stopped() && emu.cpu().reg(0) == 55, "55 de novo");
+        emu::Emulator other;
+        ASSERT_MSG(other.restore(snap), "estado viaja entre maquinas");
+        other.runCpu(512);
+        ASSERT_MSG(other.cpu().stopped() && other.cpu().reg(0) == 55, "outra termina 55");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
