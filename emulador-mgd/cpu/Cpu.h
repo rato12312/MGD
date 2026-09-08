@@ -95,6 +95,8 @@ public:
         std::array<double, 32> fpregs{};
         uint64_t sp = 0, pc = 0, steps = 0, tpidr = 0;
         uint64_t fpcr = 0, fpsr = 0;
+        uint64_t sctlr = 0, ttbr0 = 0, ttbr1 = 0, tcr = 0;
+        uint64_t mair = 0, vbar = 0, cpacr = 0;
         bool n = false, z = false, c = false, v = false;
     };
     State save() const {
@@ -103,6 +105,8 @@ public:
         s.fpregs = fp_.d;
         s.sp = sp_; s.pc = pc_; s.steps = steps_; s.tpidr = tpidr_;
         s.fpcr = fpcr_; s.fpsr = fpsr_;
+        s.sctlr = sctlr_; s.ttbr0 = ttbr0_; s.ttbr1 = ttbr1_; s.tcr = tcr_;
+        s.mair = mair_; s.vbar = vbar_; s.cpacr = cpacr_;
         s.n = flag_n_; s.z = flag_z_; s.c = flag_c_; s.v = flag_v_;
         return s;
     }
@@ -111,6 +115,8 @@ public:
         fp_.d = s.fpregs;
         sp_ = s.sp; pc_ = s.pc; steps_ = s.steps; tpidr_ = s.tpidr;
         fpcr_ = s.fpcr; fpsr_ = s.fpsr;
+        sctlr_ = s.sctlr; ttbr0_ = s.ttbr0; ttbr1_ = s.ttbr1; tcr_ = s.tcr;
+        mair_ = s.mair; vbar_ = s.vbar; cpacr_ = s.cpacr;
         flag_n_ = s.n; flag_z_ = s.z; flag_c_ = s.c; flag_v_ = s.v;
         stopped_ = false; // contexto novo, vida nova
         exit_code_ = 0;
@@ -388,6 +394,83 @@ public:
         if ((insn & 0xFFFFFFE0) == 0xD53B4220) { // MRS Xd,CurrentEL (sempre EL1)
             int d = static_cast<int>(dec.rd);
             if (d != 31) regs_[d] = 0x4;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFFE0) == 0xD53B1000 || (insn & 0xFFFFFFE0) == 0xD53B2000 ||
+            (insn & 0xFFFFFFE0) == 0xD53B2020 || (insn & 0xFFFFFFE0) == 0xD53B2040 ||
+            (insn & 0xFFFFFFE0) == 0xD53BA200 || (insn & 0xFFFFFFE0) == 0xD53BC000 ||
+            (insn & 0xFFFFFFE0) == 0xD53B1020) {
+            // MRS Xd, {SCTLR,TTBR0,TTBR1,TCR,MAIR,VBAR,CPACR}_EL1 (guardados)
+            uint32_t base = insn & 0xFFFFFFE0;
+            int d = static_cast<int>(dec.rd);
+            uint64_t v = 0;
+            if (base == 0xD53B1000) v = sctlr_;
+            else if (base == 0xD53B2000) v = ttbr0_;
+            else if (base == 0xD53B2020) v = ttbr1_;
+            else if (base == 0xD53B2040) v = tcr_;
+            else if (base == 0xD53BA200) v = mair_;
+            else if (base == 0xD53BC000) v = vbar_;
+            else v = cpacr_;
+            if (d != 31) regs_[d] = v;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC1F) == 0xD513101F || (insn & 0xFFFFFC1F) == 0xD513201F ||
+            (insn & 0xFFFFFC1F) == 0xD513203F || (insn & 0xFFFFFC1F) == 0xD513205F ||
+            (insn & 0xFFFFFC1F) == 0xD513A21F || (insn & 0xFFFFFC1F) == 0xD513C01F ||
+            (insn & 0xFFFFFC1F) == 0xD513103F) {
+            // MSR {SCTLR,TTBR0,TTBR1,TCR,MAIR,VBAR,CPACR}_EL1,Xn (guardados)
+            uint32_t base = insn & 0xFFFFFC1F;
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            uint64_t v = (n == 31) ? 0 : regs_[n];
+            if (base == 0xD513101F) sctlr_ = v;
+            else if (base == 0xD513201F) ttbr0_ = v;
+            else if (base == 0xD513203F) ttbr1_ = v;
+            else if (base == 0xD513205F) tcr_ = v;
+            else if (base == 0xD513A21F) mair_ = v;
+            else if (base == 0xD513C01F) vbar_ = v;
+            else cpacr_ = v;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFFE0) == 0xD53B0000) { // MRS Xd,MIDR_EL1 (Cortex-A57)
+            int d = static_cast<int>(dec.rd);
+            if (d != 31) regs_[d] = 0x410FD070ull;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFFE0) == 0xD53B0020) { // MRS Xd,CTR_EL0 (64B linhas)
+            int d = static_cast<int>(dec.rd);
+            if (d != 31) regs_[d] = 0x8444C004ull;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFFE0) == 0xD53B00E0) { // MRS Xd,DCZID_EL0 (BS=4)
+            int d = static_cast<int>(dec.rd);
+            if (d != 31) regs_[d] = 4;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFFE0) == 0xD53BE060) { // MRS Xd,CNTPCT_EL0 (timer)
+            int d = static_cast<int>(dec.rd);
+            if (d != 31) regs_[d] = steps_;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFE1F) == 0xD500401F) { // MSR SPSEL,#0/1 (aceita)
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if (insn == 0xD508871F) { // TLBI VMALLE1 (aceita, sem paginação real)
             pc_ += 4;
             steps_++;
             return true;
@@ -2094,6 +2177,8 @@ private:
     uint64_t steps_ = 0;
     uint64_t tpidr_ = 0;
     uint64_t fpcr_ = 0, fpsr_ = 0;
+    uint64_t sctlr_ = 0, ttbr0_ = 0, ttbr1_ = 0, tcr_ = 0;
+    uint64_t mair_ = 0, vbar_ = 0, cpacr_ = 0;
     bool stopped_ = false;
     uint64_t exit_code_ = 0;
     bool flag_n_ = false, flag_z_ = false, flag_c_ = false, flag_v_ = false;

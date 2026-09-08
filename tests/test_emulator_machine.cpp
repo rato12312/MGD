@@ -3042,6 +3042,33 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(!emu::parseNpdm(curto.data(), curto.size()).valid, "curto nega");
     }
 
+    // Registradores de boot: escreve e lê de volta.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 0xDEAD);
+        ASSERT_MSG(cpu.step(0xD513101Fu), "msr sctlr,x0");
+        ASSERT_MSG(cpu.step(0xD53B1001u), "mrs x1,sctlr");
+        ASSERT_MSG(cpu.reg(1) == 0xDEAD, "sctlr voltou");
+        cpu.setReg(0, 0x80000);
+        ASSERT_MSG(cpu.step(0xD513201Fu), "msr ttbr0,x0");
+        ASSERT_MSG(cpu.step(0xD53B2001u), "mrs x1,ttbr0");
+        ASSERT_MSG(cpu.reg(1) == 0x80000, "ttbr0 voltou");
+        cpu.setReg(0, 0xFF);
+        ASSERT_MSG(cpu.step(0xD513A21Fu), "msr mair,x0");
+        ASSERT_MSG(cpu.step(0xD53BA201u), "mrs x1,mair");
+        ASSERT_MSG(cpu.reg(1) == 0xFF, "mair voltou");
+        ASSERT_MSG(cpu.step(0xD53B0001u), "mrs x1,midr");
+        ASSERT_MSG(cpu.reg(1) == 0x410FD070ull, "cortex-a57");
+        ASSERT_MSG(cpu.step(0xD53B0021u), "mrs x1,ctr");
+        ASSERT_MSG(cpu.reg(1) == 0x8444C004ull, "linhas 64B");
+        ASSERT_MSG(cpu.step(0xD53B00E3u), "mrs x3,dczid");
+        ASSERT_MSG(cpu.reg(3) == 4, "bloco 64B");
+        ASSERT_MSG(cpu.step(0xD53BE064u), "mrs x4,cntpct");
+        ASSERT_MSG(cpu.reg(4) + 1 == cpu.steps(), "timer anda");
+        ASSERT_MSG(cpu.step(0xD50041FFu), "msr spsel,#1");
+        ASSERT_MSG(cpu.step(0xD508871Fu), "tlbi vmalle1");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
