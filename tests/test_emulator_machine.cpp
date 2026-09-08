@@ -2531,6 +2531,13 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(2) == 5, "fpsr voltou");
     }
 
+    // CurrentEL sempre EL1.
+    {
+        emu::Cpu cpu;
+        ASSERT_MSG(cpu.step(0xD53B4220u), "mrs x0,currentel");
+        ASSERT_MSG(cpu.reg(0) == 4, "EL1");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

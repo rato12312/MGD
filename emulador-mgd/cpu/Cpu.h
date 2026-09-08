@@ -384,6 +384,13 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFFFFFE0) == 0xD53B4220) { // MRS Xd,CurrentEL (sempre EL1)
+            int d = static_cast<int>(dec.rd);
+            if (d != 31) regs_[d] = 0x4;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFFFFFE0) == 0xD53BD040) { // MRS Xd,TPIDR_EL0 (TLS)
             int d = static_cast<int>(dec.rd);
             if (d != 31) regs_[d] = tpidr_;
