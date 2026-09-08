@@ -121,6 +121,27 @@ inline void cmac(const uint8_t key[16], const uint8_t* msg, size_t len, uint8_t 
     detail::encryptBlock(rk, X, out);
 }
 
+// CTR 128-bit completo (carrega o contador inteiro, BE).
+inline void cryptCtrFull(const uint8_t key[16], const uint8_t ctr0[16],
+                         const uint8_t* in, uint8_t* out, size_t len) {
+    uint8_t rk[176];
+    detail::expandKey(key, rk);
+    uint8_t ctr[16];
+    std::memcpy(ctr, ctr0, 16);
+    size_t pos = 0;
+    while (pos < len) {
+        uint8_t ks[16];
+        detail::encryptBlock(rk, ctr, ks);
+        size_t n = len - pos < 16 ? len - pos : 16;
+        for (size_t i = 0; i < n; i++) out[pos + i] = in[pos + i] ^ ks[i];
+        pos += n;
+        for (int i = 15; i >= 0; i--) { // ++ BE 128-bit
+            ctr[i]++;
+            if (ctr[i] != 0) break;
+        }
+    }
+}
+
 // CTR: keystream = E(nonce||ctr BE), XOR nos dados. Criptografa = descriptografa.
 inline void cryptCtr(const uint8_t key[16], const uint8_t nonce12[12], const uint8_t* in,
                      uint8_t* out, size_t len, uint32_t ctr0 = 0) {

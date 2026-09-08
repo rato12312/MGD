@@ -12,6 +12,7 @@
 #include "emulador-mgd/loader/Lz4.h"
 #include "emulador-mgd/loader/NsoLoader.h"
 #include "emulador-mgd/loader/Aes.h"
+#include "emulador-mgd/loader/Keys.h"
 #include "emulador-mgd/loader/NcaProbe.h"
 #include "emulador-mgd/loader/Sha256.h"
 #include "emulador-mgd/loader/Pfs0.h"
@@ -2749,6 +2750,32 @@ bool run_emulator_machine_tests() {
         cpu.setReg(1, 0x10);
         ASSERT_MSG(cpu.step(0x8B2163E0u), "add x0,sp,x1");
         ASSERT_MSG(cpu.reg(0) == 0x1010, "sp+x1");
+    }
+
+    // Chaveiro: slot do usuário criptografa seção; sem slot nega.
+    // CTR-128 equivale ao nonce12+u32 quando o contador cabe em 32 bits.
+    {
+        emu::KeyManager keys;
+        uint8_t k[16] = {1, 2, 3};
+        ASSERT_MSG(keys.setSlot(3, k), "slot 3 setado");
+        ASSERT_MSG(!keys.setSlot(99, k), "slot ruim nega");
+        ASSERT_MSG(keys.hasSlot(3) && !keys.hasSlot(4), "tem/não-tem");
+        uint8_t msg[48];
+        for (int i = 0; i < 48; i++) msg[i] = static_cast<uint8_t>(i * 3 + 1);
+        uint8_t nonce[12] = {9};
+        uint8_t ctr[16] = {0};
+        for (int i = 0; i < 12; i++) ctr[i] = nonce[i];
+        uint8_t enc[48] = {0}, dec[48] = {0}, ref[48] = {0};
+        ASSERT_MSG(keys.cryptSection(msg, enc, 48, 3, ctr), "criptografou");
+        ASSERT_MSG(keys.cryptSection(enc, dec, 48, 3, ctr), "descriptografou");
+        bool rt = true;
+        for (int i = 0; i < 48; i++) rt = rt && (dec[i] == msg[i]);
+        ASSERT_MSG(rt, "seção volta");
+        ASSERT_MSG(!keys.cryptSection(msg, enc, 48, 4, ctr), "sem chave nega");
+        emu::aes::cryptCtr(k, nonce, msg, ref, 48, 0);
+        bool same = true;
+        for (int i = 0; i < 48; i++) same = same && (enc[i] == ref[i]);
+        ASSERT_MSG(same, "CTR-128 == nonce12+u32");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
