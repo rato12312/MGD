@@ -337,6 +337,20 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFFFFFE0) == 0xD53BD060) { // MRS Xd,TPIDRRO_EL0
+            int d = static_cast<int>(dec.rd);
+            if (d != 31) regs_[d] = tpidr_; // single-thread: mesmo TLS
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFFE0) == 0xD53BE000) { // MRS Xd,CNTFRQ_EL0 (19.2MHz)
+            int d = static_cast<int>(dec.rd);
+            if (d != 31) regs_[d] = 19200000ull;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFFFFFE0) == 0xD53BD040) { // MRS Xd,TPIDR_EL0 (TLS)
             int d = static_cast<int>(dec.rd);
             if (d != 31) regs_[d] = tpidr_;

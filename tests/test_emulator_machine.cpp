@@ -2457,6 +2457,17 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.backtrace().empty(), "fp zero = vazio");
     }
 
+    // TPIDRRO espelha TLS; CNTFRQ = 19.2MHz.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(5, 0xBEEF);
+        ASSERT_MSG(cpu.step(0xD51BD0BFu), "msr tpidr");
+        ASSERT_MSG(cpu.step(0xD53BD060u), "mrs x0,tpidrro");
+        ASSERT_MSG(cpu.reg(0) == 0xBEEF, "ro le tls");
+        ASSERT_MSG(cpu.step(0xD53BE002u), "mrs x2,cntfrq");
+        ASSERT_MSG(cpu.reg(2) == 19200000ull, "19.2MHz");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
