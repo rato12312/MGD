@@ -12,6 +12,10 @@
 #include "../hos/Kernel.h"
 #include "../loader/NroLoader.h"
 #include "../loader/NsoLoader.h"
+#include "../loader/Keys.h"
+#include "../loader/NcaSections.h"
+#include "../loader/Pfs0.h"
+#include "../loader/RomFs.h"
 #include "../odyssey/OdysseyWorld.h"
 #include "../config/MgdSwitches.h"
 
@@ -27,6 +31,7 @@ public:
     hos::Kernel& kernel() { return kernel_; }
     odyssey::OdysseyWorld& world() { return world_; }
     MgdSwitches& switches() { return switches_; }
+    emu::KeyManager& keys() { return key_mgr_; }
 
     // Aplica as chaves: MMU liga/desliga, barato segue a Mali, painter obedece.
     void applySwitches() {
@@ -125,6 +130,76 @@ public:
         return true;
     }
 
+    // Boot a partir de NSP: carrega PFS0, acha NCA do programa, descriptografa com chaves do usuário,
+    // extrai ExeFS/main.nso, carrega na RAM, configura applet.
+    // Usuario DEVE ter chamado keys().setSlot() antes com:
+    //   slot 0 = header key (XTS), slots 1-4 = section keys (CTR)
+    bool bootNsp(const uint8_t* nsp, size_t nsp_size) {
+        // 1. Parse PFS0 container
+        std::vector<uint8_t> pfs0_data(nsp, nsp + nsp_size);
+        loader::Pfs0Reader pfs0(pfs0_data);
+        if (!pfs0.valid()) return false;
+
+        // 2. Procura NCA tipo Program (0) ou Control (1)
+        for (size_t i = 0; i < pfs0.entryCount(); i++) {
+            auto entry = pfs0.entry(i);
+            if (!entry.valid) continue;
+            if (entry.name.find(".nca") == std::string::npos) continue;
+
+            std::vector<uint8_t> nca_data(entry.size);
+            if (!pfs0.readEntry(i, nca_data.data(), nca_data.size())) continue;
+
+            // 3. Probe NCA
+            loader::NcaProbe probe(nca_data.data(), nca_data.size());
+            if (!probe.valid() || probe.type() != loader::NcaType::PROGRAM) continue;
+
+            // 4. Decrypt NCA with user keys
+            loader::KeyManager::NcaDecryptResult dec;
+            int header_slot = 0;
+            int section_slots[4] = {1, 2, 3, 4};
+            if (!key_mgr_.decryptNca(nca_data.data(), nca_data.size(), header_slot, section_slots, dec)) {
+                continue; // chaves erradas ou faltando
+            }
+            if (!dec.valid) continue;
+
+            // 5. Parse sections
+            loader::NcaSections sections(dec.header.data(), dec.header.size());
+            if (!sections.valid()) continue;
+
+            // 6. Find ExeFS section (usually section 0)
+            for (int s = 0; s < 4; s++) {
+                if (sections.section(s).size == 0) continue;
+                auto& sec = dec.sections[s];
+                if (sec.data.empty()) continue;
+
+                // Try as PFS0 (ExeFS)
+                loader::Pfs0Reader exefs(sec.data);
+                if (!exefs.valid()) continue;
+
+                // Find main.nso
+                for (size_t j = 0; j < exefs.entryCount(); j++) {
+                    auto e = exefs.entry(j);
+                    if (!e.valid || e.name != "main") continue;
+                    if (e.name.find(".nso") == std::string::npos && e.name != "main") continue;
+
+                    std::vector<uint8_t> nso_data(e.size);
+                    if (!exefs.readEntry(j, nso_data.data(), nso_data.size())) continue;
+
+                    // 7. Boot the NSO
+                    if (bootNso(nso_data.data(), nso_data.size())) {
+                        // Launch applet
+                        kernel_.services().publish("appletOE");
+                        hos::IpcMessage req{2, {}};
+                        hos::IpcMessage rep;
+                        kernel_.applet().dispatch(req, rep);
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     bridge::RuntimeFrameStats bootWorld(uint32_t n = 20) { return world_.boot(n); }
 
 private:
@@ -133,6 +208,7 @@ private:
     hos::Kernel kernel_;
     odyssey::OdysseyWorld world_;
     MgdSwitches switches_;
+    emu::KeyManager key_mgr_;
     double last_frame_ms_ = 0.0;
     double avg_ms_ = 0.0;
     uint64_t frames_ = 0;
