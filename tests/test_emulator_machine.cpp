@@ -14,6 +14,7 @@
 #include "emulador-mgd/loader/Aes.h"
 #include "emulador-mgd/loader/Keys.h"
 #include "emulador-mgd/loader/NcaProbe.h"
+#include "emulador-mgd/loader/Npdm.h"
 #include "emulador-mgd/loader/NcaSections.h"
 #include "emulador-mgd/loader/Sha256.h"
 #include "emulador-mgd/loader/Pfs0.h"
@@ -2995,6 +2996,50 @@ bool run_emulator_machine_tests() {
         emu.runCpu(8);
         ASSERT_MSG(emu.cpu().stopped(), "nso saiu limpo");
         ASSERT_MSG(emu.cpu().reg(0) == 7, "x0=7 do nso");
+    }
+
+    // NPDM sintético: meta + acid + aci + serviço + ThreadInfo.
+    {
+        std::vector<uint8_t> blob(0x500, 0);
+        auto w32 = [&](size_t off, uint32_t v) {
+            for (int i = 0; i < 4; i++) blob[off + i] = static_cast<uint8_t>(v >> (8 * i));
+        };
+        auto w64 = [&](size_t off, uint64_t v) {
+            for (int i = 0; i < 8; i++) blob[off + i] = static_cast<uint8_t>(v >> (8 * i));
+        };
+        blob[0] = 'M'; blob[1] = 'E'; blob[2] = 'T'; blob[3] = 'A';
+        blob[0x0C] = 7; // 64-bit + addrspace 3
+        blob[0x0E] = 44;
+        w32(0x1C, 0x10000);
+        const char* nm = "Application";
+        for (int i = 0; i < 11; i++) blob[0x20 + i] = static_cast<uint8_t>(nm[i]);
+        w32(0x70, 0x4C0); w32(0x74, 0x40); // aci
+        w32(0x78, 0x80); w32(0x7C, 0x440); // acid
+        // ACI @0x4C0
+        blob[0x4C0] = 'A'; blob[0x4C1] = 'C'; blob[0x4C2] = 'I'; blob[0x4C3] = '0';
+        w64(0x4D0, 0x0100000000010000ull);
+        // ACID @0x80: header em 0x280
+        blob[0x280] = 'A'; blob[0x281] = 'C'; blob[0x282] = 'I'; blob[0x283] = 'D';
+        w32(0x284, 0x440);
+        w32(0x2A8, 0x300); w32(0x2AC, 8);   // sac @0x380
+        w32(0x2B0, 0x310); w32(0x2B4, 4);   // kc @0x390
+        blob[0x380] = 6; // len 7 - 1
+        const char* sv = "nvdrv:a";
+        for (int i = 0; i < 7; i++) blob[0x381 + i] = static_cast<uint8_t>(sv[i]);
+        w32(0x390, 0x03008107u); // ThreadInfo: low 16 high 32 core 0-3
+        emu::NpdmInfo info = emu::parseNpdm(blob.data(), blob.size());
+        ASSERT_MSG(info.valid, "npdm valido");
+        ASSERT_MSG(info.is64 && info.addr_space == 3, "64-bit");
+        ASSERT_MSG(info.main_prio == 44, "prio 44");
+        ASSERT_MSG(info.main_stack == 0x10000, "stack");
+        ASSERT_MSG(info.name == "Application", "nome");
+        ASSERT_MSG(info.program_id == 0x0100000000010000ull, "program id");
+        ASSERT_MSG(info.services.size() == 1 && info.services[0] == "nvdrv:a", "servico");
+        ASSERT_MSG(info.has_thread_info, "tem threadinfo");
+        ASSERT_MSG(info.thread_low == 16 && info.thread_high == 32, "prios");
+        ASSERT_MSG(info.min_core == 0 && info.max_core == 3, "cores");
+        std::vector<uint8_t> curto(16, 0);
+        ASSERT_MSG(!emu::parseNpdm(curto.data(), curto.size()).valid, "curto nega");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
