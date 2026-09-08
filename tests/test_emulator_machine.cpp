@@ -2468,6 +2468,25 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(2) == 19200000ull, "19.2MHz");
     }
 
+    // AES-CTR: contador 32-bit vira sem quebrar.
+    {
+        uint8_t key[16] = {7};
+        uint8_t nonce[12] = {3};
+        uint8_t msg[48];
+        for (int i = 0; i < 48; i++) msg[i] = static_cast<uint8_t>(i + 1);
+        uint8_t enc[48] = {0}, dec[48] = {0};
+        emu::aes::cryptCtr(key, nonce, msg, enc, 48, 0xFFFFFFFEu);
+        emu::aes::cryptCtr(key, nonce, enc, dec, 48, 0xFFFFFFFEu);
+        bool rt = true;
+        for (int i = 0; i < 48; i++) rt = rt && (dec[i] == msg[i]);
+        ASSERT_MSG(rt, "round-trip com overflow");
+        uint8_t enc0[48] = {0};
+        emu::aes::cryptCtr(key, nonce, msg, enc0, 48, 0);
+        bool diff = false;
+        for (int i = 0; i < 48; i++) diff = diff || (enc[i] != enc0[i]);
+        ASSERT_MSG(diff, "ctr0 muda keystream");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
