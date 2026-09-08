@@ -14,6 +14,13 @@ namespace hos {
 struct IpcMessage {
     uint32_t cmd = 0;
     std::vector<uint8_t> payload;
+    // Buffers anexados (X/A/B/W): viajam junto, sem copiar o conteúdo.
+    struct Buffer {
+        uint64_t guest_ptr = 0;
+        uint64_t size = 0;
+        uint32_t kind = 0; // 0=X(envia) 1=A(recebe) 2=B(mapa) 3=W(escrita)
+    };
+    std::vector<Buffer> buffers;
 };
 
 class Session {

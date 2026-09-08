@@ -2487,6 +2487,36 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(diff, "ctr0 muda keystream");
     }
 
+    // FS lista + IPC com buffers.
+    {
+        hos::FsService fs;
+        hos::IpcMessage a1;
+        a1.cmd = 1;
+        a1.payload = {'f', '1', 0, 1, 2};
+        hos::IpcMessage r1;
+        ASSERT_MSG(fs.dispatch(a1, r1) && r1.cmd == 1, "f1 entrou");
+        hos::IpcMessage a2;
+        a2.cmd = 1;
+        a2.payload = {'f', '2', 0, 3};
+        hos::IpcMessage r2;
+        ASSERT_MSG(fs.dispatch(a2, r2), "f2 entrou");
+        hos::IpcMessage ls;
+        ls.cmd = 5;
+        hos::IpcMessage lr;
+        ASSERT_MSG(fs.dispatch(ls, lr) && lr.cmd == 1, "listou");
+        std::string names(lr.payload.begin(), lr.payload.end());
+        ASSERT_MSG(names.find("f1") != std::string::npos, "tem f1");
+        ASSERT_MSG(names.find("f2") != std::string::npos, "tem f2");
+        hos::Session s;
+        hos::IpcMessage req;
+        req.cmd = 9;
+        req.buffers.push_back({0x1000, 64, 0});
+        ASSERT_MSG(s.sendRequest(req), "pedido com buffer foi");
+        hos::IpcMessage got;
+        ASSERT_MSG(s.recvRequest(got), "servidor leu");
+        ASSERT_MSG(got.buffers.size() == 1 && got.buffers[0].guest_ptr == 0x1000, "buffer intacto");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

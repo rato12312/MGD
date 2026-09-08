@@ -7,6 +7,7 @@
 // cmd 2 = Open: payload = nome; responde id ou 0.
 // cmd 3 = Read: payload = id(4) + offset(8) + size(8); responde bytes.
 // cmd 4 = Close: payload = id; responde 1/0.
+// cmd 5 = List: responde nomes separados por '\0'.
 
 #include <cstdint>
 #include <string>
@@ -81,6 +82,14 @@ public:
                 return true;
             }
             rep.cmd = open_.erase(rd32(req.payload, 0)) > 0 ? 1 : 0;
+            return true;
+        }
+        if (req.cmd == 5) {
+            rep.cmd = 1;
+            for (const auto& kv : files_) {
+                for (char ch : kv.first) rep.payload.push_back(static_cast<uint8_t>(ch));
+                rep.payload.push_back(0);
+            }
             return true;
         }
         return false;
