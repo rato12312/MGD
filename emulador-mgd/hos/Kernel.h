@@ -26,6 +26,8 @@
 #include "ServiceManager.h"
 #include "Thread.h"
 #include "Session.h"
+#include "Mutex.h"
+#include "Event.h"
 
 namespace mgd {
 namespace hos {
@@ -287,6 +289,24 @@ public:
                 return svcGetThreadContext(args);
             case 0x15: // SVC_SET_THREAD_CONTEXT
                 return svcSetThreadContext(args);
+            case 0x16: // SVC_CREATE_MUTEX
+                return svcCreateMutex(args);
+            case 0x17: // SVC_LOCK_MUTEX
+                return svcLockMutex(args);
+            case 0x18: // SVC_UNLOCK_MUTEX
+                return svcUnlockMutex(args);
+            case 0x19: // SVC_CLOSE_MUTEX
+                return svcCloseMutex(args);
+            case 0x1A: // SVC_CREATE_EVENT
+                return svcCreateEvent(args);
+            case 0x1B: // SVC_SIGNAL_EVENT
+                return svcSignalEvent(args);
+            case 0x1C: // SVC_WAIT_EVENT
+                return svcWaitEvent(args);
+            case 0x1D: // SVC_CLEAR_EVENT
+                return svcClearEvent(args);
+            case 0x1E: // SVC_CLOSE_EVENT
+                return svcCloseEvent(args);
             default:
                 return RESULT_UNIMPLEMENTED;
         }
@@ -388,6 +408,83 @@ private:
         return RESULT_OK;
     }
 
+    // ===== Mutex SVCs =====
+    SvcResult svcCreateMutex(SvcArgs& args) {
+        // X0 = mutex handle out
+        uint32_t id = mutexes_.create();
+        args.out[0] = createHandle(0x3000 | id);
+        return RESULT_OK;
+    }
+    SvcResult svcLockMutex(SvcArgs& args) {
+        // X0 = mutex handle, X1 = timeout (ignored), X2 = owner thread id
+        uint32_t h = static_cast<uint32_t>(args.x[0]);
+        uint32_t tag; if (!getHandle(h, tag)) return RESULT_INVALID_HANDLE;
+        uint32_t mid = tag & 0xFFF;
+        uint64_t owner = args.x[2] ? args.x[2] : sched_.currentThreadId();
+        if (!mutexes_.lock(mid, owner)) return RESULT_INVALID_HANDLE;
+        return RESULT_OK;
+    }
+    SvcResult svcUnlockMutex(SvcArgs& args) {
+        // X0 = mutex handle, X1 = owner thread id
+        uint32_t h = static_cast<uint32_t>(args.x[0]);
+        uint32_t tag; if (!getHandle(h, tag)) return RESULT_INVALID_HANDLE;
+        uint32_t mid = tag & 0xFFF;
+        uint64_t owner = args.x[1] ? args.x[1] : sched_.currentThreadId();
+        if (!mutexes_.unlock(mid, owner)) return RESULT_INVALID_HANDLE;
+        return RESULT_OK;
+    }
+    SvcResult svcCloseMutex(SvcArgs& args) {
+        // X0 = mutex handle
+        uint32_t h = static_cast<uint32_t>(args.x[0]);
+        uint32_t tag; if (!getHandle(h, tag)) return RESULT_INVALID_HANDLE;
+        uint32_t mid = tag & 0xFFF;
+        if (!mutexes_.close(mid)) return RESULT_INVALID_HANDLE;
+        closeHandle(h);
+        return RESULT_OK;
+    }
+
+    // ===== Event SVCs =====
+    SvcResult svcCreateEvent(SvcArgs& args) {
+        // X0 = event handle out, X1 = reset type (0=auto, 1=manual)
+        uint32_t id = events_.create(static_cast<uint32_t>(args.x[1]));
+        args.out[0] = createHandle(0x4000 | id);
+        return RESULT_OK;
+    }
+    SvcResult svcSignalEvent(SvcArgs& args) {
+        // X0 = event handle
+        uint32_t h = static_cast<uint32_t>(args.x[0]);
+        uint32_t tag; if (!getHandle(h, tag)) return RESULT_INVALID_HANDLE;
+        uint32_t eid = tag & 0xFFF;
+        events_.signal(eid);
+        return RESULT_OK;
+    }
+    SvcResult svcWaitEvent(SvcArgs& args) {
+        // X0 = event handle, X1 = timeout ns (0 = infinite)
+        uint32_t h = static_cast<uint32_t>(args.x[0]);
+        uint32_t tag; if (!getHandle(h, tag)) return RESULT_INVALID_HANDLE;
+        uint32_t eid = tag & 0xFFF;
+        uint64_t timeout = args.x[1];
+        events_.wait(eid, timeout);
+        return RESULT_OK;
+    }
+    SvcResult svcClearEvent(SvcArgs& args) {
+        // X0 = event handle
+        uint32_t h = static_cast<uint32_t>(args.x[0]);
+        uint32_t tag; if (!getHandle(h, tag)) return RESULT_INVALID_HANDLE;
+        uint32_t eid = tag & 0xFFF;
+        events_.clear(eid);
+        return RESULT_OK;
+    }
+    SvcResult svcCloseEvent(SvcArgs& args) {
+        // X0 = event handle
+        uint32_t h = static_cast<uint32_t>(args.x[0]);
+        uint32_t tag; if (!getHandle(h, tag)) return RESULT_INVALID_HANDLE;
+        uint32_t eid = tag & 0xFFF;
+        events_.close(eid);
+        closeHandle(h);
+        return RESULT_OK;
+    }
+
 private:
     uint64_t heap_base_ = 0x08000000; // base típica do heap do app
     uint64_t heap_size_ = 0;
@@ -403,6 +500,8 @@ private:
     uint64_t ram_size_ = 0;
     Scheduler sched_;
     ServiceManager services_;
+    MutexTable mutexes_;
+    EventTable events_;
     NvService nv_;
     ViService vi_;
     AudService aud_;

@@ -55,7 +55,6 @@ public:
         while (done < maxSteps && !queue_.empty()) {
             int pick = pickReady();
             if (pick < 0) {
-                // ninguém acordada: salta o relógio p/ o próximo wake
                 uint64_t w = queue_[0].wake_at;
                 for (const auto& t : queue_)
                     if (t.wake_at < w) w = t.wake_at;
@@ -64,7 +63,8 @@ public:
             }
             Thread t = queue_[static_cast<size_t>(pick)];
             queue_.erase(queue_.begin() + pick);
-            cpu.setMmu(t.aspace); // isolamento: cada thread no seu mapa
+            current_id_ = t.id;
+            cpu.setMmu(t.aspace);
             cpu.load(t.ctx);
             uint64_t got = cpu.run(quantum);
             done += got;
@@ -73,13 +73,17 @@ public:
             if (!cpu.stopped()) {
                 queue_.push_back(t);
             }
-            if (got == 0) break; // travou: não gira em falso
+            if (got == 0) break;
         }
+        current_id_ = 0;
         return done;
     }
 
     size_t pending() const { return queue_.size(); }
     uint64_t elapsed() const { return elapsed_; }
+    uint64_t currentThreadId() const {
+        return current_id_;
+    }
 
 private:
     // Índice da pronta com menor prio, ou -1 se todas dormem.
@@ -96,6 +100,7 @@ private:
     std::deque<Thread> queue_;
     uint64_t next_id_ = 0;
     uint64_t elapsed_ = 0;
+    mutable uint64_t current_id_ = 0;
 };
 
 } // namespace hos
