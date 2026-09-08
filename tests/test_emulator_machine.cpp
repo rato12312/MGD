@@ -2739,6 +2739,18 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(other.cpu().stopped() && other.cpu().reg(0) == 55, "outra termina 55");
     }
 
+    // NEG (Rn=XZR lê zero) + ADD Xd,SP,Xm (forma extended).
+    {
+        emu::Cpu cpu;
+        cpu.setReg(1, 5);
+        ASSERT_MSG(cpu.step(0xCB0103E0u), "neg x0,x1");
+        ASSERT_MSG(cpu.reg(0) == static_cast<uint64_t>(-5), "negou");
+        cpu.setSp(0x1000);
+        cpu.setReg(1, 0x10);
+        ASSERT_MSG(cpu.step(0x8B2163E0u), "add x0,sp,x1");
+        ASSERT_MSG(cpu.reg(0) == 0x1010, "sp+x1");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

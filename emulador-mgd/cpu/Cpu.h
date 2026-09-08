@@ -1150,20 +1150,38 @@ public:
             steps_++;
             return true;
         }
+        if (((insn & 0xFFE0E000) == 0x8B206000 || (insn & 0xFFE0E000) == 0xCB206000) &&
+            (((insn >> 10) & 0x7) <= 4)) {
+            // ADD / SUB (extended, UXTX/LSL): a forma que usa SP de verdade.
+            // Antes do shifted-reg (as máscaras se sobrepõem).
+            bool isAdd = (insn & 0xFFE0E000) == 0x8B206000;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int amount = static_cast<int>((insn >> 10) & 0x7);
+            uint64_t nv = (n == 31) ? sp_ : regs_[n];
+            uint64_t mv = (m == 31) ? 0 : regs_[m];
+            uint64_t sv = (amount == 0) ? mv : (mv << amount);
+            uint64_t res = isAdd ? (nv + sv) : (nv - sv);
+            if (d != 31) regs_[d] = res;
+            else if (n == 31) sp_ = res; // ADD/SUB SP,SP,Xm
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if (((insn & 0xFF200000) == 0x8B000000 || (insn & 0xFF200000) == 0xCB000000) &&
             ((insn >> 22) & 0x3) == 0x0) {
-            // ADD / SUB 64-bit registrado com LSL #n (cobre NEG/MOV SP)
+            // ADD / SUB 64-bit registrado com LSL #n (Rn=31 é XZR aqui)
             bool isAdd = (insn & 0xFF200000) == 0x8B000000;
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
             int m = static_cast<int>(dec.rm);
             int sh = static_cast<int>((insn >> 10) & 0x3F);
-            uint64_t nv = (n == 31) ? sp_ : regs_[n]; // Rn=31 aqui é SP
+            uint64_t nv = (n == 31) ? 0 : regs_[n];
             uint64_t mv = (m == 31) ? 0 : regs_[m];
             uint64_t sv = (sh == 0) ? mv : (mv << sh);
             uint64_t res = isAdd ? (nv + sv) : (nv - sv);
             if (d != 31) regs_[d] = res;
-            else if (n == 31) sp_ = res; // ADD/SUB SP,SP,Xm
             pc_ += 4;
             steps_++;
             return true;
