@@ -35,6 +35,7 @@
 #include "emulador-mgd/hos/PsmService.h"
 #include "emulador-mgd/hos/SetService.h"
 #include "emulador-mgd/hos/TimeService.h"
+#include "emulador-mgd/hos/Hipc.h"
 #include "emulador-mgd/hos/ServiceManager.h"
 #include "emulador-mgd/hos/Thread.h"
 
@@ -2421,6 +2422,20 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.step(0xD513423Fu), "msr nzcv,x1 (zero)");
         ASSERT_MSG(cpu.step(0xD53B4201u), "mrs x1,nzcv");
         ASSERT_MSG(cpu.reg(1) == 0, "limpo");
+    }
+
+    // HIPC: monta, parceia, responde (ida e volta).
+    {
+        std::vector<uint8_t> req = hos::hipcMakeRequest(7);
+        hos::HipcRequest parsed;
+        ASSERT_MSG(hos::hipcParseRequest(req, parsed) && parsed.cmd == 7, "pedido SFCI");
+        std::vector<uint8_t> bad = {0, 1, 2};
+        ASSERT_MSG(!hos::hipcParseRequest(bad, parsed), "curto nega");
+        std::vector<uint8_t> rep = hos::hipcMakeReply(0);
+        hos::HipcReply rp;
+        ASSERT_MSG(hos::hipcParseReply(rep, rp) && rp.result == 0, "resposta SFCO");
+        std::vector<uint8_t> wrong = hos::hipcMakeRequest(1);
+        ASSERT_MSG(!hos::hipcParseReply(wrong, rp), "SFCI nao e SFCO");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
