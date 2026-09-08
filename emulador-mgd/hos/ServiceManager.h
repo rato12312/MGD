@@ -7,8 +7,10 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
 
 #include "PortRegistry.h"
+#include "Session.h"
 
 namespace mgd {
 namespace hos {
@@ -20,6 +22,17 @@ public:
     }
 
     bool publish(const std::string& name) { return ports_.registerPort(name); }
+
+    // IPC Port operations
+    uint32_t createPort(const std::string& name, uint32_t maxSessions) {
+        ports_.registerPort(name);
+        port_max_sessions_[name] = maxSessions;
+        return static_cast<uint32_t>(ports_.portCount());
+    }
+
+    uint32_t findPort(const std::string& name) const {
+        return ports_.hasPort(name) ? 1 : 0; // simplified
+    }
 
     // cmd 1 = GetService: payload = nome; out = id de sessão ou 0.
     // Retorna true se o comando foi entendido.
@@ -66,6 +79,7 @@ private:
         std::string service;
     };
     PortRegistry ports_;
+    std::unordered_map<std::string, uint32_t> port_max_sessions_;
     std::unordered_map<uint32_t, SessionPair> sessions_;
     uint32_t next_session_ = 1;
 

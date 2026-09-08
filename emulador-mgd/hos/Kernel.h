@@ -25,6 +25,7 @@
 #include "ViService.h"
 #include "ServiceManager.h"
 #include "Thread.h"
+#include "Session.h"
 
 namespace mgd {
 namespace hos {
@@ -196,7 +197,6 @@ public:
     SvcResult call(uint32_t num, SvcArgs& args) {
         switch (num) {
             case SVC_SET_HEAP_SIZE: {
-                // X1 = tamanho pedido; devolve base em out[0] e mapeia o heap.
                 heap_size_ = args.x[1];
                 args.out[0] = heap_base_;
                 if (mmu_ && heap_size_ > 0) mmu_->map(heap_base_, heap_base_, heap_size_, true, true, false);
@@ -210,11 +210,10 @@ public:
                 return ok ? RESULT_OK : RESULT_INVALID_HANDLE;
             }
             case SVC_SET_MEMORY_ATTRIBUTE: {
-                last_mem_attr_ = args.x[3]; // guarda; semântica real depois
+                last_mem_attr_ = args.x[3];
                 return RESULT_OK;
             }
             case SVC_MAP_MEMORY: {
-                // Alias: dst enxerga o físico de src (mesma permissão).
                 if (!mmu_) return RESULT_INVALID_HANDLE;
                 uint64_t pa = 0;
                 if (!mmu_->translate(args.x[1], args.x[2], false, false, pa))
@@ -233,7 +232,6 @@ public:
                 return RESULT_OK;
             }
             case SVC_QUERY_MEMORY: {
-                // X0 = out (MemInfo no guest), X2 = endereço consultado.
                 if (!mmu_ || !ram_) return RESULT_INVALID_HANDLE;
                 MemInfo info;
                 const emu::MemRegion* r = mmu_->find(args.x[2]);
@@ -259,7 +257,6 @@ public:
                 return RESULT_OK;
             }
             case SVC_SLEEP_THREAD: {
-                // Single-thread: não há quem acordar; só volta OK.
                 slept_ns_ += args.x[0];
                 return RESULT_OK;
             }
@@ -268,15 +265,127 @@ public:
                 return RESULT_OK;
             }
             case SVC_GET_INFO: {
-                // X1 = id; devolve 0 (stub honesto até mapear infos reais).
                 args.out[0] = 0;
                 args.out[1] = 0;
                 (void)args.x[1];
                 return RESULT_OK;
             }
+            // ===== IPC SVCs (expondo serviços para o guest) =====
+            case 0x0E: // SVC_CREATE_PORT
+                return svcCreatePort(args);
+            case 0x0F: // SVC_MANAGE_NAMED_PORT
+                return svcManageNamedPort(args);
+            case 0x10: // SVC_CONNECT_TO_PORT
+                return svcConnectToPort(args);
+            case 0x11: // SVC_SEND_SYNC_REQUEST
+                return svcSendSyncRequest(args);
+            case 0x12: // SVC_REPLY_AND_RECEIVE
+                return svcReplyAndReceive(args);
+            case 0x13: // SVC_CLOSE_HANDLE
+                return svcCloseHandle(args);
+            case 0x14: // SVC_GET_THREAD_CONTEXT
+                return svcGetThreadContext(args);
+            case 0x15: // SVC_SET_THREAD_CONTEXT
+                return svcSetThreadContext(args);
             default:
                 return RESULT_UNIMPLEMENTED;
         }
+    }
+
+private:
+    SvcResult svcCreatePort(SvcArgs& args) {
+        // X0 = name ptr (guest), X1 = max sessions, X2 = reply handle out, X3 = server handle out
+        // Simplificado: cria porta anônima (server handle) e reply handle
+        std::string name;
+        uint64_t name_ptr = args.x[0];
+        if (name_ptr && ram_) {
+            for (size_t i = 0; i < 32 && name_ptr + i < ram_size_; i++) {
+                char c = static_cast<char>(ram_[name_ptr + i]);
+                if (c == 0) break;
+                name += c;
+            }
+        }
+        uint32_t server_h = services_.createPort(name, static_cast<uint32_t>(args.x[1]));
+        uint32_t reply_h = createHandle(0x2000 | server_h); // client-side
+        args.out[0] = reply_h;
+        args.out[1] = server_h;
+        return RESULT_OK;
+    }
+
+    SvcResult svcManageNamedPort(SvcArgs& args) {
+        // X0 = operation (0=register, 1=unregister), X1 = name ptr, X2 = server handle
+        // Stub: apenas ok
+        (void)args.x[0]; (void)args.x[1]; (void)args.x[2];
+        return RESULT_OK;
+    }
+
+    SvcResult svcConnectToPort(SvcArgs& args) {
+        // X0 = name ptr, X1 = client handle out
+        std::string name;
+        uint64_t name_ptr = args.x[0];
+        if (name_ptr && ram_) {
+            for (size_t i = 0; i < 32 && name_ptr + i < ram_size_; i++) {
+                char c = static_cast<char>(ram_[name_ptr + i]);
+                if (c == 0) break;
+                name += c;
+            }
+        }
+        uint32_t server_h = services_.findPort(name);
+        if (server_h == 0) return RESULT_INVALID_HANDLE;
+        uint32_t client_h = createHandle(0x1000 | server_h);
+        args.out[0] = client_h;
+        return RESULT_OK;
+    }
+
+    SvcResult svcSendSyncRequest(SvcArgs& args) {
+        // X0 = handle, X1..X7 = send buffers (stub: apenas marca pendente)
+        uint32_t h = static_cast<uint32_t>(args.x[0]);
+        uint32_t tag;
+        if (!getHandle(h, tag)) return RESULT_INVALID_HANDLE;
+        // Encontra sessão pelo tag (simplificado)
+        for (const auto& kv : services_.allSessions()) {
+            uint32_t st;
+            if (kv.second->recvRequest(*reinterpret_cast<IpcMessage*>(&args.x[1]))) {
+                // stub: ecoa de volta
+                IpcMessage rep;
+                rep.cmd = 1;
+                rep.payload = {0};
+                kv.second->sendReply(rep);
+                break;
+            }
+        }
+        return RESULT_OK;
+    }
+
+    SvcResult svcReplyAndReceive(SvcArgs& args) {
+        // X0 = handles array ptr, X1 = count, X2 = timeout
+        // Stub: apenas ok
+        (void)args.x[0]; (void)args.x[1]; (void)args.x[2];
+        return RESULT_OK;
+    }
+
+    SvcResult svcCloseHandle(SvcArgs& args) {
+        // X0 = handle
+        uint32_t h = static_cast<uint32_t>(args.x[0]);
+        if (!closeHandle(h)) return RESULT_INVALID_HANDLE;
+        return RESULT_OK;
+    }
+
+    SvcResult svcGetThreadContext(SvcArgs& args) {
+        // X0 = thread handle, X1 = context ptr out
+        // Stub: zeros
+        if (!ram_) return RESULT_INVALID_HANDLE;
+        uint64_t out = args.x[1];
+        if (out + 256 > ram_size_) return RESULT_INVALID_HANDLE;
+        for (size_t i = 0; i < 256; i++) ram_[out + i] = 0;
+        return RESULT_OK;
+    }
+
+    SvcResult svcSetThreadContext(SvcArgs& args) {
+        // X0 = thread handle, X1 = context ptr
+        // Stub: ok
+        (void)args.x[0]; (void)args.x[1];
+        return RESULT_OK;
     }
 
 private:
