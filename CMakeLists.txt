@@ -164,3 +164,7 @@ add_test(NAME mgd_unit_tests COMMAND mgd_tests)
 # ========== BENCHMARK — consultador por polígonos ==========
 add_executable(benchmark_polygon tools/benchmark_polygon.cpp)
 target_link_libraries(benchmark_polygon mgd_core)
+
+# ========== FERRAMENTA — inspetor NSP (só loaders, sem core) ==========
+add_executable(mgd_nsp tools/mgd_nsp.cpp)
+target_include_directories(mgd_nsp PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
