@@ -2980,6 +2980,23 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(!emu::aes::xtsDecrypt(k1, k2, tw, enc, back, 20), "quebrado nega");
     }
 
+    // Boot NSO pelo Emulador (LZ4 -> mapa -> entry -> roda).
+    {
+        std::vector<uint8_t> blob(0x100, 0);
+        blob[0] = 'N'; blob[1] = 'S'; blob[2] = 'O'; blob[3] = '0';
+        blob[0x0C] = 1; // text comprimido
+        blob[0x10] = 0x80; blob[0x18] = 8; // text: file 0x80, mem 0, decomp 8
+        blob[0x60] = 9;                    // comp 9
+        blob[0x80] = 0x80; // LZ4: 8 literais
+        blob[0x81] = 0xE0; blob[0x82] = 0x00; blob[0x83] = 0x80; blob[0x84] = 0xD2; // MOVZ X0,#7
+        blob[0x85] = 0x01; blob[0x86] = 0x00; blob[0x87] = 0x00; blob[0x88] = 0xD4; // SVC#0
+        emu::Emulator emu;
+        ASSERT_MSG(emu.bootNso(blob.data(), blob.size()), "nso bootou");
+        emu.runCpu(8);
+        ASSERT_MSG(emu.cpu().stopped(), "nso saiu limpo");
+        ASSERT_MSG(emu.cpu().reg(0) == 7, "x0=7 do nso");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
