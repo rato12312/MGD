@@ -2300,6 +2300,58 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(ok, "128 da pilha intactos");
     }
 
+    // Bubble sort [5,3,4,1,2] -> [1,2,3,4,5]: programa de verdade.
+    {
+        emu::Cpu cpu;
+        std::vector<uint32_t> prog = {
+            0xD2800080u, // MOVZ X0, #4
+            0xD2802002u, // MOVZ X2, #0x100
+            0xD28000A3u, // MOVZ X3, #5
+            0xB8000043u, // STRW X3, [X2]
+            0xD2800063u, // MOVZ X3, #3
+            0xB8000443u, // STRW X3, [X2, #4]
+            0xD2800083u, // MOVZ X3, #4
+            0xB8000843u, // STRW X3, [X2, #8]
+            0xD2800023u, // MOVZ X3, #1
+            0xB8000C43u, // STRW X3, [X2, #12]
+            0xD2800043u, // MOVZ X3, #2
+            0xB8001043u, // STRW X3, [X2, #16]
+            0xB4000200u, // outer: CBZ X0, done
+            0xD2800021u, // MOVZ X1, #0
+            0xD1000400u, // SUB X0, X0, #1
+            0x8B010063u, // inner: ADD X3, X1, X1
+            0x8B030063u, // ADD X3, X3, X3
+            0x8B030043u, // ADD X3, X2, X3
+            0xB9400064u, // LDRW X4, [X3]
+            0xB9400465u, // LDRW X5, [X3, #4]
+            0xEB00009Fu, // CMP X4, X5
+            0x54000069u, // B.LS skip
+            0xB8000065u, // STRW X5, [X3]
+            0xB8000464u, // STRW X4, [X3, #4]
+            0x91000421u, // skip: ADD X1, X1, #1
+            0xEB00003Fu, // SUBS XZR, X1, X0
+            0x54FFFEEBu, // B.LT inner
+            0x17FFFFF1u, // B outer
+            0xB9400040u, // done: LDRW X0, [X2]
+            0xD4000001u, // SVC #0
+        };
+        for (size_t i = 0; i < prog.size(); ++i)
+            for (int b = 0; b < 4; b++)
+                cpu.ram()[i * 4 + b] = static_cast<uint8_t>(prog[i] >> (8 * b));
+        cpu.run(1024);
+        ASSERT_MSG(cpu.stopped(), "sort parou");
+        ASSERT_MSG(cpu.reg(0) == 1, "menor na frente");
+        bool sorted = true;
+        const uint32_t want[5] = {1, 2, 3, 4, 5};
+        for (int i = 0; i < 5; i++) {
+            uint32_t v = 0;
+            for (int b = 0; b < 4; b++)
+                v |= static_cast<uint32_t>(cpu.ram()[0x100 + i * 4 + b]) << (8 * b);
+            sorted = sorted && (v == want[i]);
+        }
+        ASSERT_MSG(sorted, "array ordenado");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
