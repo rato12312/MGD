@@ -248,7 +248,7 @@ public:
                 return RESULT_OK;
             }
             case SVC_CREATE_THREAD: {
-                uint64_t id = sched_.spawn(args.x[1], args.x[2]);
+                uint64_t id = sched_.spawn(args.x[1], args.x[2], 0, mmu_);
                 args.out[0] = id;
                 return RESULT_OK;
             }

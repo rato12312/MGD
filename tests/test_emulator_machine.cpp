@@ -2654,6 +2654,59 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(emu.fps() > 0.0, "fps medido");
     }
 
+    // Sono: B dorme, A roda, relógio salta, B acorda.
+    {
+        emu::Cpu cpu;
+        auto poke = [&](uint64_t addr, uint32_t insn) {
+            for (int i = 0; i < 4; i++)
+                cpu.ram()[addr + i] = static_cast<uint8_t>(insn >> (8 * i));
+        };
+        poke(0x00, 0xD2800021u); // MOVZ X1, #1 (A)
+        poke(0x04, 0xD4000001u); // SVC#0
+        poke(0x40, 0xD2800041u); // MOVZ X1, #2 (B)
+        poke(0x44, 0xD4000001u); // SVC#0
+        hos::Scheduler sched;
+        sched.spawn(0x0, 0x8000, 1);  // A
+        uint64_t b = sched.spawn(0x40, 0x9000, 0); // B (prio maior, mas dorme)
+        ASSERT_MSG(sched.sleep(b, 100), "B dormiu");
+        ASSERT_MSG(!sched.sleep(999, 1), "id ruim nega");
+        uint64_t done = sched.run(cpu, 64, 8);
+        ASSERT_MSG(done == 4, "2+2 instr");
+        ASSERT_MSG(sched.pending() == 0, "todos sairam");
+    }
+
+    // Isolamento: mesmo VA, mapas diferentes, B falha sem corromper A.
+    {
+        emu::Cpu cpu;
+        auto poke = [&](uint64_t addr, uint32_t insn) {
+            for (int i = 0; i < 4; i++)
+                cpu.ram()[addr + i] = static_cast<uint8_t>(insn >> (8 * i));
+        };
+        // A @0: X0=0x55 -> [0x1000]
+        poke(0x00, 0xD2800AA0u); // MOVZ X0, #0x55
+        poke(0x04, 0xD2820001u); // MOVZ X1, #0x1000
+        poke(0x08, 0xF8000020u); // STR X0, [X1]
+        poke(0x0C, 0xD4000001u); // SVC#0
+        // B @0x80: X0=0x77 -> [0x1000] (sem mapa: fault, gira sem sair)
+        poke(0x80, 0xD2800EE0u); // MOVZ X0, #0x77
+        poke(0x84, 0xD2820001u); // MOVZ X1, #0x1000
+        poke(0x88, 0xF8000020u); // STR X0, [X1] (nega)
+        poke(0x8C, 0xD4000001u); // SVC#0 (nunca chega)
+        emu::Mmu mmuA, mmuB;
+        mmuA.map(0x0, 0x0, 0x200, true, true, true);
+        mmuA.map(0x1000, 0x1000, 0x1000, true, true, false);
+        mmuB.map(0x0, 0x0, 0x200, true, true, true);
+        hos::Scheduler sched;
+        sched.spawn(0x0, 0x8000, 0, &mmuA);
+        sched.spawn(0x80, 0x9000, 0, &mmuB);
+        sched.run(cpu, 64, 8);
+        uint64_t v = 0;
+        for (int i = 0; i < 8; i++)
+            v |= static_cast<uint64_t>(cpu.ram()[0x1000 + i]) << (8 * i);
+        ASSERT_MSG(v == 0x55, "A escreveu, B nao corrompeu");
+        ASSERT_MSG(sched.pending() == 1, "B presa na fault (honesto)");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
