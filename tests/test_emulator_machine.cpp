@@ -2613,6 +2613,47 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(!ar.payload.empty() && ar.payload[0] == 1, "self id 1");
     }
 
+    // Integração total: NRO boota, threads rodam, serviços atendem,
+    // 3 frames pintam, display conta 3 presents.
+    {
+        emu::Emulator emu;
+        emu.kernel().bootServices();
+        // NRO mínimo: heap + exit
+        std::vector<uint32_t> text = {
+            0xD2800201u, // MOVZ X1, #16
+            0xD4000021u, // SVC #1 SetHeapSize
+            0xD40000E1u, // SVC #7 ExitProcess
+        };
+        std::vector<uint8_t> blob(0x80 + text.size() * 4, 0);
+        blob[0x10] = 'N'; blob[0x11] = 'R'; blob[0x12] = 'O'; blob[0x13] = '0';
+        blob[0x20] = 0x80;
+        blob[0x24] = static_cast<uint8_t>(text.size() * 4);
+        for (size_t i = 0; i < text.size(); ++i)
+            for (int b = 0; b < 4; b++)
+                blob[0x80 + i * 4 + b] = static_cast<uint8_t>(text[i] >> (8 * b));
+        ASSERT_MSG(emu.bootNro(blob.data(), blob.size()), "nro bootou");
+        emu.runCpu(16);
+        ASSERT_MSG(emu.cpu().stopped(), "nro saiu");
+        ASSERT_MSG(emu.kernel().heapSize() == 16, "heap 16");
+        // layer do display via dispatch direto
+        hos::IpcMessage mk;
+        hos::IpcMessage mr;
+        mk.cmd = 2;
+        ASSERT_MSG(emu.kernel().vi().dispatch(mk, mr) && mr.cmd == 1, "layer criada");
+        // 3 frames: mundo pinta, display apresenta
+        for (int f = 0; f < 3; f++) {
+            ASSERT_MSG(emu.frame("integracao.ppm", 6), "frame saiu");
+            hos::IpcMessage p;
+            hos::IpcMessage pr;
+            p.cmd = 3;
+            p.payload = mr.payload;
+            ASSERT_MSG(emu.kernel().vi().dispatch(p, pr) && pr.cmd == 1, "present foi");
+        }
+        ASSERT_MSG(emu.frameCount() == 3, "3 frames");
+        ASSERT_MSG(emu.kernel().vi().presented() == 3, "3 presents");
+        ASSERT_MSG(emu.fps() > 0.0, "fps medido");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
