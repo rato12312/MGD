@@ -58,6 +58,10 @@ public:
         return false;
     }
 
+    // Atalhos ExeFS (wiki: é PFS0 com estes nomes).
+    bool readMain(std::vector<uint8_t>& out) const { return readFile("main", out); }
+    bool readNpdm(std::vector<uint8_t>& out) const { return readFile("main.npdm", out); }
+
 private:
     struct Entry {
         std::string name;

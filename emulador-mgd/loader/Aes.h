@@ -142,6 +142,36 @@ inline void cryptCtrFull(const uint8_t key[16], const uint8_t ctr0[16],
     }
 }
 
+// XTS-AES-128 ENCRYPT (SP 800-38E): 2 chaves, tweak por setor (u128 LE).
+// Só blocos cheios (header NCA tem 0xC00 % 16 == 0). Decrypt exige a
+// cifra inversa (passo futuro). Tweak do NCA tem endianness própria (wiki).
+inline bool xtsEncrypt(const uint8_t key1[16], const uint8_t key2[16],
+                       const uint8_t tweak16[16], const uint8_t* in,
+                       uint8_t* out, size_t len) {
+    if (len % 16 != 0) return false;
+    uint8_t rk1[176], rk2[176];
+    detail::expandKey(key1, rk1);
+    detail::expandKey(key2, rk2);
+    // T0 = E_k2(tweak); depois multiplica por x a cada bloco
+    uint8_t T[16];
+    detail::encryptBlock(rk2, tweak16, T);
+    size_t pos = 0;
+    while (pos < len) {
+        uint8_t buf[16];
+        for (size_t i = 0; i < 16; i++) buf[i] = in[pos + i] ^ T[i];
+        uint8_t enc[16] = {0};
+        detail::encryptBlock(rk1, buf, enc);
+        for (size_t i = 0; i < 16; i++) out[pos + i] = enc[i] ^ T[i];
+        pos += 16;
+        // T *= x no corpo GF(2^128) (poly x^128+x^7+x^2+x+1)
+        uint8_t carry = (T[15] & 0x80) ? 0x87 : 0;
+        for (int i = 15; i > 0; i--) T[i] = (T[i] << 1) | (T[i - 1] >> 7);
+        T[0] <<= 1;
+        T[0] ^= carry;
+    }
+    return true;
+}
+
 // CTR: keystream = E(nonce||ctr BE), XOR nos dados. Criptografa = descriptografa.
 inline void cryptCtr(const uint8_t key[16], const uint8_t nonce12[12], const uint8_t* in,
                      uint8_t* out, size_t len, uint32_t ctr0 = 0) {

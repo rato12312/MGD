@@ -1768,6 +1768,8 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(f1.size() == 2 && f1[0] == 5, "b intacto");
         std::vector<uint8_t> no;
         ASSERT_MSG(!pfs.readFile("z", no), "inexistente nega");
+        std::vector<uint8_t> main;
+        ASSERT_MSG(!pfs.readMain(main), "sem main aqui");
     }
 
     // AES: vetor NIST ECB + round-trip CTR.
@@ -2926,6 +2928,34 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(!lay.sections[1].used, "secao 1 vazia");
         std::vector<uint8_t> curto(16, 0);
         ASSERT_MSG(!emu::parseNcaSections(curto.data(), curto.size()).valid, "curto nega");
+    }
+
+    // XTS: determinístico, tweak move tudo, tamanho quebrado nega.
+    {
+        uint8_t k1[16] = {1}, k2[16] = {2}, tw[16] = {3};
+        uint8_t pt[32] = {0};
+        for (int i = 0; i < 32; i++) pt[i] = static_cast<uint8_t>(i);
+        uint8_t c1[32] = {0}, c2[32] = {0};
+        ASSERT_MSG(emu::aes::xtsEncrypt(k1, k2, tw, pt, c1, 32), "xts ok");
+        ASSERT_MSG(emu::aes::xtsEncrypt(k1, k2, tw, pt, c2, 32), "xts de novo");
+        bool same = true, nz = false;
+        for (int i = 0; i < 32; i++) {
+            same = same && (c1[i] == c2[i]);
+            nz = nz || (c1[i] != 0);
+        }
+        ASSERT_MSG(same && nz, "deterministico e nao trivial");
+        uint8_t tw2[16] = {4};
+        uint8_t c3[32] = {0};
+        ASSERT_MSG(emu::aes::xtsEncrypt(k1, k2, tw2, pt, c3, 32), "outro tweak");
+        bool diff = false;
+        for (int i = 0; i < 32; i++) diff = diff || (c1[i] != c3[i]);
+        ASSERT_MSG(diff, "tweak muda tudo");
+        // blocos diferentes entre si (tweak evolui)
+        bool halves = false;
+        for (int i = 0; i < 16; i++) halves = halves || (c1[i] != c1[16 + i]);
+        ASSERT_MSG(halves, "blocos distintos");
+        uint8_t bad[32] = {0};
+        ASSERT_MSG(!emu::aes::xtsEncrypt(k1, k2, tw, pt, bad, 20), "quebrado nega");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
