@@ -2265,6 +2265,21 @@ bool run_emulator_machine_tests() {
                    "mul 4s certo");
     }
 
+    // LDPSW com sinal.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(2, 0x100);
+        auto w32 = [&](uint64_t addr, uint32_t v) {
+            for (int i = 0; i < 4; i++)
+                cpu.ram()[addr + i] = static_cast<uint8_t>(v >> (8 * i));
+        };
+        w32(0x108, 0xFFFFFFFFu);
+        w32(0x10C, 5);
+        ASSERT_MSG(cpu.step(0x69410440u), "ldpsw x0,x1,[x2,#8]");
+        ASSERT_MSG(cpu.reg(0) == 0xFFFFFFFFFFFFFFFFull, "sw -1 estendido");
+        ASSERT_MSG(cpu.reg(1) == 5, "sw 5");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

@@ -1352,6 +1352,41 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFC00000) == 0x69400000 || (insn & 0xFFC00000) == 0x69800000 ||
+            (insn & 0xFFC00000) == 0x68C00000) {
+            // LDPSW Xt1,Xt2,[Xn,#imm] (par com sinal; sem escrita = só leitura)
+            uint32_t fam = insn & 0xFFC00000;
+            bool preIndex = (fam == 0x69800000);
+            bool postIndex = (fam == 0x68C00000);
+            int t1 = static_cast<int>(insn & 0x1F);
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            int t2 = static_cast<int>((insn >> 10) & 0x1F);
+            int64_t off = static_cast<int64_t>((insn >> 15) & 0x7F);
+            if (off & 0x40) off |= ~static_cast<int64_t>(0x7F);
+            uint64_t base = (n == 31) ? sp_ : regs_[n];
+            uint64_t addr = postIndex ? base : base + static_cast<uint64_t>(off * 4);
+            auto lds32 = [&](uint64_t a, bool& ok) {
+                uint64_t pa = 0;
+                ok = phys(a, 4, false, false, pa);
+                if (!ok) return int64_t(0);
+                uint32_t w = 0;
+                __builtin_memcpy(&w, &mem_[static_cast<size_t>(pa)], 4);
+                return static_cast<int64_t>(static_cast<int32_t>(w));
+            };
+            bool ok1 = true, ok2 = true;
+            int64_t v1 = lds32(addr, ok1), v2 = lds32(addr + 4, ok2);
+            if (!ok1 || !ok2) return false;
+            if (t1 != 31) regs_[t1] = static_cast<uint64_t>(v1);
+            if (t2 != 31) regs_[t2] = static_cast<uint64_t>(v2);
+            if (preIndex || postIndex) {
+                uint64_t nb = base + static_cast<uint64_t>(off * 4);
+                if (n == 31) sp_ = nb;
+                else regs_[n] = nb;
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFC00000) == 0x29000000 || (insn & 0xFFC00000) == 0x29400000 ||
             (insn & 0xFFC00000) == 0x29800000 || (insn & 0xFFC00000) == 0x29C00000 ||
             (insn & 0xFFC00000) == 0x28800000 || (insn & 0xFFC00000) == 0x28C00000) {
