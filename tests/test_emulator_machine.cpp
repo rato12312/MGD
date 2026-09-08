@@ -2438,6 +2438,25 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(!hos::hipcParseReply(wrong, rp), "SFCI nao e SFCO");
     }
 
+    // Backtrace segue X29.
+    {
+        emu::Cpu cpu;
+        auto w64 = [&](uint64_t addr, uint64_t v) {
+            for (int i = 0; i < 8; i++)
+                cpu.ram()[addr + i] = static_cast<uint8_t>(v >> (8 * i));
+        };
+        w64(0x1000, 0x0FF0);
+        w64(0x1008, 0x400);
+        w64(0x0FF0, 0);
+        w64(0x0FF8, 0x200);
+        cpu.setReg(29, 0x1000);
+        std::vector<uint64_t> bt = cpu.backtrace();
+        ASSERT_MSG(bt.size() == 2, "2 frames");
+        ASSERT_MSG(bt[0] == 0x400 && bt[1] == 0x200, "retornos certos");
+        cpu.setReg(29, 0);
+        ASSERT_MSG(cpu.backtrace().empty(), "fp zero = vazio");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

@@ -65,6 +65,22 @@ public:
     uint32_t lastUnknown(size_t i) const {
         return i < unknown_log_.size() ? unknown_log_[i] : 0;
     }
+    // Backtrace: segue X29 ([fp]=prev, [fp+8]=ret). Físico direto, com teto.
+    std::vector<uint64_t> backtrace(size_t max = 32) const {
+        std::vector<uint64_t> out;
+        uint64_t fp = regs_[29];
+        for (size_t i = 0; i < max && fp != 0; i++) {
+            if (fp + 16 > ramSize() || (fp & 7) != 0) break;
+            uint64_t prev = 0, ret = 0;
+            __builtin_memcpy(&prev, &mem_[static_cast<size_t>(fp)], 8);
+            __builtin_memcpy(&ret, &mem_[static_cast<size_t>(fp) + 8], 8);
+            if (ret == 0) break;
+            out.push_back(ret);
+            if (prev == fp) break; // não anda em círculo
+            fp = prev;
+        }
+        return out;
+    }
     // Trace: últimos PCs executados (debug de código real).
     void traceEnable(bool on) { trace_on_ = on; }
     uint64_t tracePc(size_t i) const {
