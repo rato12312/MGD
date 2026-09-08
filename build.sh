@@ -12,5 +12,6 @@ TEST_SOURCES=$(find tests -name '*.cpp' | sort)
 
 $CXX $CXXFLAGS -I. -DMGD_TESTING $CORE_SOURCES $TEST_SOURCES -o "$BUILD_DIR/mgd_tests"
 $CXX $CXXFLAGS -I. $CORE_SOURCES src/main.cpp -o "$BUILD_DIR/mgd_app"
+$CXX $CXXFLAGS -I. tools/mgd_nsp.cpp -o "$BUILD_DIR/mgd_nsp"
 
-echo "Build OK -> $BUILD_DIR/mgd_tests, $BUILD_DIR/mgd_app"
+echo "Build OK -> $BUILD_DIR/mgd_tests, $BUILD_DIR/mgd_app, $BUILD_DIR/mgd_nsp"
