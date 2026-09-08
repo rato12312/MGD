@@ -2231,6 +2231,16 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.step(0xD50B7520u), "ic ivau, x0");
     }
 
+    // DC limpeza aceita e segue.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 0x100);
+        ASSERT_MSG(cpu.step(0xD50B7A20u), "dc cvac,x0");
+        ASSERT_MSG(cpu.step(0xD50B7E20u), "dc civac,x0");
+        ASSERT_MSG(cpu.step(0xD50B7620u), "dc ivac,x0");
+        ASSERT_MSG(cpu.pc() == 12, "andou 3");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

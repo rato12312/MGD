@@ -896,6 +896,13 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFFFFFE0) == 0xD50B7A20 || (insn & 0xFFFFFFE0) == 0xD50B7E20 ||
+            (insn & 0xFFFFFFE0) == 0xD50B7620) {
+            // DC CVAC/CIVAC/IVAC: single-thread já é coerente, só segue
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFFFFFE0) == 0xD50B7420) { // DC ZVA, Xt (zera 64 bytes)
             int n = static_cast<int>((insn >> 5) & 0x1F);
             uint64_t base = (n == 31) ? sp_ : regs_[n];
