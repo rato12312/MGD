@@ -15,6 +15,9 @@
 #include "emulador-mgd/loader/Keys.h"
 #include "emulador-mgd/loader/NcaProbe.h"
 #include "emulador-mgd/loader/Npdm.h"
+#include "emulador-mgd/loader/Keys.h"
+#include "emulador-mgd/hos/AppletService.h"
+#include "emulador-mgd/runtime/Emulator.h"
 #include "emulador-mgd/loader/NcaSections.h"
 #include "emulador-mgd/loader/Sha256.h"
 #include "emulador-mgd/loader/Pfs0.h"
@@ -3067,6 +3070,78 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(4) + 1 == cpu.steps(), "timer anda");
         ASSERT_MSG(cpu.step(0xD50041FFu), "msr spsel,#1");
         ASSERT_MSG(cpu.step(0xD508871Fu), "tlbi vmalle1");
+    }
+
+    // Integração completa: Emulator + NSP boot + frame loop
+    {
+        emu::Emulator emu;
+        emu.applySwitches();
+        emu.kernel().bootServices();
+
+        // Testa frame vazio (sem NSP)
+        bool ok = emu.frame("test_frame.ppm", 4);
+        ASSERT_MSG(ok, "frame vazio roda");
+        ASSERT_MSG(emu.fps() > 0.0, "fps medido");
+
+        // Testa save/restore state
+        auto snap = emu.snapshot();
+        ASSERT_MSG(snap.ram.size() == emu.cpu().ramSize(), "snapshot ram size");
+        bool restored = emu.restore(snap);
+        ASSERT_MSG(restored, "restore ok");
+        ASSERT_MSG(emu.cpu().pc() == snap.cpu.pc, "pc restaurado");
+    }
+
+    // Testa AppletService Create/Start
+    {
+        emu::Emulator emu;
+        emu.applySwitches();
+        emu.kernel().bootServices();
+
+        hos::IpcMessage req{2, {}}; // CreateApplet
+        req.payload = {'t', 'e', 's', 't', 0, 0x12,0x34,0x56,0x78, 0x9A,0xBC,0xDE,0xF0, 0x11,0x22,0x33,0x44};
+        hos::IpcMessage rep;
+        bool handled = emu.kernel().applet().dispatch(req, rep);
+        ASSERT_MSG(handled, "create applet handled");
+        ASSERT_MSG(rep.cmd == 1, "create applet ok");
+    }
+
+    // Testa KeyManager NCA decrypt (com chaves zeros = falha esperada)
+    {
+        emu::KeyManager km;
+        uint8_t zero_key[16] = {0};
+        km.setSlot(0, zero_key); // header
+        km.setSlot(1, zero_key); // section 0
+        km.setSlot(2, zero_key);
+        km.setSlot(3, zero_key);
+        km.setSlot(4, zero_key);
+
+        // NCA mínimo inválido (sem header NCA3)
+        uint8_t fake_nca[0xC00] = {0};
+        std::memcpy(fake_nca, "NCA3", 4);
+        emu::KeyManager::NcaDecryptResult dec;
+        int slots[4] = {1, 2, 3, 4};
+        // Deve falhar porque criptografia com chave zero não produz header válido
+        bool r = km.decryptNca(fake_nca, 0xC00, 0, slots, dec);
+        ASSERT_MSG(!r || !dec.valid, "chave zero falha como esperado");
+    }
+
+    // Testa GPU executor draw call counting
+    {
+        emu::Emulator emu;
+        emu.applySwitches();
+        emu.kernel().bootServices();
+
+        // Submit command buffer simples (SET_DRAW_ARRAYS)
+        uint32_t cmds[] = {
+            0x00010086, // SET_DRAW_ARRAYS, size=1
+            3, 1,       // vertex_count=3, instance_count=1
+        };
+        std::vector<uint8_t> buf(sizeof(cmds));
+        for (size_t i = 0; i < sizeof(cmds)/4; i++) {
+            for (int b = 0; b < 4; b++) buf[i*4+b] = static_cast<uint8_t>(cmds[i] >> (8*b));
+        }
+        emu.kernel().nv().dispatch(hos::IpcMessage{3, buf}, hos::IpcMessage{});
+        ASSERT_MSG(emu.kernel().nv().drawCalls() >= 1, "draw call contado");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
