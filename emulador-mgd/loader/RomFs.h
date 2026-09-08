@@ -107,7 +107,73 @@ public:
         return false;
     }
 
+    // Recursivo: "a/b/c.bin" anda pelos filhos. "" = raiz.
+    bool readPath(const std::string& path, std::vector<uint8_t>& out) const {
+        if (!blob_) return false;
+        size_t slash = path.rfind('/');
+        std::string dir = (slash == std::string::npos) ? "" : path.substr(0, slash);
+        std::string name = (slash == std::string::npos) ? path : path.substr(slash + 1);
+        if (dir.empty()) return readRootFile(name, out);
+        uint32_t d = findDir(dir);
+        if (d == 0xFFFFFFFFu) return false;
+        return readFileIn(d, name, out);
+    }
+
+    std::vector<std::string> listPath(const std::string& dir) const {
+        std::vector<std::string> out;
+        if (!blob_) return out;
+        if (dir.empty()) return listRoot();
+        uint32_t d = findDir(dir);
+        if (d == 0xFFFFFFFFu) return out;
+        uint32_t file = rd32(d + 0x0C);
+        while (file != 0xFFFFFFFFu) {
+            out.push_back(fileName(file));
+            file = rd32(file + 0x04);
+        }
+        return out;
+    }
+
 private:
+    // Acha diretório por caminho "a/b": anda child/sibling a partir da raiz.
+    uint32_t findDir(const std::string& path) const {
+        uint32_t dir = dir_tab_off_; // raiz
+        size_t start = 0;
+        while (start <= path.size()) {
+            size_t slash = path.find('/', start);
+            std::string comp = (slash == std::string::npos) ? path.substr(start)
+                                                            : path.substr(start, slash - start);
+            uint32_t cur = rd32(dir + 0x08); // child
+            bool found = false;
+            while (cur != 0xFFFFFFFFu) {
+                if (dirName(cur) == comp) {
+                    dir = cur;
+                    found = true;
+                    break;
+                }
+                cur = rd32(cur + 0x04);
+            }
+            if (!found) return 0xFFFFFFFFu;
+            if (slash == std::string::npos) break;
+            start = slash + 1;
+        }
+        return dir;
+    }
+
+    bool readFileIn(uint32_t dir, const std::string& name, std::vector<uint8_t>& out) const {
+        uint32_t file = rd32(dir + 0x0C);
+        while (file != 0xFFFFFFFFu) {
+            if (fileName(file) == name) {
+                uint64_t doff = rd64(file + 0x08);
+                uint64_t dsize = rd64(file + 0x10);
+                if (data_off_ + doff + dsize > len_) return false;
+                out.assign(blob_ + data_off_ + doff, blob_ + data_off_ + doff + dsize);
+                return true;
+            }
+            file = rd32(file + 0x04);
+        }
+        return false;
+    }
+
     std::string dirName(uint32_t entry) const {
         uint32_t nlen = rd32(entry + 0x14);
         if (entry + 0x18 + nlen > len_) return "";

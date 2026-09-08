@@ -52,7 +52,8 @@ inline NroImage parseNro(const uint8_t* blob, size_t len) {
     return img;
 }
 
-// Mapeia a imagem em mem[base..] (header junto). Entry = base (Start).
+// Mapeia a imagem em mem[base..] (header junto) + zera .bss.
+// BSS = logo após .data em memória. Entry = base (Start).
 inline bool loadNroInto(const NroImage& img, const uint8_t* blob, uint8_t* mem,
                         uint64_t memSize, uint64_t base, uint64_t& entryOut) {
     if (!img.valid) return false;
@@ -63,6 +64,11 @@ inline bool loadNroInto(const NroImage& img, const uint8_t* blob, uint8_t* mem,
         uint64_t dst = base + segs[i]->memory_offset;
         if (dst + segs[i]->size > memSize) return false;
         std::memcpy(mem + dst, blob + segs[i]->file_offset, segs[i]->size);
+    }
+    uint64_t bss = base + img.data.memory_offset + img.data.size;
+    if (img.bss_size > 0) {
+        if (bss + img.bss_size > memSize) return false;
+        std::memset(mem + bss, 0, img.bss_size);
     }
     entryOut = base;
     return true;

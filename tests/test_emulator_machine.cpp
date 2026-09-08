@@ -2822,6 +2822,83 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(kernel.lastMemAttr() == 0x08, "attr guardado");
     }
 
+    // NRO com BSS: suja a RAM, carrega, BSS sai zerado.
+    {
+        std::vector<uint32_t> text = {0xD28000E0u, 0xD4000001u}; // MOVZ X0,#7; SVC#0
+        std::vector<uint8_t> blob(0x90, 0);
+        blob[0x10] = 'N'; blob[0x11] = 'R'; blob[0x12] = 'O'; blob[0x13] = '0';
+        auto w32 = [&](size_t off, uint32_t v) {
+            for (int i = 0; i < 4; i++) blob[off + i] = static_cast<uint8_t>(v >> (8 * i));
+        };
+        w32(0x20, 0x80); w32(0x24, 8);    // text
+        w32(0x30, 0); w32(0x34, 0);       // rodata vazia
+        w32(0x40, 0x100); w32(0x44, 8);   // data
+        w32(0x48, 16);                    // bss 16
+        for (size_t i = 0; i < text.size(); ++i)
+            for (int b = 0; b < 4; b++)
+                blob[0x80 + i * 4 + b] = static_cast<uint8_t>(text[i] >> (8 * b));
+        for (int i = 0; i < 8; i++) blob[0x88 + i] = static_cast<uint8_t>(0xA0 + i);
+        emu::Cpu cpu;
+        for (uint64_t i = 0; i < cpu.ramSize(); i++) cpu.ram()[i] = 0xFF;
+        emu::NroImage img = emu::parseNro(blob.data(), blob.size());
+        ASSERT_MSG(img.valid, "nro com bss valido");
+        uint64_t entry = 0;
+        ASSERT_MSG(emu::loadNroInto(img, blob.data(), cpu.ram(), cpu.ramSize(), 0, entry),
+                   "mapeou com bss");
+        bool bsszero = true;
+        for (int i = 0; i < 16; i++) bsszero = bsszero && (cpu.ram()[0x108 + i] == 0);
+        ASSERT_MSG(bsszero, "bss zerado");
+        ASSERT_MSG(cpu.ram()[0x100] == 0xA0, "data intacto");
+        cpu.setPc(entry + 0x80);
+        ASSERT_MSG(cpu.run(8) == 2, "roda");
+        ASSERT_MSG(cpu.reg(0) == 7, "x0=7");
+    }
+
+    // RomFS aninhado: a/b/f via caminho.
+    {
+        std::vector<uint8_t> blob(0xC2, 0);
+        auto w32 = [&](size_t off, uint32_t v) {
+            for (int i = 0; i < 4; i++) blob[off + i] = static_cast<uint8_t>(v >> (8 * i));
+        };
+        auto w64 = [&](size_t off, uint64_t v) {
+            for (int i = 0; i < 8; i++) blob[off + i] = static_cast<uint8_t>(v >> (8 * i));
+        };
+        w32(0x0C, 0x50); w32(0x10, 0x4A);
+        w32(0x1C, 0xA0); w32(0x20, 0x21);
+        w64(0x24, 0xC1);
+        w32(0x50 + 0x04, 0xFFFFFFFFu);
+        w32(0x50 + 0x08, 0x68); // root.child = subA
+        w32(0x50 + 0x0C, 0xFFFFFFFFu);
+        w32(0x68 + 0x00, 0x50);
+        w32(0x68 + 0x04, 0xFFFFFFFFu);
+        w32(0x68 + 0x08, 0x81); // subA.child = subB
+        w32(0x68 + 0x0C, 0xFFFFFFFFu);
+        w32(0x68 + 0x14, 1);
+        blob[0x80] = 'a';
+        w32(0x81 + 0x00, 0x68);
+        w32(0x81 + 0x04, 0xFFFFFFFFu);
+        w32(0x81 + 0x08, 0xFFFFFFFFu);
+        w32(0x81 + 0x0C, 0xA0); // subB.file
+        w32(0x81 + 0x14, 1);
+        blob[0x99] = 'b';
+        w32(0xA0 + 0x00, 0x81);
+        w32(0xA0 + 0x04, 0xFFFFFFFFu);
+        w64(0xA0 + 0x08, 0);
+        w64(0xA0 + 0x10, 1);
+        w32(0xA0 + 0x1C, 1);
+        blob[0xC0] = 'f';
+        blob[0xC1] = 42;
+        emu::RomFsReader rom;
+        ASSERT_MSG(rom.open(blob.data(), blob.size()), "romfs aninhado abriu");
+        std::vector<uint8_t> data;
+        ASSERT_MSG(rom.readPath("a/b/f", data), "leu caminho");
+        ASSERT_MSG(data.size() == 1 && data[0] == 42, "byte certo");
+        std::vector<std::string> ls = rom.listPath("a/b");
+        ASSERT_MSG(ls.size() == 1 && ls[0] == "f", "listou sub");
+        ASSERT_MSG(rom.listPath("a").empty(), "a sem arquivos");
+        ASSERT_MSG(!rom.readPath("a/x", data), "caminho ruim nega");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
