@@ -25,11 +25,13 @@ class Scheduler {
 public:
     Scheduler() = default;
 
-    uint64_t spawn(uint64_t entry, uint64_t sp, uint32_t prio = 0, emu::Mmu* aspace = nullptr) {
+    uint64_t spawn(uint64_t entry, uint64_t sp, uint32_t prio = 0, emu::Mmu* aspace = nullptr,
+                   uint64_t tls = 0) {
         Thread t;
         t.id = ++next_id_;
         t.ctx.pc = entry;
         t.ctx.sp = sp;
+        t.ctx.tpidr = (tls != 0) ? tls : (0x200000ull + t.id * 0x1000ull);
         t.prio = prio;
         t.aspace = aspace;
         queue_.push_back(t);

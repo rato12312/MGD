@@ -2778,6 +2778,50 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(same, "CTR-128 == nonce12+u32");
     }
 
+    // TLS por thread: cada uma lê o seu.
+    {
+        emu::Cpu cpu;
+        hos::Scheduler sched;
+        // prog @X: MRS X0,TPIDR_EL0 ; STR X0,[X1] ; SVC#0 (X1 vem presetado? não:
+        // cada thread seta X1 antes via programa diferente — simplifica: 2 addrs)
+        auto poke = [&](uint64_t addr, uint32_t insn) {
+            for (int i = 0; i < 4; i++)
+                cpu.ram()[addr + i] = static_cast<uint8_t>(insn >> (8 * i));
+        };
+        // A @0: X1=0x300, MRS, STR, exit
+        poke(0x00, 0xD2806001u); // MOVZ X1, #0x300
+        poke(0x04, 0xD53BD040u); // MRS X0, TPIDR_EL0
+        poke(0x08, 0xF8000020u); // STR X0, [X1]
+        poke(0x0C, 0xD4000001u); // SVC#0
+        // B @0x40: X1=0x308, MRS, STR, exit
+        poke(0x40, 0xD2806101u); // MOVZ X1, #0x308
+        poke(0x44, 0xD53BD040u); // MRS X0, TPIDR_EL0
+        poke(0x48, 0xF8000020u); // STR X0, [X1]
+        poke(0x4C, 0xD4000001u); // SVC#0
+        sched.spawn(0x0, 0x8000, 0, nullptr, 0xAAA);
+        sched.spawn(0x40, 0x9000, 0, nullptr, 0xBBB);
+        sched.run(cpu, 32, 8);
+        uint64_t a = 0, b = 0;
+        for (int i = 0; i < 8; i++) {
+            a |= static_cast<uint64_t>(cpu.ram()[0x300 + i]) << (8 * i);
+            b |= static_cast<uint64_t>(cpu.ram()[0x308 + i]) << (8 * i);
+        }
+        ASSERT_MSG(a == 0xAAA && b == 0xBBB, "tls distinto por thread");
+        ASSERT_MSG(sched.pending() == 0, "todos sairam");
+    }
+
+    // SetMemoryAttribute guarda mask/attr e volta OK.
+    {
+        hos::Kernel kernel;
+        hos::SvcArgs a;
+        a.x[0] = 0x1000;
+        a.x[1] = 0x1000;
+        a.x[2] = 0xFF;
+        a.x[3] = 0x08;
+        ASSERT_MSG(kernel.call(hos::SVC_SET_MEMORY_ATTRIBUTE, a) == hos::RESULT_OK, "attr ok");
+        ASSERT_MSG(kernel.lastMemAttr() == 0x08, "attr guardado");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

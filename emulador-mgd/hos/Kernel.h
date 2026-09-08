@@ -33,6 +33,7 @@ namespace hos {
 enum SvcNumber : uint32_t {
     SVC_SET_HEAP_SIZE = 0x01,
     SVC_SET_MEMORY_PERMISSION = 0x02, // X0=addr X1=size X2=perm(rwx bits)
+    SVC_SET_MEMORY_ATTRIBUTE = 0x03,  // X0=addr X1=size X2=mask X3=attr (guarda)
     SVC_MAP_MEMORY = 0x04,            // X0=dst X1=src X2=size
     SVC_UNMAP_MEMORY = 0x05,          // X0=addr X1=size (match exato)
     SVC_QUERY_MEMORY = 0x06,
@@ -122,6 +123,7 @@ public:
 
     uint64_t heapBase() const { return heap_base_; }
     uint64_t heapSize() const { return heap_size_; }
+    uint64_t lastMemAttr() const { return last_mem_attr_; }
     bool exited() const { return exited_; }
     uint64_t sleptNs() const { return slept_ns_; }
     Scheduler& scheduler() { return sched_; }
@@ -207,6 +209,10 @@ public:
                                         (p & 1) != 0, (p & 2) != 0, (p & 4) != 0);
                 return ok ? RESULT_OK : RESULT_INVALID_HANDLE;
             }
+            case SVC_SET_MEMORY_ATTRIBUTE: {
+                last_mem_attr_ = args.x[3]; // guarda; semântica real depois
+                return RESULT_OK;
+            }
             case SVC_MAP_MEMORY: {
                 // Alias: dst enxerga o físico de src (mesma permissão).
                 if (!mmu_) return RESULT_INVALID_HANDLE;
@@ -276,6 +282,7 @@ public:
 private:
     uint64_t heap_base_ = 0x08000000; // base típica do heap do app
     uint64_t heap_size_ = 0;
+    uint64_t last_mem_attr_ = 0;
     bool exited_ = false;
     uint64_t slept_ns_ = 0;
     uint64_t next_pid_ = 1;
