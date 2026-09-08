@@ -2241,6 +2241,30 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.pc() == 12, "andou 3");
     }
 
+    // MUL vetorial 4S.
+    {
+        emu::Cpu cpu;
+        auto w32 = [&](uint64_t addr, uint32_t v) {
+            for (int i = 0; i < 4; i++)
+                cpu.ram()[addr + i] = static_cast<uint8_t>(v >> (8 * i));
+        };
+        w32(0x100, 2); w32(0x104, 3); w32(0x108, 4); w32(0x10C, 5);
+        w32(0x110, 10); w32(0x114, 10); w32(0x118, 10); w32(0x11C, 10);
+        cpu.setReg(1, 0x100);
+        ASSERT_MSG(cpu.step(0x3DC00020u), "ldr q0");
+        ASSERT_MSG(cpu.step(0x3DC00421u), "ldr q1");
+        ASSERT_MSG(cpu.step(0x6E419C02u), "mul v2.4s,v0.4s,v1.4s");
+        ASSERT_MSG(cpu.step(0xD2804003u), "movz x3,#0x200");
+        ASSERT_MSG(cpu.step(0x3D800062u), "str q2");
+        auto r32 = [&](uint64_t addr) {
+            uint32_t v = 0;
+            for (int i = 0; i < 4; i++) v |= static_cast<uint32_t>(cpu.ram()[addr + i]) << (8 * i);
+            return v;
+        };
+        ASSERT_MSG(r32(0x200) == 20 && r32(0x204) == 30 && r32(0x208) == 40 && r32(0x20C) == 50,
+                   "mul 4s certo");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

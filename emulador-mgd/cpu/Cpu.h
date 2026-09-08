@@ -584,6 +584,30 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFF9FFC00) == 0x6E009C00) {
+            // MUL vetorial inteiro size-aware (8b/16b/32b; 64b não existe)
+            int sz = static_cast<int>((insn >> 21) & 0x3);
+            if (sz == 3) return false; // deixa p/ log de desconhecido
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int lanes = 16 >> sz;
+            int bits = 8 << sz;
+            uint64_t mask = (bits == 64) ? ~0ull : ((1ull << bits) - 1ull);
+            uint64_t an[2] = {fp_.q[n][0], fp_.q[n][1]};
+            uint64_t bn[2] = {fp_.q[m][0], fp_.q[m][1]};
+            for (int lane = 0; lane < lanes; lane++) {
+                int half = lane / (64 / bits);
+                int shift = (lane * bits) % 64;
+                uint64_t a = (an[half] >> shift) & mask;
+                uint64_t b = (bn[half] >> shift) & mask;
+                uint64_t r = (a * b) & mask;
+                fp_.q[d][half] = (fp_.q[d][half] & ~(mask << shift)) | (r << shift);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFE0FC00) == 0x6E201C00) { // ORR Vd.16B,Vn,Vm (move 128)
             int d = static_cast<int>(dec.rd);
             int n = static_cast<int>(dec.rn);
