@@ -2958,6 +2958,28 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(!emu::aes::xtsEncrypt(k1, k2, tw, pt, bad, 20), "quebrado nega");
     }
 
+    // AES-decrypt: vetor NIST + XTS ida-e-volta.
+    {
+        uint8_t key[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+        uint8_t ct[16] = {0x69, 0xC4, 0xE0, 0xD8, 0x6A, 0x7B, 0x04, 0x30,
+                          0xD8, 0xCD, 0xB7, 0x80, 0x70, 0xB4, 0xC5, 0x55};
+        uint8_t pt[16] = {0};
+        emu::aes::decryptEcb(key, ct, pt);
+        bool ok = true;
+        for (int i = 0; i < 16; i++) ok = ok && (pt[i] == i * 17);
+        ASSERT_MSG(ok, "NIST decrypt bate");
+        uint8_t k1[16] = {1}, k2[16] = {2}, tw[16] = {3};
+        uint8_t msg[32];
+        for (int i = 0; i < 32; i++) msg[i] = static_cast<uint8_t>(i + 5);
+        uint8_t enc[32] = {0}, back[32] = {0};
+        ASSERT_MSG(emu::aes::xtsEncrypt(k1, k2, tw, msg, enc, 32), "xts enc");
+        ASSERT_MSG(emu::aes::xtsDecrypt(k1, k2, tw, enc, back, 32), "xts dec");
+        bool rt = true;
+        for (int i = 0; i < 32; i++) rt = rt && (back[i] == msg[i]);
+        ASSERT_MSG(rt, "XTS ida-e-volta");
+        ASSERT_MSG(!emu::aes::xtsDecrypt(k1, k2, tw, enc, back, 20), "quebrado nega");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }

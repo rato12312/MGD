@@ -79,6 +79,46 @@ inline void encryptBlock(const uint8_t rk[176], const uint8_t in[16], uint8_t ou
     }
     std::memcpy(out, s, 16);
 }
+inline uint8_t gmul(uint8_t x, uint8_t m) {
+    // multiplica no GF(2^8) por 9/11/13/14 (via xtime)
+    uint8_t x2 = xtime(x), x4 = xtime(x2), x8 = xtime(x4);
+    switch (m) {
+        case 0x09: return x8 ^ x;
+        case 0x0B: return x8 ^ x2 ^ x;
+        case 0x0D: return x8 ^ x4 ^ x;
+        case 0x0E: return x8 ^ x4 ^ x2;
+        default: return 0;
+    }
+}
+
+inline void decryptBlock(const uint8_t rk[176], const uint8_t in[16], uint8_t out[16]) {
+    uint8_t inv[256];
+    for (int i = 0; i < 256; i++) inv[kSbox[i]] = static_cast<uint8_t>(i);
+    uint8_t s[16];
+    for (int i = 0; i < 16; i++) s[i] = in[i] ^ rk[160 + i];
+    for (int round = 9; round >= 1; round--) {
+        uint8_t t[16]; // InvShiftRows
+        t[0] = s[0]; t[4] = s[4]; t[8] = s[8]; t[12] = s[12];
+        t[1] = s[13]; t[5] = s[1]; t[9] = s[5]; t[13] = s[9];
+        t[2] = s[10]; t[6] = s[14]; t[10] = s[2]; t[14] = s[6];
+        t[3] = s[7]; t[7] = s[11]; t[11] = s[15]; t[15] = s[3];
+        for (int i = 0; i < 16; i++) s[i] = inv[t[i]]; // InvSubBytes
+        for (int i = 0; i < 16; i++) s[i] ^= rk[round * 16 + i]; // AddRoundKey
+        for (int c = 0; c < 4; c++) { // InvMixColumns
+            uint8_t a0 = s[4 * c], a1 = s[4 * c + 1], a2 = s[4 * c + 2], a3 = s[4 * c + 3];
+            s[4 * c] = gmul(a0, 0x0E) ^ gmul(a1, 0x0B) ^ gmul(a2, 0x0D) ^ gmul(a3, 0x09);
+            s[4 * c + 1] = gmul(a0, 0x09) ^ gmul(a1, 0x0E) ^ gmul(a2, 0x0B) ^ gmul(a3, 0x0D);
+            s[4 * c + 2] = gmul(a0, 0x0D) ^ gmul(a1, 0x09) ^ gmul(a2, 0x0E) ^ gmul(a3, 0x0B);
+            s[4 * c + 3] = gmul(a0, 0x0B) ^ gmul(a1, 0x0D) ^ gmul(a2, 0x09) ^ gmul(a3, 0x0E);
+        }
+    }
+    uint8_t t[16]; // rodada final (sem InvMixColumns)
+    t[0] = s[0]; t[4] = s[4]; t[8] = s[8]; t[12] = s[12];
+    t[1] = s[13]; t[5] = s[1]; t[9] = s[5]; t[13] = s[9];
+    t[2] = s[10]; t[6] = s[14]; t[10] = s[2]; t[14] = s[6];
+    t[3] = s[7]; t[7] = s[11]; t[11] = s[15]; t[15] = s[3];
+    for (int i = 0; i < 16; i++) out[i] = inv[t[i]] ^ rk[i];
+}
 } // namespace detail
 
 // ECB de 1 bloco (base do CTR + vetor NIST).
@@ -86,6 +126,39 @@ inline void encryptEcb(const uint8_t key[16], const uint8_t in[16], uint8_t out[
     uint8_t rk[176];
     detail::expandKey(key, rk);
     detail::encryptBlock(rk, in, out);
+}
+
+// ECB decrypt de 1 bloco (vetor NIST inverso).
+inline void decryptEcb(const uint8_t key[16], const uint8_t in[16], uint8_t out[16]) {
+    uint8_t rk[176];
+    detail::expandKey(key, rk);
+    detail::decryptBlock(rk, in, out);
+}
+
+// XTS-AES-128 DECRYPT (só blocos cheios).
+inline bool xtsDecrypt(const uint8_t key1[16], const uint8_t key2[16],
+                       const uint8_t tweak16[16], const uint8_t* in,
+                       uint8_t* out, size_t len) {
+    if (len % 16 != 0) return false;
+    uint8_t rk1[176], rk2[176];
+    detail::expandKey(key1, rk1);
+    detail::expandKey(key2, rk2);
+    uint8_t T[16];
+    detail::encryptBlock(rk2, tweak16, T);
+    size_t pos = 0;
+    while (pos < len) {
+        uint8_t buf[16];
+        for (size_t i = 0; i < 16; i++) buf[i] = in[pos + i] ^ T[i];
+        uint8_t dec[16] = {0};
+        detail::decryptBlock(rk1, buf, dec);
+        for (size_t i = 0; i < 16; i++) out[pos + i] = dec[i] ^ T[i];
+        pos += 16;
+        uint8_t carry = (T[15] & 0x80) ? 0x87 : 0;
+        for (int i = 15; i > 0; i--) T[i] = (T[i] << 1) | (T[i - 1] >> 7);
+        T[0] <<= 1;
+        T[0] ^= carry;
+    }
+    return true;
 }
 
 // CMAC (SP 800-38B): autentica blocos (cabeçalho NCA usa).
