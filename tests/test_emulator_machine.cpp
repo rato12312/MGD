@@ -14,6 +14,7 @@
 #include "emulador-mgd/loader/Aes.h"
 #include "emulador-mgd/loader/Keys.h"
 #include "emulador-mgd/loader/NcaProbe.h"
+#include "emulador-mgd/loader/NcaSections.h"
 #include "emulador-mgd/loader/Sha256.h"
 #include "emulador-mgd/loader/Pfs0.h"
 #include "emulador-mgd/loader/RomFs.h"
@@ -2902,6 +2903,29 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(ls.size() == 1 && ls[0] == "f", "listou sub");
         ASSERT_MSG(rom.listPath("a").empty(), "a sem arquivos");
         ASSERT_MSG(!rom.readPath("a/x", data), "caminho ruim nega");
+    }
+
+    // Seções NCA: FsEntry + FsHeader viram offset/tipo/crypto.
+    {
+        std::vector<uint8_t> hdr(0x400 + 4 * 0x200, 0);
+        auto w32 = [&](size_t off, uint32_t v) {
+            for (int i = 0; i < 4; i++) hdr[off + i] = static_cast<uint8_t>(v >> (8 * i));
+        };
+        w32(0x240, 2); // seção 0: blocos [2,4) = bytes [0x400,0x800)
+        w32(0x244, 4);
+        w32(0x400, 2); // version 2
+        hdr[0x402] = 0; // RomFS
+        hdr[0x404] = 3; // CTR
+        emu::NcaLayout lay = emu::parseNcaSections(hdr.data(), hdr.size());
+        ASSERT_MSG(lay.valid, "layout valido");
+        ASSERT_MSG(lay.sections[0].used, "secao 0 usada");
+        ASSERT_MSG(lay.sections[0].data_offset == 0x400, "offset 0x400");
+        ASSERT_MSG(lay.sections[0].data_size == 0x400, "tamanho 0x400");
+        ASSERT_MSG(lay.sections[0].fs_type == 0, "RomFS");
+        ASSERT_MSG(lay.sections[0].crypto == 3, "CTR");
+        ASSERT_MSG(!lay.sections[1].used, "secao 1 vazia");
+        std::vector<uint8_t> curto(16, 0);
+        ASSERT_MSG(!emu::parseNcaSections(curto.data(), curto.size()).valid, "curto nega");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
