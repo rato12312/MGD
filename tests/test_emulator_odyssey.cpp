@@ -25,6 +25,16 @@ bool run_emulator_odyssey_tests() {
     bridge::RuntimeFrameStats s2 = world.idleFrame(2, 20);
     ASSERT_MSG(s2.pixels_written == 0, "parado nao reescreve");
 
+    // Streaming: Edge (teto 1024) + 3000 polígonos = evicção com teto.
+    {
+        odyssey::OdysseyWorld big;
+        big.cheap(odyssey::CheapMode::edge());
+        bridge::RuntimeFrameStats s3 = big.boot(3000);
+        ASSERT_MSG(s3.polygons_fed == 3000, "3000 alimentados");
+        ASSERT_MSG(big.runtime().cache().evictions() >= 1, "velho caiu");
+        ASSERT_MSG(big.runtime().cache().polygonCount() <= 1024, "teto segurou");
+    }
+
     std::cout << "  Emulator odyssey tests passed!" << std::endl;
     return true;
 }
