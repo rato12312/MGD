@@ -301,6 +301,26 @@ public:
             steps_++;
             return true;
         }
+        if ((insn & 0xFFFFFFE0) == 0xD53B4200) { // MRS Xd,NZCV (empacota flags)
+            int d = static_cast<int>(dec.rd);
+            uint64_t v = (flag_n_ ? (1ull << 31) : 0) | (flag_z_ ? (1ull << 30) : 0) |
+                         (flag_c_ ? (1ull << 29) : 0) | (flag_v_ ? (1ull << 28) : 0);
+            if (d != 31) regs_[d] = v;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC1F) == 0xD513421F) { // MSR NZCV,Xn (desempacota)
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            uint64_t v = (n == 31) ? 0 : regs_[n];
+            flag_n_ = ((v >> 31) & 1u) != 0;
+            flag_z_ = ((v >> 30) & 1u) != 0;
+            flag_c_ = ((v >> 29) & 1u) != 0;
+            flag_v_ = ((v >> 28) & 1u) != 0;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
         if ((insn & 0xFFFFFFE0) == 0xD53BD040) { // MRS Xd,TPIDR_EL0 (TLS)
             int d = static_cast<int>(dec.rd);
             if (d != 31) regs_[d] = tpidr_;
@@ -308,7 +328,7 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFFFFFE0) == 0xD51BD040) { // MSR TPIDR_EL0,Xn
+        if ((insn & 0xFFFFFC1F) == 0xD51BD01F) { // MSR TPIDR_EL0,Xn
             int n = static_cast<int>((insn >> 5) & 0x1F);
             tpidr_ = (n == 31) ? 0 : regs_[n];
             pc_ += 4;

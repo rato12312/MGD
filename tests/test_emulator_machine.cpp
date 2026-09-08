@@ -407,7 +407,7 @@ bool run_emulator_machine_tests() {
     {
         emu::Cpu cpu;
         cpu.setReg(5, 0xCAFE);
-        ASSERT_MSG(cpu.step(0xD51BD0A0u), "msr tpidr_el0,x5");
+        ASSERT_MSG(cpu.step(0xD51BD0BFu), "msr tpidr_el0,x5");
         cpu.setReg(5, 0);
         ASSERT_MSG(cpu.step(0xD53BD040u), "mrs x0,tpidr_el0");
         ASSERT_MSG(cpu.reg(0) == 0xCAFE, "tls certo");
@@ -2408,6 +2408,19 @@ bool run_emulator_machine_tests() {
         bad.info = 999;
         ASSERT_MSG(!emu::applyRelativeRelocs(image.data(), image.size(), &bad, 1, 0x1000, nullptr),
                    "tipo estranho nega");
+    }
+
+    // NZCV empacota e desempacota.
+    {
+        emu::Cpu cpu;
+        cpu.setReg(0, 0);
+        cpu.setReg(1, 0);
+        ASSERT_MSG(cpu.step(0xF100001Fu), "subs z=1,c=1");
+        ASSERT_MSG(cpu.step(0xD53B4200u), "mrs x0,nzcv");
+        ASSERT_MSG(cpu.reg(0) == 0x60000000ull, "Z+C empacotados");
+        ASSERT_MSG(cpu.step(0xD513423Fu), "msr nzcv,x1 (zero)");
+        ASSERT_MSG(cpu.step(0xD53B4201u), "mrs x1,nzcv");
+        ASSERT_MSG(cpu.reg(1) == 0, "limpo");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
