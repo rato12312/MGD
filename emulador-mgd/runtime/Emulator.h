@@ -82,6 +82,9 @@ public:
     }
 
     uint64_t runCpu(uint64_t maxSteps) { return cpu_.run(maxSteps); }
+    uint64_t runThreads(uint64_t maxSteps, uint64_t quantum = 4) {
+        return kernel_.runThreads(cpu_, maxSteps, quantum);
+    }
 
     // Boot de NRO: mapeia, aponta SP, pula no entry. Retorna false se inválido.
     bool bootNro(const uint8_t* blob, size_t len, uint64_t base = 0, uint64_t sp = 0x8000) {

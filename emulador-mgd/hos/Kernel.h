@@ -10,6 +10,8 @@
 
 #include "../ram/Mmu.h"
 #include "ApmService.h"
+#include "AppletService.h"
+#include "AccService.h"
 #include "AudService.h"
 #include "FatalService.h"
 #include "FsService.h"
@@ -138,6 +140,8 @@ public:
         services_.publish("time:u");  // relógio
         services_.publish("apm");     // performance (handheld)
         services_.publish("psm");     // bateria
+        services_.publish("acc:u");   // conta
+        services_.publish("appletOE"); // applet manager
         services_.publish("lbl:u");   // brilho
         services_.publish("set:sys"); // idioma/região
         services_.publish("fatal:u"); // erros registrados
@@ -161,6 +165,8 @@ public:
             else if (name == "hid:u") understood = hid_.dispatch(req, rep);
             else if (name == "time:u") understood = time_.dispatch(req, rep);
             else if (name == "apm") understood = apm_.dispatch(req, rep);
+            else if (name == "acc:u") understood = acc_.dispatch(req, rep);
+            else if (name == "appletOE") understood = applet_.dispatch(req, rep);
             else if (name == "psm") understood = psm_.dispatch(req, rep);
             else if (name == "lbl:u") understood = lbl_.dispatch(req, rep);
             else if (name == "set:sys") understood = set_.dispatch(req, rep);
@@ -177,6 +183,8 @@ public:
     HidService& hid() { return hid_; }
     TimeService& time() { return time_; }
     ApmService& apm() { return apm_; }
+    AccService& acc() { return acc_; }
+    AppletService& applet() { return applet_; }
     PsmService& psm() { return psm_; }
     LblService& lbl() { return lbl_; }
     SetService& set() { return set_; }
@@ -286,6 +294,8 @@ private:
     HidService hid_;
     TimeService time_;
     ApmService apm_;
+    AccService acc_;
+    AppletService applet_;
     PsmService psm_;
     LblService lbl_;
     SetService set_;

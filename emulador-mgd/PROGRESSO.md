@@ -1,19 +1,19 @@
 # Emulador MGD — progresso (só Odyssey)
 
-Regra: % sempre. Cálculo honesto por área.
+Regra: % sempre. Plano: 5 etapas de 20%.
 
-## Placar (~12%)
-- CPU inteira 64-bit: ~85% (ALU, shifts, bitfield, mult/div, branches, pilha)
-- CPU inteira 32-bit: ~80% (ALU, shifts, bitfield, mult/div)
-- CPU FP escalar (D+S): ~70% (aritmética, conversão, cmp, select)
-- NEON vetorial: ~15% (FADD/SUB/MUL/DIV/MAX/MIN/CMP/MLA int+FP .2D/.4S, ORR, BSL, LDR/STR Q)
-- MMU: ~20% (regiões + R/W/X + alias, sem paginação)
-- SVC/HOS núcleo: ~12% (heap, query, map, perm, threads, sleep, eventos, mutex)
-- Serviços: stubs honestos (sm, nvdrv, vi, audren, fsp, hid, time, apm, psm, lbl, set, fatal, pm)
-- Loaders: NRO, NSO+LZ4, PFS0, RomFS, sonda NCA (sem descripto)
-- Cripto: AES-ECB/CTR/CMAC + SHA-256 (com NIST)
-- GPU execução: ~3% (fila + fence + dreno nulo)
-- Mundo/painter: mapa mental + DNA + LOD + preset barato + PPM
+## Placar (~14%)
+- Etapa 1 — fundação executável: CPU+MMU+threads+HOS amarrados (feito)
+- Etapa 2 — serviços de boot: acc/applet/pm/sm/nv/vi/aud/fs/hid/time (feito)
+- Etapa 3 — dados do jogo: NRO/NSO/PFS0/RomFS+subdir, AES/SHA (feito)
+- Etapa 4 — GPU recebe: submit+fence+dreno+bytes guardados (iniciado)
+- Etapa 5 — integração e medida: frame+fps+preset (iniciado)
+
+## Detalhe por área
+- CPU inteira 64-bit: ~85%. 32-bit: ~80%. FP escalar: ~70%.
+- NEON vetorial: ~18%. MMU: ~20%. SVC/HOS: ~15%.
+- Loaders: ~60%. Cripto: pronta. GPU execução: ~4%.
+- Mundo/painter: mapa mental + DNA + LOD + preset + PPM.
 
 ## Para rodar o Odyssey falta (ordem)
 1. NEON inteiro completo (8H/4S/16B em tudo) + resto FP

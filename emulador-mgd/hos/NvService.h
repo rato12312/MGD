@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <unordered_map>
+#include <vector>
 
 #include "Session.h"
 
@@ -55,6 +56,13 @@ public:
                 return true;
             }
             pending_.push_back(Pending{id, next_fence_++});
+            if (req.payload.size() > 4) {
+                // Guarda os bytes do command buffer (teto 64KiB) p/ decoder futuro.
+                size_t n = req.payload.size() - 4;
+                if (n > 65536) n = 65536;
+                last_submit_.assign(req.payload.begin() + 4, req.payload.begin() + 4 + n);
+                submit_count_++;
+            }
             rep.cmd = 1;
             uint32_t f = next_fence_ - 1;
             rep.payload = {static_cast<uint8_t>(f & 0xFF),
@@ -113,6 +121,8 @@ public:
 
     size_t channelCount() const { return channels_.size(); }
     size_t pendingCount() const { return pending_.size(); }
+    uint64_t submitCount() const { return submit_count_; }
+    const std::vector<uint8_t>& lastSubmit() const { return last_submit_; }
 
 private:
     static uint32_t rd32(const std::vector<uint8_t>& v, size_t o) {
@@ -127,6 +137,8 @@ private:
     };
     std::unordered_map<uint32_t, uint32_t> channels_;
     std::vector<Pending> pending_;
+    std::vector<uint8_t> last_submit_;
+    uint64_t submit_count_ = 0;
     uint32_t next_channel_ = 1;
     uint32_t next_fence_ = 1;
     uint32_t completed_fence_ = 0;

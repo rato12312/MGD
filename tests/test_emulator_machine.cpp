@@ -25,6 +25,8 @@
 #include "emulador-mgd/hos/ViService.h"
 #include "emulador-mgd/hos/AudService.h"
 #include "emulador-mgd/hos/ApmService.h"
+#include "emulador-mgd/hos/AccService.h"
+#include "emulador-mgd/hos/AppletService.h"
 #include "emulador-mgd/hos/FatalService.h"
 #include "emulador-mgd/hos/FsService.h"
 #include "emulador-mgd/hos/Event.h"
@@ -1292,6 +1294,8 @@ bool run_emulator_machine_tests() {
             hos::IpcMessage sr;
             ASSERT_MSG(nv.dispatch(s, sr) && sr.cmd == 1, "submit fila");
         }
+        ASSERT_MSG(nv.submitCount() >= 1, "submits com bytes contados");
+        ASSERT_MSG(!nv.lastSubmit().empty(), "bytes guardados");
         ASSERT_MSG(nv.drain(2) == 2, "drenou 2");
         ASSERT_MSG(nv.pendingCount() == 1, "resta 1");
         ASSERT_MSG(nv.drain(8) == 1, "drena o resto");
@@ -1668,9 +1672,9 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(fatal.lastFatal() == 0xBEEF, "codigo certo");
     }
 
-    // RomFS sintético: lista raiz e lê arquivo.
+    // RomFS sintético: raiz + subdir, lista e lê.
     {
-        std::vector<uint8_t> blob(0xA8, 0);
+        std::vector<uint8_t> blob(0xD3, 0);
         auto w32 = [&](size_t off, uint32_t v) {
             for (int i = 0; i < 4; i++) blob[off + i] = static_cast<uint8_t>(v >> (8 * i));
         };
@@ -1678,31 +1682,54 @@ bool run_emulator_machine_tests() {
             for (int i = 0; i < 8; i++) blob[off + i] = static_cast<uint8_t>(v >> (8 * i));
         };
         w32(0x0C, 0x50); // dir table
-        w32(0x10, 0x18);
-        w32(0x1C, 0x80); // file table
-        w32(0x20, 0x25);
-        w64(0x24, 0xA5); // dados
-        // root @0x50: file -> 0x80
-        w32(0x50 + 0x04, 0xFFFFFFFFu); // sibling
-        w32(0x50 + 0x08, 0xFFFFFFFFu); // child
-        w32(0x50 + 0x0C, 0x80);        // file
-        // file0 @0x80: "a.txt", dados em 0, tamanho 3
-        w32(0x80 + 0x00, 0x50); // parent
-        w32(0x80 + 0x04, 0xFFFFFFFFu);
-        w64(0x80 + 0x08, 0);
-        w64(0x80 + 0x10, 3);
-        w32(0x80 + 0x1C, 5);
-        blob[0xA0] = 'a'; blob[0xA1] = '.'; blob[0xA2] = 't';
-        blob[0xA3] = 'x'; blob[0xA4] = 't';
-        blob[0xA5] = 7; blob[0xA6] = 8; blob[0xA7] = 9;
+        w32(0x10, 0x34);
+        w32(0x1C, 0x84); // file table
+        w32(0x20, 0x4A);
+        w64(0x24, 0xCE); // dados
+        // root @0x50: file -> 0x84, child -> 0x68
+        w32(0x50 + 0x04, 0xFFFFFFFFu);
+        w32(0x50 + 0x08, 0x68);
+        w32(0x50 + 0x0C, 0x84);
+        // sub @0x68 "data": file -> 0xA9
+        w32(0x68 + 0x00, 0x50);
+        w32(0x68 + 0x04, 0xFFFFFFFFu);
+        w32(0x68 + 0x08, 0xFFFFFFFFu);
+        w32(0x68 + 0x0C, 0xA9);
+        w32(0x68 + 0x14, 4);
+        blob[0x80] = 'd'; blob[0x81] = 'a'; blob[0x82] = 't'; blob[0x83] = 'a';
+        // file0 @0x84 "a.txt", dados em 0, tam 3
+        w32(0x84 + 0x00, 0x50);
+        w32(0x84 + 0x04, 0xFFFFFFFFu);
+        w64(0x84 + 0x08, 0);
+        w64(0x84 + 0x10, 3);
+        w32(0x84 + 0x1C, 5);
+        blob[0xA4] = 'a'; blob[0xA5] = '.'; blob[0xA6] = 't';
+        blob[0xA7] = 'x'; blob[0xA8] = 't';
+        // file1 @0xA9 "b.bin" no sub, dados em 3, tam 2
+        w32(0xA9 + 0x00, 0x68);
+        w32(0xA9 + 0x04, 0xFFFFFFFFu);
+        w64(0xA9 + 0x08, 3);
+        w64(0xA9 + 0x10, 2);
+        w32(0xA9 + 0x1C, 5);
+        blob[0xC9] = 'b'; blob[0xCA] = '.'; blob[0xCB] = 'b';
+        blob[0xCC] = 'i'; blob[0xCD] = 'n';
+        // dados @0xCE: {7,8,9} + {1,2}
+        blob[0xCE] = 7; blob[0xCF] = 8; blob[0xD0] = 9;
+        blob[0xD1] = 1; blob[0xD2] = 2;
         emu::RomFsReader rom;
         ASSERT_MSG(rom.open(blob.data(), blob.size()), "romfs abriu");
         std::vector<std::string> names = rom.listRoot();
         ASSERT_MSG(names.size() == 1 && names[0] == "a.txt", "lista raiz");
         std::vector<uint8_t> data;
-        ASSERT_MSG(rom.readRootFile("a.txt", data), "leu arquivo");
-        ASSERT_MSG(data.size() == 3 && data[0] == 7 && data[2] == 9, "bytes certos");
-        ASSERT_MSG(!rom.readRootFile("nada", data), "inexistente nega");
+        ASSERT_MSG(rom.readRootFile("a.txt", data), "leu raiz");
+        ASSERT_MSG(data.size() == 3 && data[0] == 7 && data[2] == 9, "bytes raiz");
+        std::vector<std::string> sub = rom.listSubdir("data");
+        ASSERT_MSG(sub.size() == 1 && sub[0] == "b.bin", "lista sub");
+        std::vector<uint8_t> data2;
+        ASSERT_MSG(rom.readSubFile("data", "b.bin", data2), "leu sub");
+        ASSERT_MSG(data2.size() == 2 && data2[0] == 1 && data2[1] == 2, "bytes sub");
+        ASSERT_MSG(rom.listSubdir("nada").empty(), "subdir ruim vazio");
+        ASSERT_MSG(!rom.readSubFile("data", "nada", data2), "arq ruim nega");
     }
 
     // PFS0 sintético: 2 arquivos entram e saem intactos.
@@ -2536,6 +2563,54 @@ bool run_emulator_machine_tests() {
         emu::Cpu cpu;
         ASSERT_MSG(cpu.step(0xD53B4220u), "mrs x0,currentel");
         ASSERT_MSG(cpu.reg(0) == 4, "EL1");
+    }
+
+    // Emulador roda threads: main cria worker, worker marca, ambos saem.
+    {
+        emu::Emulator emu;
+        // main @0: CreateThread(entry 0x40, sp 0x9000), SVC#0
+        std::vector<uint32_t> main = {
+            0xD2800801u, // MOVZ X1, #0x40
+            0xD2920002u, // MOVZ X2, #0x9000
+            0xD4000101u, // SVC #8 CreateThread
+            0xD4000001u, // SVC#0
+        };
+        ASSERT_MSG(emu.loadProgram(main, 0), "main cabe");
+        // worker @0x40: X0=0x100 base, X2=0xB marcador, STR, SVC#0
+        auto poke = [&](uint64_t addr, uint32_t insn) {
+            for (int i = 0; i < 4; i++)
+                emu.cpu().ram()[addr + i] = static_cast<uint8_t>(insn >> (8 * i));
+        };
+        poke(0x40, 0xD2802000u); // MOVZ X0, #0x100
+        poke(0x44, 0xD2800162u); // MOVZ X2, #0xB
+        poke(0x48, 0xF8000002u); // STR X2, [X0]
+        poke(0x4C, 0xD4000001u); // SVC#0
+        emu.cpu().setSp(0x8000);
+        emu.cpu().setPc(0);
+        ASSERT_MSG(emu.runCpu(8) == 4, "main criou");
+        ASSERT_MSG(emu.kernel().scheduler().pending() == 1, "worker na fila");
+        ASSERT_MSG(emu.runThreads(32, 8) == 4, "worker rodou 4");
+        uint64_t mark = 0;
+        for (int i = 0; i < 8; i++)
+            mark |= static_cast<uint64_t>(emu.cpu().ram()[0x100 + i]) << (8 * i);
+        ASSERT_MSG(mark == 0xB, "worker marcou");
+        ASSERT_MSG(emu.kernel().scheduler().pending() == 0, "fila vazia");
+    }
+
+    // Conta (1 usuário) + applet (self id 1).
+    {
+        hos::AccService acc;
+        hos::AppletService applet;
+        hos::IpcMessage g;
+        hos::IpcMessage r;
+        g.cmd = 1;
+        ASSERT_MSG(acc.dispatch(g, r) && r.cmd == 1, "conta veio");
+        ASSERT_MSG(!r.payload.empty() && r.payload[0] == 1, "1 usuario");
+        hos::IpcMessage a;
+        hos::IpcMessage ar;
+        a.cmd = 1;
+        ASSERT_MSG(applet.dispatch(a, ar) && ar.cmd == 1, "applet veio");
+        ASSERT_MSG(!ar.payload.empty() && ar.payload[0] == 1, "self id 1");
     }
 
     std::cout << "  Emulator machine tests passed!" << std::endl;
