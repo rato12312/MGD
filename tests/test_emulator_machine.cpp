@@ -1731,6 +1731,11 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(data2.size() == 2 && data2[0] == 1 && data2[1] == 2, "bytes sub");
         ASSERT_MSG(rom.listSubdir("nada").empty(), "subdir ruim vazio");
         ASSERT_MSG(!rom.readSubFile("data", "nada", data2), "arq ruim nega");
+        ASSERT_MSG(rom.indexSize() == 2, "indice tem 2");
+        std::vector<uint8_t> data3;
+        ASSERT_MSG(rom.readIndexed("data/b.bin", data3), "indice le");
+        ASSERT_MSG(data3.size() == 2 && data3[0] == 1, "indice certo");
+        ASSERT_MSG(rom.readIndexed("a.txt", data3) && data3[0] == 7, "indice raiz");
     }
 
     // PFS0 sintético: 2 arquivos entram e saem intactos.

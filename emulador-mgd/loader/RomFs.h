@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace mgd {
@@ -31,6 +32,7 @@ public:
         if (dir_tab_off_ + dir_tab_size_ > len) return false;
         if (file_tab_off_ + file_tab_size_ > len) return false;
         if (data_off_ > len) return false;
+        buildIndex(); // mapa mental: caminho -> entrada (O(1) depois)
         return true;
     }
 
@@ -134,6 +136,29 @@ public:
     }
 
 private:
+    // Indexa tudo recursivamente: "a/b/f" -> entrada do arquivo.
+    void buildIndex() {
+        index_.clear();
+        indexDir(dir_tab_off_, "");
+    }
+    void indexDir(uint32_t dir, const std::string& prefix) {
+        uint32_t file = rd32(dir + 0x0C);
+        size_t guard = 0;
+        while (file != 0xFFFFFFFFu && guard < 100000) {
+            guard++;
+            index_[prefix + fileName(file)] = file;
+            file = rd32(file + 0x04);
+        }
+        uint32_t child = rd32(dir + 0x08);
+        guard = 0;
+        while (child != 0xFFFFFFFFu && guard < 100000) {
+            guard++;
+            std::string sub = prefix.empty() ? dirName(child) : prefix + "/" + dirName(child);
+            indexDir(child, sub + "/");
+            child = rd32(child + 0x04);
+        }
+    }
+
     // Acha diretório por caminho "a/b": anda child/sibling a partir da raiz.
     uint32_t findDir(const std::string& path) const {
         uint32_t dir = dir_tab_off_; // raiz
@@ -200,6 +225,21 @@ private:
     uint32_t dir_hash_off_ = 0, dir_tab_off_ = 0, dir_tab_size_ = 0;
     uint32_t file_hash_off_ = 0, file_tab_off_ = 0, file_tab_size_ = 0;
     uint64_t data_off_ = 0;
+    std::unordered_map<std::string, uint32_t> index_; // caminho -> entrada
+
+public:
+    size_t indexSize() const { return index_.size(); }
+    // Leitura pelo índice (O(1)); cai no walk se faltar.
+    bool readIndexed(const std::string& path, std::vector<uint8_t>& out) const {
+        auto it = index_.find(path);
+        if (it == index_.end()) return readPath(path, out);
+        uint32_t file = it->second;
+        uint64_t doff = rd64(file + 0x08);
+        uint64_t dsize = rd64(file + 0x10);
+        if (data_off_ + doff + dsize > len_) return false;
+        out.assign(blob_ + data_off_ + doff, blob_ + data_off_ + doff + dsize);
+        return true;
+    }
 };
 
 } // namespace emu
