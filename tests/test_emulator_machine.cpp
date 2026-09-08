@@ -2280,6 +2280,26 @@ bool run_emulator_machine_tests() {
         ASSERT_MSG(cpu.reg(1) == 5, "sw 5");
     }
 
+    // STP/LDP Q com índice (pilha de 128).
+    {
+        emu::Cpu cpu;
+        cpu.setSp(0x1000);
+        for (int i = 0; i < 16; i++) cpu.ram()[0x100 + i] = static_cast<uint8_t>(0xA0 + i);
+        cpu.setReg(1, 0x100);
+        ASSERT_MSG(cpu.step(0x3DC00020u), "ldr q0");
+        ASSERT_MSG(cpu.step(0x3DC00421u), "ldr q1");
+        ASSERT_MSG(cpu.step(0xADBF07E0u), "stp q0,q1,[sp,#-32]!");
+        ASSERT_MSG(cpu.sp() == 0xFE0, "sp desceu 32");
+        ASSERT_MSG(cpu.step(0xACC10FE2u), "ldp q2,q3,[sp],#32");
+        ASSERT_MSG(cpu.sp() == 0x1000, "sp voltou");
+        ASSERT_MSG(cpu.step(0xD2804004u), "movz x4,#0x200");
+        ASSERT_MSG(cpu.step(0x3D800082u), "str q2,[x4]");
+        bool ok = true;
+        for (int i = 0; i < 16; i++)
+            ok = ok && (cpu.ram()[0x200 + i] == static_cast<uint8_t>(0xA0 + i));
+        ASSERT_MSG(ok, "128 da pilha intactos");
+    }
+
     std::cout << "  Emulator machine tests passed!" << std::endl;
     return true;
 }
