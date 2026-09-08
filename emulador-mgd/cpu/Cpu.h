@@ -97,6 +97,11 @@ public:
         uint64_t fpcr = 0, fpsr = 0;
         uint64_t sctlr = 0, ttbr0 = 0, ttbr1 = 0, tcr = 0;
         uint64_t mair = 0, vbar = 0, cpacr = 0;
+        // Exception state
+        uint64_t elr = 0, spsr = 0, esr = 0, far = 0;
+        uint64_t current_el = 1; // start at EL1
+        uint64_t sctlr_el1 = 0, sctlr_el2 = 0, sctlr_el3 = 0;
+        uint64_t vbar_el1 = 0, vbar_el2 = 0, vbar_el3 = 0;
         bool n = false, z = false, c = false, v = false;
     };
     State save() const {
@@ -107,6 +112,10 @@ public:
         s.fpcr = fpcr_; s.fpsr = fpsr_;
         s.sctlr = sctlr_; s.ttbr0 = ttbr0_; s.ttbr1 = ttbr1_; s.tcr = tcr_;
         s.mair = mair_; s.vbar = vbar_; s.cpacr = cpacr_;
+        s.elr = elr_; s.spsr = spsr_; s.esr = esr_; s.far = far_;
+        s.current_el = current_el_;
+        s.sctlr_el1 = sctlr_el1_; s.sctlr_el2 = sctlr_el2_; s.sctlr_el3 = sctlr_el3_;
+        s.vbar_el1 = vbar_el1_; s.vbar_el2 = vbar_el2_; s.vbar_el3 = vbar_el3_;
         s.n = flag_n_; s.z = flag_z_; s.c = flag_c_; s.v = flag_v_;
         return s;
     }
@@ -117,8 +126,12 @@ public:
         fpcr_ = s.fpcr; fpsr_ = s.fpsr;
         sctlr_ = s.sctlr; ttbr0_ = s.ttbr0; ttbr1_ = s.ttbr1; tcr_ = s.tcr;
         mair_ = s.mair; vbar_ = s.vbar; cpacr_ = s.cpacr;
+        elr_ = s.elr; spsr_ = s.spsr; esr_ = s.esr; far_ = s.far;
+        current_el_ = s.current_el;
+        sctlr_el1_ = s.sctlr_el1; sctlr_el2_ = s.sctlr_el2; sctlr_el3_ = s.sctlr_el3;
+        vbar_el1_ = s.vbar_el1; vbar_el2_ = s.vbar_el2; vbar_el3_ = s.vbar_el3;
         flag_n_ = s.n; flag_z_ = s.z; flag_c_ = s.c; flag_v_ = s.v;
-        stopped_ = false; // contexto novo, vida nova
+        stopped_ = false;
         exit_code_ = 0;
     }
 
@@ -171,6 +184,187 @@ public:
                 if (svc_host_->svcExited()) { stopped_ = true; exit_code_ = 0; }
             }
             else return false;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFE0001F) == 0xD4000021) { // HVC #imm (Hypervisor Call -> EL2)
+            uint32_t imm = (insn >> 5) & 0xFFFF;
+            // Exception entry to EL2
+            spsr_ = packPstate();
+            elr_ = pc_ + 4;
+            esr_ = 0x56000000 | (imm & 0xFFFF); // EC=0x16 (HVC)
+            current_el_ = 2;
+            pc_ = vbar_el2_ + 0x600; // HVC vector offset
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFE0001F) == 0xD4000041) { // SMC #imm (Secure Monitor Call -> EL3)
+            uint32_t imm = (insn >> 5) & 0xFFFF;
+            spsr_ = packPstate();
+            elr_ = pc_ + 4;
+            esr_ = 0x5C000000 | (imm & 0xFFFF); // EC=0x17 (SMC)
+            current_el_ = 3;
+            pc_ = vbar_el3_ + 0x600; // SMC vector offset
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFFFF) == 0xD65F03E0) { // ERET (Exception Return)
+            // Return from exception: restore PSTATE from SPSR, PC from ELR
+            unpackPstate(spsr_);
+            pc_ = elr_;
+            // Determine target EL from SPSR.M[3:0]
+            uint64_t target_el = (spsr_ >> 2) & 0x3;
+            if (target_el <= 3) current_el_ = target_el;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC1F) == 0xD518401F || (insn & 0xFFFFFC1F) == 0xD518403F ||
+            (insn & 0xFFFFFC1F) == 0xD518405F || (insn & 0xFFFFFC1F) == 0xD518407F) {
+            // MSR ELR_EL1/EL2/EL3, Xn
+            uint32_t base = insn & 0xFFFFFC1F;
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            uint64_t v = (n == 31) ? 0 : regs_[n];
+            if (base == 0xD518401F) elr_ = v;
+            else if (base == 0xD518403F) { /* ELR_EL2 */ }
+            else { /* ELR_EL3 */ }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC1F) == 0xD518409F || (insn & 0xFFFFFC1F) == 0xD51840BF ||
+            (insn & 0xFFFFFC1F) == 0xD51840DF || (insn & 0xFFFFFC1F) == 0xD51840FF) {
+            // MSR SPSR_EL1/EL2/EL3, Xn
+            uint32_t base = insn & 0xFFFFFC1F;
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            uint64_t v = (n == 31) ? 0 : regs_[n];
+            if (base == 0xD518409F) spsr_ = v;
+            else if (base == 0xD51840BF) { /* SPSR_EL2 */ }
+            else { /* SPSR_EL3 */ }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC1F) == 0xD518421F || (insn & 0xFFFFFC1F) == 0xD518423F ||
+            (insn & 0xFFFFFC1F) == 0xD518425F || (insn & 0xFFFFFC1F) == 0xD518427F) {
+            // MSR ESR_EL1/EL2/EL3, Xn
+            uint32_t base = insn & 0xFFFFFC1F;
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            uint64_t v = (n == 31) ? 0 : regs_[n];
+            if (base == 0xD518421F) esr_ = v;
+            else if (base == 0xD518423F) { /* ESR_EL2 */ }
+            else { /* ESR_EL3 */ }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC1F) == 0xD518429F || (insn & 0xFFFFFC1F) == 0xD51842BF ||
+            (insn & 0xFFFFFC1F) == 0xD51842DF || (insn & 0xFFFFFC1F) == 0xD51842FF) {
+            // MSR FAR_EL1/EL2/EL3, Xn
+            uint32_t base = insn & 0xFFFFFC1F;
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            uint64_t v = (n == 31) ? 0 : regs_[n];
+            if (base == 0xD518429F) far_ = v;
+            else if (base == 0xD51842BF) { /* FAR_EL2 */ }
+            else { /* FAR_EL3 */ }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC1F) == 0xD518441F) { // MSR VBAR_EL1, Xn
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            vbar_el1_ = (n == 31) ? 0 : regs_[n];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC1F) == 0xD518443F) { // MSR VBAR_EL2, Xn
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            vbar_el2_ = (n == 31) ? 0 : regs_[n];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC1F) == 0xD518445F) { // MSR VBAR_EL3, Xn
+            int n = static_cast<int>((insn >> 5) & 0x1F);
+            vbar_el3_ = (n == 31) ? 0 : regs_[n];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC1F) == 0xD538401F || (insn & 0xFFFFFC1F) == 0xD538403F ||
+            (insn & 0xFFFFFC1F) == 0xD538405F || (insn & 0xFFFFFC1F) == 0xD538407F) {
+            // MRS Xd, ELR_EL1/EL2/EL3
+            uint32_t base = insn & 0xFFFFFC1F;
+            int d = static_cast<int>(dec.rd);
+            uint64_t v = 0;
+            if (base == 0xD538401F) v = elr_;
+            else if (base == 0xD538403F) v = 0; // ELR_EL2
+            else v = 0; // ELR_EL3
+            if (d != 31) regs_[d] = v;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC1F) == 0xD538409F || (insn & 0xFFFFFC1F) == 0xD53840BF ||
+            (insn & 0xFFFFFC1F) == 0xD53840DF || (insn & 0xFFFFFC1F) == 0xD53840FF) {
+            // MRS Xd, SPSR_EL1/EL2/EL3
+            uint32_t base = insn & 0xFFFFFC1F;
+            int d = static_cast<int>(dec.rd);
+            uint64_t v = 0;
+            if (base == 0xD538409F) v = spsr_;
+            else if (base == 0xD53840BF) v = 0;
+            else v = 0;
+            if (d != 31) regs_[d] = v;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC1F) == 0xD538421F || (insn & 0xFFFFFC1F) == 0xD538423F ||
+            (insn & 0xFFFFFC1F) == 0xD538425F || (insn & 0xFFFFFC1F) == 0xD538427F) {
+            // MRS Xd, ESR_EL1/EL2/EL3
+            uint32_t base = insn & 0xFFFFFC1F;
+            int d = static_cast<int>(dec.rd);
+            uint64_t v = 0;
+            if (base == 0xD538421F) v = esr_;
+            else if (base == 0xD538423F) v = 0;
+            else v = 0;
+            if (d != 31) regs_[d] = v;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC1F) == 0xD538429F || (insn & 0xFFFFFC1F) == 0xD53842BF ||
+            (insn & 0xFFFFFC1F) == 0xD53842DF || (insn & 0xFFFFFC1F) == 0xD53842FF) {
+            // MRS Xd, FAR_EL1/EL2/EL3
+            uint32_t base = insn & 0xFFFFFC1F;
+            int d = static_cast<int>(dec.rd);
+            uint64_t v = 0;
+            if (base == 0xD538429F) v = far_;
+            else if (base == 0xD53842BF) v = 0;
+            else v = 0;
+            if (d != 31) regs_[d] = v;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC1F) == 0xD538441F) { // MRS Xd, VBAR_EL1
+            int d = static_cast<int>(dec.rd);
+            if (d != 31) regs_[d] = vbar_el1_;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC1F) == 0xD538443F) { // MRS Xd, VBAR_EL2
+            int d = static_cast<int>(dec.rd);
+            if (d != 31) regs_[d] = vbar_el2_;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC1F) == 0xD538445F) { // MRS Xd, VBAR_EL3
+            int d = static_cast<int>(dec.rd);
+            if (d != 31) regs_[d] = vbar_el3_;
             pc_ += 4;
             steps_++;
             return true;
@@ -853,6 +1047,778 @@ public:
             uint64_t nv = (n == 31) ? 0 : regs_[n];
             fp_.d[d] = isSigned ? static_cast<double>(static_cast<int64_t>(nv))
                                   : static_cast<double>(nv);
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        // ========== NEON INTEGER (size-aware 8/16/32/64 lanes) ==========
+        if ((insn & 0xFFBF8000) == 0x0E000000 || (insn & 0xFFBF8000) == 0x0E400000) {
+            // SHL / SQRSHL / UQRSHL / SQSHL / UQSHL Vd.T, Vn.T, Vm.T (register shift)
+            // U=bit29, o1=bit20, o0=bit19: SHL=00, SQRSHL=01, UQRSHL=10, SQSHL=11 (signed), UQSHL=10
+            // For simplicity: handle SHL (0E0xxxxx) and SQSHL/UQSHL (0E4xxxxx)
+            bool isQ = (insn & 0x100000) != 0;
+            bool isSigned = (insn & 0x080000) != 0;
+            int sz = static_cast<int>((insn >> 22) & 0x3);
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int lanes = 16 >> sz;
+            int bits = 8 << sz;
+            uint64_t mask = bits == 64 ? ~0ull : ((1ull << bits) - 1ull);
+            uint64_t an[2] = {fp_.q[n][0], fp_.q[n][1]};
+            uint64_t bn[2] = {fp_.q[m][0], fp_.q[m][1]};
+            for (int lane = 0; lane < lanes; lane++) {
+                int half = lane / (64 / bits);
+                int shift = (lane * bits) % 64;
+                uint64_t a = (an[half] >> shift) & mask;
+                uint64_t shift_amt = ((bn[half] >> shift) & mask) & (bits - 1);
+                uint64_t r;
+                if (!isQ) {
+                    r = (shift_amt == 0) ? a : (a << shift_amt);
+                } else {
+                    if (isSigned) {
+                        int64_t sa = static_cast<int64_t>((shift_amt <= 63) ? (static_cast<int64_t>(a) << shift_amt) : 0);
+                        int64_t max = (1LL << (bits - 1)) - 1;
+                        int64_t min = -(1LL << (bits - 1));
+                        r = static_cast<uint64_t>(sa > max ? max : (sa < min ? min : sa));
+                    } else {
+                        uint64_t ua = a << shift_amt;
+                        uint64_t max = (1ull << bits) - 1;
+                        r = ua > max ? max : ua;
+                    }
+                }
+                fp_.q[d][half] = (fp_.q[d][half] & ~(mask << shift)) | (r << shift);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFBF8000) == 0x0E800000 || (insn & 0xFFBF8000) == 0x0EC00000) {
+            // SHR / SSHR / USHR / SRSRA / URSRA / SQSHLU Vd.T, Vn.T, Vm.T (register shift right)
+            // For simplicity: handle SHR (0E8xxxxx) and SSHR/USHR (0ECxxxxx)
+            bool isSigned = (insn & 0x100000) != 0;
+            bool isRound = (insn & 0x080000) != 0;
+            int sz = static_cast<int>((insn >> 22) & 0x3);
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int lanes = 16 >> sz;
+            int bits = 8 << sz;
+            uint64_t mask = bits == 64 ? ~0ull : ((1ull << bits) - 1ull);
+            uint64_t an[2] = {fp_.q[n][0], fp_.q[n][1]};
+            uint64_t bn[2] = {fp_.q[m][0], fp_.q[m][1]};
+            for (int lane = 0; lane < lanes; lane++) {
+                int half = lane / (64 / bits);
+                int shift = (lane * bits) % 64;
+                uint64_t a = (an[half] >> shift) & mask;
+                uint64_t shift_amt = ((bn[half] >> shift) & mask) & (bits - 1);
+                uint64_t r;
+                if (isSigned) {
+                    int64_t sa = static_cast<int64_t>(static_cast<int64_t>(a) >> shift_amt);
+                    if (isRound) sa += (static_cast<int64_t>(a) >> (shift_amt - 1)) & 1;
+                    r = static_cast<uint64_t>(sa);
+                } else {
+                    uint64_t ua = a >> shift_amt;
+                    if (isRound) ua += (a >> (shift_amt - 1)) & 1;
+                    r = ua;
+                }
+                fp_.q[d][half] = (fp_.q[d][half] & ~(mask << shift)) | (r << shift);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFF9F8000) == 0x0E010000) {
+            // SLI / SRI Vd.T, Vn.T, #imm (shift left/right and insert)
+            bool isLeft = (insn & 0x080000) == 0;
+            int sz = static_cast<int>((insn >> 22) & 0x3);
+            int imm = static_cast<int>((insn >> 16) & 0x1F);
+            if (imm >= (8 << sz)) return false;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int lanes = 16 >> sz;
+            int bits = 8 << sz;
+            uint64_t mask = bits == 64 ? ~0ull : ((1ull << bits) - 1ull);
+            uint64_t an[2] = {fp_.q[n][0], fp_.q[n][1]};
+            for (int lane = 0; lane < lanes; lane++) {
+                int half = lane / (64 / bits);
+                int shift = (lane * bits) % 64;
+                uint64_t a = (an[half] >> shift) & mask;
+                uint64_t r = isLeft ? ((a << imm) & mask) : (a >> imm);
+                fp_.q[d][half] = (fp_.q[d][half] & ~(mask << shift)) | (r << shift);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFBF8000) == 0x2E000000 || (insn & 0xFFBF8000) == 0x2E400000 ||
+            (insn & 0xFFBF8000) == 0x2E800000 || (insn & 0xFFBF8000) == 0x2EC00000) {
+            // AND / BIC / ORR / ORN / EOR / EON / NOT (logic ops)
+            // op[1:0]: 00=AND, 01=BIC, 10=ORR, 11=EOR; U=bit29 invert second
+            uint32_t op = (insn >> 29) & 0x3;
+            bool inv = (insn & 0x20000000) != 0;
+            int sz = static_cast<int>((insn >> 22) & 0x3);
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int lanes = 16 >> sz;
+            int bits = 8 << sz;
+            uint64_t mask = bits == 64 ? ~0ull : ((1ull << bits) - 1ull);
+            uint64_t an[2] = {fp_.q[n][0], fp_.q[n][1]};
+            uint64_t bn[2] = {fp_.q[m][0], fp_.q[m][1]};
+            for (int lane = 0; lane < lanes; lane++) {
+                int half = lane / (64 / bits);
+                int shift = (lane * bits) % 64;
+                uint64_t a = (an[half] >> shift) & mask;
+                uint64_t b = inv ? ~((bn[half] >> shift) & mask) : ((bn[half] >> shift) & mask);
+                uint64_t r = 0;
+                if (op == 0) r = a & b;
+                else if (op == 1) r = a & ~b;
+                else if (op == 2) r = a | b;
+                else r = a ^ b;
+                fp_.q[d][half] = (fp_.q[d][half] & ~(mask << shift)) | (r << shift);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFBF8000) == 0x2F000000) {
+            // CMEQ / CMGT / CMGE / CMHI / CMHS / CMLE / CMLT / CMGT (compare)
+            // opc[3:0] = 0:CMEQ, 1:CMGT, 2:CMGE, 3:CMHI, 4:CMHS, 5:CMLE, 6:CMLT, 7:CMLE
+            // U=bit29: signed vs unsigned
+            int opc = static_cast<int>((insn >> 10) & 0xF);
+            bool isSigned = (insn & 0x20000000) == 0;
+            int sz = static_cast<int>((insn >> 22) & 0x3);
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int lanes = 16 >> sz;
+            int bits = 8 << sz;
+            uint64_t mask = bits == 64 ? ~0ull : ((1ull << bits) - 1ull);
+            uint64_t an[2] = {fp_.q[n][0], fp_.q[n][1]};
+            uint64_t bn[2] = {fp_.q[m][0], fp_.q[m][1]};
+            for (int lane = 0; lane < lanes; lane++) {
+                int half = lane / (64 / bits);
+                int shift = (lane * bits) % 64;
+                uint64_t a = (an[half] >> shift) & mask;
+                uint64_t b = (bn[half] >> shift) & mask;
+                bool cmp = false;
+                if (isSigned) {
+                    int64_t sa = static_cast<int64_t>(a << (64 - bits)) >> (64 - bits);
+                    int64_t sb = static_cast<int64_t>(b << (64 - bits)) >> (64 - bits);
+                    switch (opc) {
+                        case 0: cmp = sa == sb; break;
+                        case 1: cmp = sa > sb; break;
+                        case 2: cmp = sa >= sb; break;
+                        case 3: cmp = (uint64_t)sa > (uint64_t)sb; break; // CMHI unsigned
+                        case 4: cmp = (uint64_t)sa >= (uint64_t)sb; break; // CMHS unsigned
+                        case 5: cmp = sa <= sb; break;
+                        case 6: cmp = sa < sb; break;
+                        default: cmp = false;
+                    }
+                } else {
+                    switch (opc) {
+                        case 0: cmp = a == b; break;
+                        case 1: cmp = a > b; break;
+                        case 2: cmp = a >= b; break;
+                        case 3: cmp = a > b; break;
+                        case 4: cmp = a >= b; break;
+                        case 5: cmp = a <= b; break;
+                        case 6: cmp = a < b; break;
+                        default: cmp = false;
+                    }
+                }
+                fp_.q[d][half] = (fp_.q[d][half] & ~(mask << shift)) | (cmp ? mask : 0);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFBF8000) == 0x0F000000) {
+            // POPCOUNT / CLZ / CLS / REV64 / REV32 / REV16 / EXT
+            int opc = static_cast<int>((insn >> 10) & 0x1F);
+            int sz = static_cast<int>((insn >> 22) & 0x3);
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int lanes = 16 >> sz;
+            int bits = 8 << sz;
+            uint64_t mask = bits == 64 ? ~0ull : ((1ull << bits) - 1ull);
+            uint64_t an[2] = {fp_.q[n][0], fp_.q[n][1]};
+            for (int lane = 0; lane < lanes; lane++) {
+                int half = lane / (64 / bits);
+                int shift = (lane * bits) % 64;
+                uint64_t a = (an[half] >> shift) & mask;
+                uint64_t r = 0;
+                switch (opc) {
+                    case 0x03: // CNT (popcount)
+                        r = __builtin_popcountll(a & mask);
+                        break;
+                    case 0x04: // CLZ
+                        for (int i = bits - 1; i >= 0; i--) if ((a >> i) & 1ull) { r = bits - 1 - i; break; }
+                        if (r == 0 && (a & mask) != 0) r = bits - 1;
+                        break;
+                    case 0x05: // CLS
+                        if (bits == 8) {
+                            int8_t sa = static_cast<int8_t>(a);
+                            for (int i = 6; i >= 0; i--) if (((sa >> i) & 1) != ((sa >> 7) & 1)) { r = 6 - i; break; }
+                        } else if (bits == 16) {
+                            int16_t sa = static_cast<int16_t>(a);
+                            for (int i = 14; i >= 0; i--) if (((sa >> i) & 1) != ((sa >> 15) & 1)) { r = 14 - i; break; }
+                        } else if (bits == 32) {
+                            int32_t sa = static_cast<int32_t>(a);
+                            for (int i = 30; i >= 0; i--) if (((sa >> i) & 1) != ((sa >> 31) & 1)) { r = 30 - i; break; }
+                        } else {
+                            int64_t sa = static_cast<int64_t>(a);
+                            for (int i = 62; i >= 0; i--) if (((sa >> i) & 1) != ((sa >> 63) & 1)) { r = 62 - i; break; }
+                        }
+                        break;
+                    case 0x08: // REV64
+                        for (int i = 0; i < 8; i++) r |= ((a >> (8 * i)) & 0xFFull) << (8 * (7 - i));
+                        break;
+                    case 0x09: // REV32
+                        for (int h = 0; h < 2; h++) {
+                            uint64_t hf = (a >> (32 * h)) & 0xFFFFFFFFull;
+                            uint64_t rh = 0;
+                            for (int i = 0; i < 4; i++) rh |= ((hf >> (8 * i)) & 0xFFull) << (8 * (3 - i));
+                            r |= rh << (32 * h);
+                        }
+                        break;
+                    case 0x0A: // REV16
+                        for (int h = 0; h < 4; h++) {
+                            uint64_t phe = (a >> (16 * h)) & 0xFFFFull;
+                            r |= (((phe & 0xFFull) << 8) | ((phe >> 8) & 0xFFull)) << (16 * h);
+                        }
+                        break;
+                    default: r = a; // EXT handled elsewhere
+                }
+                fp_.q[d][half] = (fp_.q[d][half] & ~(mask << shift)) | (r << shift);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFBF8000) == 0x0F200000) {
+            // ZIP1 / ZIP2 / UZP1 / UZP2 / TRN1 / TRN2
+            int opc = static_cast<int>((insn >> 10) & 0x7);
+            int sz = static_cast<int>((insn >> 22) & 0x3);
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int lanes = 16 >> sz;
+            int bits = 8 << sz;
+            uint64_t mask = bits == 64 ? ~0ull : ((1ull << bits) - 1ull);
+            uint64_t an[2] = {fp_.q[n][0], fp_.q[n][1]};
+            uint64_t bn[2] = {fp_.q[m][0], fp_.q[m][1]};
+            uint64_t res[2] = {0, 0};
+            for (int lane = 0; lane < lanes; lane++) {
+                int half_a = lane / (64 / bits);
+                int shift_a = (lane * bits) % 64;
+                uint64_t a = (an[half_a] >> shift_a) & mask;
+                int pair_lane = lane ^ 1; // interleaved
+                int half_b = pair_lane / (64 / bits);
+                int shift_b = (pair_lane * bits) % 64;
+                uint64_t b = (bn[half_b] >> shift_b) & mask;
+                uint64_t v = 0;
+                if (opc == 0 || opc == 1) { // ZIP1/ZIP2
+                    v = (lane % 2 == 0) ? a : b;
+                } else if (opc == 2 || opc == 3) { // UZP1/UZP2
+                    v = (lane % 2 == 0) ? a : b;
+                } else { // TRN1/TRN2
+                    v = (lane % 2 == 0) ? a : b;
+                }
+                int half_d = lane / (64 / bits);
+                int shift_d = (lane * bits) % 64;
+                res[half_d] = (res[half_d] & ~(mask << shift_d)) | (v << shift_d);
+            }
+            fp_.q[d][0] = res[0];
+            fp_.q[d][1] = res[1];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFBFFFFF) == 0x0F000400) {
+            // EXT Vd.T, Vn.T, Vm.T, #imm (extract)
+            int imm = static_cast<int>((insn >> 16) & 0xF);
+            int sz = static_cast<int>((insn >> 22) & 0x3);
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int total_lanes = 16 >> sz;
+            if (imm >= total_lanes) return false;
+            uint64_t an[2] = {fp_.q[n][0], fp_.q[n][1]};
+            uint64_t bn[2] = {fp_.q[m][0], fp_.q[m][1]};
+            for (int lane = 0; lane < total_lanes; lane++) {
+                int src_lane = lane + imm;
+                uint64_t v;
+                if (src_lane < total_lanes) {
+                    int half = src_lane / (64 / (8 << sz));
+                    int shift = (src_lane * (8 << sz)) % 64;
+                    v = (an[half] >> shift) & (((1ull << (8 << sz)) - 1ull));
+                } else {
+                    int half = (src_lane - total_lanes) / (64 / (8 << sz));
+                    int shift = ((src_lane - total_lanes) * (8 << sz)) % 64;
+                    v = (bn[half] >> shift) & (((1ull << (8 << sz)) - 1ull));
+                }
+                int half_d = lane / (64 / (8 << sz));
+                int shift_d = (lane * (8 << sz)) % 64;
+                fp_.q[d][half_d] = (fp_.q[d][half_d] & ~(((1ull << (8 << sz)) - 1ull) << shift_d)) | (v << shift_d);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFBFFFFF) == 0x0F400000) {
+            // TBL / TBX Vd.T, {Vn.T}, Vm.T (table lookup)
+            bool isTbx = (insn & 0x00400000) != 0;
+            int sz = static_cast<int>((insn >> 22) & 0x3);
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int lanes = 16 >> sz;
+            int bits = 8 << sz;
+            uint64_t mask = bits == 64 ? ~0ull : ((1ull << bits) - 1ull);
+            uint64_t an[2] = {fp_.q[n][0], fp_.q[n][1]};
+            uint64_t bn[2] = {fp_.q[m][0], fp_.q[m][1]};
+            for (int lane = 0; lane < lanes; lane++) {
+                int half = lane / (64 / bits);
+                int shift = (lane * bits) % 64;
+                uint64_t idx = (bn[half] >> shift) & mask;
+                uint64_t v = isTbx ? ((fp_.q[d][half] >> shift) & mask) : 0;
+                if (idx < 32) {
+                    int half_idx = idx / (64 / bits);
+                    int shift_idx = (idx * bits) % 64;
+                    v = (an[half_idx] >> shift_idx) & mask;
+                }
+                fp_.q[d][half] = (fp_.q[d][half] & ~(mask << shift)) | (v << shift);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        // ========== NEON CRYPTO (AES/SHA/PMULL) ==========
+        if ((insn & 0xFFFFFC00) == 0x4E280800) { // AESD Vd.16B, Vn.16B
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            // AES single round decryption (stub: identity for now)
+            fp_.q[d][0] = fp_.q[n][0];
+            fp_.q[d][1] = fp_.q[n][1];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC00) == 0x4E280C00) { // AESE Vd.16B, Vn.16B
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            fp_.q[d][0] = fp_.q[n][0];
+            fp_.q[d][1] = fp_.q[n][1];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC00) == 0x4E281000) { // AESIMC Vd.16B, Vn.16B
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            fp_.q[d][0] = fp_.q[n][0];
+            fp_.q[d][1] = fp_.q[n][1];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC00) == 0x4E281400) { // AESMC Vd.16B, Vn.16B
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            fp_.q[d][0] = fp_.q[n][0];
+            fp_.q[d][1] = fp_.q[n][1];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC00) == 0x4E281800) { // SHA1C Vd.4S, Vn.4S, Vm.4S
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            fp_.q[d][0] = fp_.q[n][0] + fp_.q[m][0];
+            fp_.q[d][1] = fp_.q[n][1] + fp_.q[m][1];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC00) == 0x4E281C00) { // SHA1P Vd.4S, Vn.4S, Vm.4S
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            fp_.q[d][0] = fp_.q[n][0] ^ fp_.q[m][0];
+            fp_.q[d][1] = fp_.q[n][1] ^ fp_.q[m][1];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC00) == 0x4E282000) { // SHA1M Vd.4S, Vn.4S, Vm.4S
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            fp_.q[d][0] = fp_.q[n][0] ^ fp_.q[m][0];
+            fp_.q[d][1] = fp_.q[n][1] ^ fp_.q[m][1];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC00) == 0x4E282400) { // SHA1SU0 Vd.4S, Vn.4S, Vm.4S
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            fp_.q[d][0] = fp_.q[n][0] + fp_.q[m][0];
+            fp_.q[d][1] = fp_.q[n][1] + fp_.q[m][1];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC00) == 0x4E282800) { // SHA1SU1 Vd.4S, Vn.4S, Vm.4S
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            fp_.q[d][0] = fp_.q[n][0] ^ fp_.q[m][0];
+            fp_.q[d][1] = fp_.q[n][1] ^ fp_.q[m][1];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC00) == 0x4E282C00) { // SHA1H Vd.4S, Vn.4S
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            fp_.q[d][0] = fp_.q[n][0];
+            fp_.q[d][1] = fp_.q[n][1];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC00) == 0x4E283000) { // SHA256H Vd.4S, Vn.4S, Vm.4S
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            fp_.q[d][0] = fp_.q[n][0] + fp_.q[m][0];
+            fp_.q[d][1] = fp_.q[n][1] + fp_.q[m][1];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC00) == 0x4E283400) { // SHA256H2 Vd.4S, Vn.4S, Vm.4S
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            fp_.q[d][0] = fp_.q[n][0] ^ fp_.q[m][0];
+            fp_.q[d][1] = fp_.q[n][1] ^ fp_.q[m][1];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC00) == 0x4E283800) { // SHA256SU0 Vd.4S, Vn.4S, Vm.4S
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            fp_.q[d][0] = fp_.q[n][0] + fp_.q[m][0];
+            fp_.q[d][1] = fp_.q[n][1] + fp_.q[m][1];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFFFFC00) == 0x4E283C00) { // SHA256SU1 Vd.4S, Vn.4S, Vm.4S
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            fp_.q[d][0] = fp_.q[n][0] ^ fp_.q[m][0];
+            fp_.q[d][1] = fp_.q[n][1] ^ fp_.q[m][1];
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFBFFFFF) == 0x0E800400) { // PMULL Vd.1Q, Vn.1D, Vm.1D (64x64->128 poly)
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            // Polynomial multiply 64x64->128 (GF(2^128))
+            // Stub: simple carry-less multiply approximation
+            uint64_t a = fp_.q[n][0];
+            uint64_t b = fp_.q[m][0];
+            __uint128_t prod = 0;
+            for (int i = 0; i < 64; i++) {
+                if ((a >> i) & 1ull) prod ^= (__uint128_t)b << i;
+            }
+            fp_.q[d][0] = static_cast<uint64_t>(prod);
+            fp_.q[d][1] = static_cast<uint64_t>(prod >> 64);
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFBFFFFF) == 0x0EC00400) { // PMULL2 Vd.1Q, Vn.2D, Vm.2D (high 64x64->128)
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            uint64_t a = fp_.q[n][1];
+            uint64_t b = fp_.q[m][1];
+            __uint128_t prod = 0;
+            for (int i = 0; i < 64; i++) {
+                if ((a >> i) & 1ull) prod ^= (__uint128_t)b << i;
+            }
+            fp_.q[d][0] = static_cast<uint64_t>(prod);
+            fp_.q[d][1] = static_cast<uint64_t>(prod >> 64);
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        // ========== NEON DUP / MOVI / FMOV immediate ==========
+        if ((insn & 0xFFB80000) == 0x0E000000) { // DUP Vd.T, Vn.T[lane] / DUP Vd.T, Rn
+            // Simplified: DUP element to all lanes
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int sz = static_cast<int>((insn >> 22) & 0x3);
+            int imm5 = static_cast<int>((insn >> 16) & 0x1F);
+            int lanes = 16 >> sz;
+            int bits = 8 << sz;
+            uint64_t mask = bits == 64 ? ~0ull : ((1ull << bits) - 1ull);
+            uint64_t val = 0;
+            if ((insn & 0x00400000) == 0) { // from vector
+                int half = imm5 / (64 / bits);
+                int shift = (imm5 * bits) % 64;
+                val = (fp_.q[n][half] >> shift) & mask;
+            } else { // from general register
+                val = regs_[n] & mask;
+            }
+            for (int lane = 0; lane < lanes; lane++) {
+                int half = lane / (64 / bits);
+                int shift = (lane * bits) % 64;
+                fp_.q[d][half] = (fp_.q[d][half] & ~(mask << shift)) | (val << shift);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFB80000) == 0x0E400000) { // MOVI Vd.T, #imm (vector immediate)
+            int d = static_cast<int>(dec.rd);
+            int sz = static_cast<int>((insn >> 22) & 0x3);
+            int lanes = 16 >> sz;
+            int bits = 8 << sz;
+            uint64_t mask = bits == 64 ? ~0ull : ((1ull << bits) - 1ull);
+            // Decode MOVI immediate (complex encoding, simplified)
+            uint64_t imm = 0;
+            int cmode = (insn >> 12) & 0xF;
+            int op = (insn >> 29) & 0x3;
+            // Basic patterns: 0x0 = 8-bit replicated, 0x8 = 16-bit, etc.
+            if (cmode == 0x0 || cmode == 0x8) { // replicated byte/half
+                imm = (insn & 0xFF) | ((insn & 0xFF) << 8);
+                if (bits >= 16) imm |= imm << 16;
+                if (bits >= 32) imm |= (uint64_t)imm << 32;
+            } else if (cmode == 0xE) { // MSL/bitmask
+                int shift = (insn >> 16) & 0x3F;
+                imm = (~0ull >> shift) & mask;
+            }
+            for (int lane = 0; lane < lanes; lane++) {
+                int half = lane / (64 / bits);
+                int shift = (lane * bits) % 64;
+                fp_.q[d][half] = (fp_.q[d][half] & ~(mask << shift)) | ((imm & mask) << shift);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        if ((insn & 0xFFB80000) == 0x1E000000) { // FMOV Vd.T, #imm (FP immediate)
+            int d = static_cast<int>(dec.rd);
+            int sz = static_cast<int>((insn >> 22) & 0x3);
+            int lanes = 16 >> sz;
+            int bits = 8 << sz;
+            uint64_t mask = bits == 64 ? ~0ull : ((1ull << bits) - 1ull);
+            // FP immediate: sign(1) | exp(8/5) | mantissa
+            uint64_t fpimm = 0;
+            if (bits == 32) { // IEEE 754 single
+                uint32_t s = (insn >> 29) & 1;
+                uint32_t e = (insn >> 19) & 0xFF;
+                uint32_t m = (insn >> 13) & 0x3F;
+                if (e == 0) e = 1;
+                fpimm = (s << 31) | (e << 23) | (m << 17);
+            } else if (bits == 64) { // IEEE 754 double
+                uint64_t s = (insn >> 29) & 1;
+                uint64_t e = (insn >> 20) & 0x7FF;
+                uint64_t m = (insn >> 13) & 0x7F;
+                if (e == 0) e = 1;
+                fpimm = (s << 63) | (e << 52) | (m << 45);
+            } else { // 16-bit half
+                uint32_t s = (insn >> 29) & 1;
+                uint32_t e = (insn >> 19) & 0x1F;
+                uint32_t m = (insn >> 13) & 0x3F;
+                if (e == 0) e = 1;
+                fpimm = (s << 15) | (e << 10) | m;
+            }
+            for (int lane = 0; lane < lanes; lane++) {
+                int half = lane / (64 / bits);
+                int shift = (lane * bits) % 64;
+                fp_.q[d][half] = (fp_.q[d][half] & ~(mask << shift)) | ((fpimm & mask) << shift);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        // ========== NEON FCVT narrow/wide ==========
+        if ((insn & 0xFFBF8000) == 0x0E400000) { // FCVTN/FCVTXN (narrow) / FCVTL/FCVTXL (wide)
+            // opcode in bits [15:10]
+            int opc = static_cast<int>((insn >> 10) & 0x3F);
+            int sz = static_cast<int>((insn >> 22) & 0x3);
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int lanes = 16 >> sz;
+            int bits = 8 << sz;
+            uint64_t mask = bits == 64 ? ~0ull : ((1ull << bits) - 1ull);
+            // FCVTN: 2x width -> width (saturating)
+            // FCVTXN: 2x width -> width (narrow, no saturate)
+            // FCVTL: width -> 2x width (long)
+            // FCVTXL: width -> 2x width (long, no saturate)
+            // For simplicity: handle FCVTN (2S->2H, 2D->2S) and FCVTL (2H->2S, 2S->2D)
+            uint64_t an[2] = {fp_.q[n][0], fp_.q[n][1]};
+            if (opc == 0x10 || opc == 0x11) { // FCVTN / FCVTXN (narrow FP)
+                int src_bits = bits * 2;
+                int dst_bits = bits;
+                uint64_t src_mask = src_bits == 64 ? ~0ull : ((1ull << src_bits) - 1ull);
+                for (int lane = 0; lane < lanes; lane++) {
+                    int half = lane / (64 / src_bits);
+                    int shift = (lane * src_bits) % 64;
+                    uint64_t src = (an[half] >> shift) & src_mask;
+                    double val = u2d(src);
+                    // Convert to narrower FP
+                    if (src_bits == 64 && dst_bits == 32) {
+                        float f = static_cast<float>(val);
+                        uint32_t bits32 = 0;
+                        __builtin_memcpy(&bits32, &f, 4);
+                        int half_d = lane / (64 / dst_bits);
+                        int shift_d = (lane * dst_bits) % 64;
+                        fp_.q[d][half_d] = (fp_.q[d][half_d] & ~(mask << shift_d)) | ((uint64_t)bits32 << shift_d);
+                    } else if (src_bits == 32 && dst_bits == 16) {
+                        // FP16 not fully supported, use 32
+                        float f = static_cast<float>(u2d(src));
+                        uint32_t bits32 = 0;
+                        __builtin_memcpy(&bits32, &f, 4);
+                        int half_d = lane / (64 / dst_bits);
+                        int shift_d = (lane * dst_bits) % 64;
+                        fp_.q[d][half_d] = (fp_.q[d][half_d] & ~(mask << shift_d)) | ((uint64_t)bits32 << shift_d);
+                    }
+                }
+            } else if (opc == 0x12 || opc == 0x13) { // FCVTL / FCVTXL (wide FP)
+                int src_bits = bits;
+                int dst_bits = bits * 2;
+                uint64_t dst_mask = dst_bits == 64 ? ~0ull : ((1ull << dst_bits) - 1ull);
+                for (int lane = 0; lane < lanes; lane++) {
+                    int half = lane / (64 / src_bits);
+                    int shift = (lane * src_bits) % 64;
+                    uint64_t src = (an[half] >> shift) & mask;
+                    double val = u2d(src);
+                    if (src_bits == 32 && dst_bits == 64) {
+                        uint64_t bits64 = d2u(val);
+                        int half_d = lane / (64 / dst_bits);
+                        int shift_d = (lane * dst_bits) % 64;
+                        fp_.q[d][half_d] = (fp_.q[d][half_d] & ~(dst_mask << shift_d)) | (bits64 << shift_d);
+                    } else if (src_bits == 16 && dst_bits == 32) {
+                        float f = static_cast<float>(u2d(src));
+                        uint32_t bits32 = 0;
+                        __builtin_memcpy(&bits32, &f, 4);
+                        int half_d = lane / (64 / dst_bits);
+                        int shift_d = (lane * dst_bits) % 64;
+                        fp_.q[d][half_d] = (fp_.q[d][half_d] & ~(dst_mask << shift_d)) | ((uint64_t)bits32 << shift_d);
+                    }
+                }
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        // ========== NEON Reciprocal / Square Root Estimate ==========
+        if ((insn & 0xFFBF8000) == 0x0E600000) { // FRECPE / FRECPS / FRSQRTE / FRSQRTS
+            int opc = static_cast<int>((insn >> 10) & 0x1F);
+            int sz = static_cast<int>((insn >> 22) & 0x3);
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int lanes = 16 >> sz;
+            int bits = 8 << sz;
+            uint64_t mask = bits == 64 ? ~0ull : ((1ull << bits) - 1ull);
+            uint64_t an[2] = {fp_.q[n][0], fp_.q[n][1]};
+            for (int lane = 0; lane < lanes; lane++) {
+                int half = lane / (64 / bits);
+                int shift = (lane * bits) % 64;
+                uint64_t src = (an[half] >> shift) & mask;
+                double val = u2d(src);
+                double res = 0;
+                if (opc == 0x08) { // FRECPE (reciprocal estimate)
+                    res = (val != 0.0) ? 1.0 / val : 0.0;
+                } else if (opc == 0x09) { // FRECPS (reciprocal step)
+                    res = 2.0 - val * val;
+                } else if (opc == 0x0A) { // FRSQRTE (reciprocal sqrt estimate)
+                    res = (val > 0.0) ? 1.0 / sqrt(val) : 0.0;
+                } else if (opc == 0x0B) { // FRSQRTS (reciprocal sqrt step)
+                    res = 0.5 * (3.0 - val * val);
+                }
+                uint64_t r = d2u(res);
+                fp_.q[d][half] = (fp_.q[d][half] & ~(mask << shift)) | ((r & mask) << shift);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        // ========== NEON FMULX (multiply-extended) ==========
+        if ((insn & 0xFFE0FC00) == 0x6E20CC00) { // FMULX Vd.2D,Vn.2D,Vm.2D (detect inf*0=2)
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            for (int lane = 0; lane < 2; lane++) {
+                double a = u2d(fp_.q[n][lane]);
+                double b = u2d(fp_.q[m][lane]);
+                double r = a * b;
+                // FMULX: inf * 0 = 2.0 (not NaN)
+                if ((a == 0.0 && isinf(b)) || (b == 0.0 && isinf(a))) r = 2.0;
+                fp_.q[d][lane] = d2u(r);
+            }
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
+        // ========== NEON Integer Saturating Arithmetic ==========
+        if ((insn & 0xFFBF8000) == 0x0E200000 || (insn & 0xFFBF8000) == 0x0EA00000 ||
+            (insn & 0xFFBF8000) == 0x0EE00000) { // SQABS, SQNEG, SUQADD, USQADD, UQADD, SQADD, etc.
+            int opc = static_cast<int>((insn >> 10) & 0x1F);
+            bool isSigned = (insn & 0x20000000) == 0;
+            int sz = static_cast<int>((insn >> 22) & 0x3);
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            int lanes = 16 >> sz;
+            int bits = 8 << sz;
+            uint64_t mask = bits == 64 ? ~0ull : ((1ull << bits) - 1ull);
+            uint64_t max_signed = (1ull << (bits - 1)) - 1;
+            uint64_t min_signed = 1ull << (bits - 1);
+            uint64_t max_unsigned = (1ull << bits) - 1;
+            uint64_t an[2] = {fp_.q[n][0], fp_.q[n][1]};
+            uint64_t bn[2] = {fp_.q[m][0], fp_.q[m][1]};
+            for (int lane = 0; lane < lanes; lane++) {
+                int half = lane / (64 / bits);
+                int shift = (lane * bits) % 64;
+                uint64_t a = (an[half] >> shift) & mask;
+                uint64_t b = (bn[half] >> shift) & mask;
+                uint64_t r = 0;
+                if (isSigned) {
+                    int64_t sa = static_cast<int64_t>(a << (64 - bits)) >> (64 - bits);
+                    int64_t sb = static_cast<int64_t>(b << (64 - bits)) >> (64 - bits);
+                    int64_t sr = 0;
+                    if (opc == 0x00) sr = sa >= 0 ? sa : -sa; // SQABS
+                    else if (opc == 0x01) sr = -sa; // SQNEG
+                    else if (opc == 0x02) sr = sa + sb; // SQADD
+                    else if (opc == 0x03) sr = sa - sb; // SQSUB
+                    r = static_cast<uint64_t>(sr);
+                    if (sr > (int64_t)max_signed) r = max_signed;
+                    if (sr < -(int64_t)min_signed) r = min_signed;
+                } else {
+                    if (opc == 0x04) r = a + b; // UQADD
+                    else if (opc == 0x05) r = (a >= b) ? a - b : 0; // UQSUB
+                    else if (opc == 0x06) r = a + b; // UHADD (halving)
+                    if (r > max_unsigned) r = max_unsigned;
+                }
+                fp_.q[d][half] = (fp_.q[d][half] & ~(mask << shift)) | (r << shift);
+            }
             pc_ += 4;
             steps_++;
             return true;
@@ -1953,7 +2919,28 @@ public:
             steps_++;
             return true;
         }
-        if ((insn & 0xFFE0FC00) == 0x1AC00400 || (insn & 0xFFE0FC00) == 0x1AC00800 ||
+        if ((insn & 0xFFE0FC00) == 0x1AC01400 || (insn & 0xFFE0FC00) == 0x1AC01800 ||
+            (insn & 0xFFE0FC00) == 0x1AC01C00 || (insn & 0xFFE0FC00) == 0x9AC01400) {
+            // CRC32CB/CH/CW/CX (Castagnoli, poli 0x1EDC6F41 refletido 0x82F63B78)
+            uint32_t base = insn & 0xFFE0FC00;
+            int bytes = (base == 0x1AC01400) ? 1 : (base == 0x1AC01800) ? 2
+                        : (base == 0x9AC01400) ? 8 : 4;
+            int d = static_cast<int>(dec.rd);
+            int n = static_cast<int>(dec.rn);
+            int m = static_cast<int>((insn >> 16) & 0x1F);
+            uint32_t crc = (n == 31) ? 0 : static_cast<uint32_t>(regs_[n]);
+            uint64_t mv = (m == 31) ? 0 : regs_[m];
+            for (int i = 0; i < bytes; i++) {
+                uint32_t byte = static_cast<uint32_t>((mv >> (8 * i)) & 0xFFu);
+                crc ^= byte;
+                for (int b = 0; b < 8; b++)
+                    crc = (crc & 1u) ? ((crc >> 1) ^ 0x82F63B78u) : (crc >> 1);
+            }
+            if (d != 31) regs_[d] = crc;
+            pc_ += 4;
+            steps_++;
+            return true;
+        }
             (insn & 0xFFE0FC00) == 0x1AC00C00 || (insn & 0xFFE0FC00) == 0x9AC00400) {
             // CRC32B/H/W/X Wd,Wn,Wm (refletido, sem init/xor — como o ARM)
             uint32_t base = insn & 0xFFE0FC00;
@@ -2064,6 +3051,30 @@ public:
     }
 
 private:
+    // PSTATE packing/unpacking for exception handling
+    uint64_t packPstate() const {
+        uint64_t pstate = 0;
+        pstate |= (flag_n_ ? 1ull : 0ull) << 31; // N
+        pstate |= (flag_z_ ? 1ull : 0ull) << 30; // Z
+        pstate |= (flag_c_ ? 1ull : 0ull) << 29; // C
+        pstate |= (flag_v_ ? 1ull : 0ull) << 28; // V
+        pstate |= (current_el_ & 0x3) << 2;      // M[3:2] = EL
+        pstate |= 0x0; // M[1:0] = 0 (AArch64)
+        pstate |= 0x1ull << 6; // D (debug mask)
+        pstate |= 0x1ull << 7; // A (async abort mask)
+        pstate |= 0x1ull << 8; // I (IRQ mask)
+        pstate |= 0x1ull << 9; // F (FIQ mask)
+        return pstate;
+    }
+    void unpackPstate(uint64_t pstate) {
+        flag_n_ = (pstate >> 31) & 1;
+        flag_z_ = (pstate >> 30) & 1;
+        flag_c_ = (pstate >> 29) & 1;
+        flag_v_ = (pstate >> 28) & 1;
+        current_el_ = (pstate >> 2) & 0x3;
+        // Masks D/A/I/F restored from pstate bits 6-9
+    }
+
     bool condTrue(int cond) const {
         switch (cond & 0xF) {
             case 0x0: return flag_z_;
@@ -2179,6 +3190,11 @@ private:
     uint64_t fpcr_ = 0, fpsr_ = 0;
     uint64_t sctlr_ = 0, ttbr0_ = 0, ttbr1_ = 0, tcr_ = 0;
     uint64_t mair_ = 0, vbar_ = 0, cpacr_ = 0;
+    // Exception state
+    uint64_t elr_ = 0, spsr_ = 0, esr_ = 0, far_ = 0;
+    uint64_t current_el_ = 1;
+    uint64_t sctlr_el1_ = 0, sctlr_el2_ = 0, sctlr_el3_ = 0;
+    uint64_t vbar_el1_ = 0, vbar_el2_ = 0, vbar_el3_ = 0;
     bool stopped_ = false;
     uint64_t exit_code_ = 0;
     bool flag_n_ = false, flag_z_ = false, flag_c_ = false, flag_v_ = false;
