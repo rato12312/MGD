@@ -22,6 +22,7 @@
 #include "../odyssey/OdysseyHandoff.h"
 #include "../core/bridge/EmulatorHandoff.h"
 #include "../core/bridge/MentalMapRuntime.h"
+#include "../core/query/CameraMentalMapQuery.h"
 #include "../config/MgdSwitches.h"
 
 namespace mgd {
@@ -54,6 +55,16 @@ public:
         world_.cheap(switches_.cheapForLevel());
         // Inicializa handoff com CPU
         handoff_ = odyssey::OdysseyHandoffSource(&cpu_);
+        // Configura camera query
+        camera_query_.setCamera(&world_.runtime().pipeline().camera());
+        camera_query_.setMentalMap(&world_.runtime().map());
+        camera_query_.setPolygonCache(&world_.runtime().cache());
+        camera_query_.setPolygonConsultant(&world_.runtime().cache().consultant());
+        camera_query_.setCollisionSystem(&world_.runtime().pipeline().collision());
+        camera_query_.setVisibilitySystem(&world_.runtime().pipeline().visibility());
+        camera_query_.setViewDistance(switches_.cheapForLevel().lod_aggressive ? 60.0f : 100.0f);
+        camera_query_.enableLOD(true);
+        camera_query_.setLODDistances(20.0f, 60.0f);
     }
 
     bool present(const char* path) {
@@ -209,6 +220,10 @@ public:
 
     // Configura offsets do Odyssey por versão
     void setOdysseyOffsets(const odyssey::OdysseyOffsets& o) { handoff_.setOffsets(o); }
+    void configureCameraQuery(float view_dist = 100.0f, bool lod = true) {
+        camera_query_.setViewDistance(view_dist);
+        camera_query_.enableLOD(lod);
+    }
 
 private:
     Cpu cpu_;
@@ -218,6 +233,7 @@ private:
     MgdSwitches switches_;
     emu::KeyManager key_mgr_;
     odyssey::OdysseyHandoffSource handoff_;
+    core::CameraMentalMapQuery camera_query_;
     double last_frame_ms_ = 0.0;
     double avg_ms_ = 0.0;
     uint64_t frames_ = 0;

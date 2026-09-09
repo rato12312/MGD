@@ -6,6 +6,9 @@
 #include "../query/dna/DnaPipeline.h"
 #include "../mental_map/ChunkManager.h"
 #include "../mental_map/MentalMap.h"
+#include "../camera/Camera.h"
+#include "../collision/CollisionSystem.h"
+#include "../visibility/BasicVisibility.h"
 #include <cstdint>
 #include <vector>
 
@@ -27,10 +30,10 @@ struct RuntimeFrameStats {
 
 class MentalMapRuntime {
 public:
-    MentalMapRuntime() : consultant_(&cache_, nullptr) {}
-    MentalMapRuntime(int fbW, int fbH) : consultant_(&cache_, nullptr), pipe_(fbW, fbH) {}
+    MentalMapRuntime() : consultant_(&cache_, nullptr), camera_(64, 32), collision_(), visibility_() {}
+    MentalMapRuntime(int fbW, int fbH) : consultant_(&cache_, nullptr), pipe_(fbW, fbH), camera_(64, 32), collision_(), visibility_() {}
 
-    void resize(int fbW, int fbH) { pipe_.resize(fbW, fbH); }
+    void resize(int fbW, int fbH) { pipe_.resize(fbW, fbH); camera_.resize(fbW, fbH); }
     void setLod(bool on, float nearDist = 20.0f, float farDist = 60.0f) {
         use_lod_ = on;
         lod_near_ = nearDist;
@@ -53,7 +56,6 @@ public:
             }
         }
         // 4. Pipeline: primeira vez calcula, depois só o que mudou.
-        // (Detecção fina de mudança por frame fica no ChangeDetector do pipe.)
         if (!built_) {
             pipe_.buildFromPolygons(polys, 10);
             built_ = true;
@@ -69,13 +71,20 @@ public:
 
     MentalMap& map() { return map_; }
     RegionPolygonCache& cache() { return cache_; }
+    PolygonConsultant& consultant() { return consultant_; }
     dna::DnaPipeline& pipeline() { return pipe_; }
+    Camera& camera() { return camera_; }
+    CollisionSystem& collision() { return collision_; }
+    BasicVisibility& visibility() { return visibility_; }
 
 private:
     RegionPolygonCache cache_;
     PolygonConsultant consultant_;
     MentalMap map_;
     dna::DnaPipeline pipe_{64, 32};
+    Camera camera_{64, 32};
+    CollisionSystem collision_;
+    BasicVisibility visibility_;
     bool built_ = false;
     bool use_lod_ = false;
     float lod_near_ = 20.0f, lod_far_ = 60.0f;
