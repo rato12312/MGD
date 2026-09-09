@@ -522,11 +522,21 @@ bool VulkanGpuExecutor::init(void* window_handle) {
     fb_mgr_ = std::make_unique<FramebufferManager>(512, 288, 1280, 720);
     painter_ = std::make_unique<PainterCompute>();
     if(!painter_->init(vk_ctx_.get(), fb_mgr_.get())) return false;
+    asset_pipeline_ = std::make_unique<AssetPipeline>();
     return true;
+}
+
+void VulkanGpuExecutor::setAssetRegistry(core::AssetRegistry* registry, core::Infector* infector) {
+    if (asset_pipeline_) asset_pipeline_->init(vk_ctx_.get(), registry, infector);
+}
+
+bool VulkanGpuExecutor::uploadAllAssets() {
+    return asset_pipeline_ && asset_pipeline_->uploadAllAssets();
 }
 
 void VulkanGpuExecutor::shutdown() {
     if(vk_ctx_) vk_ctx_->waitIdle();
+    asset_pipeline_.reset();
     painter_.reset();
     fb_mgr_.reset();
     recompiler_.reset();

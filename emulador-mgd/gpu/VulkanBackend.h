@@ -23,6 +23,7 @@
 #include "Gpu.h"
 #include "core/gpu/FramebufferManager.h"
 #include "core/gpu/PainterCompute.h"
+#include "core/gpu/AssetPipeline.h"
 
 namespace mgd {
 namespace gpu {
@@ -235,6 +236,10 @@ public:
     uint32_t createRenderTarget(uint32_t w, uint32_t h);
     uint32_t createShader(ShaderStage stage, const std::vector<uint32_t>& bytecode);
 
+    // Asset Pipeline
+    void setAssetRegistry(core::AssetRegistry* registry, core::Infector* infector);
+    bool uploadAllAssets();
+
     // Stats
     uint64_t totalDrawCalls() const { return draw_calls_; }
     uint64_t totalComputeDispatches() const { return compute_dispatches_; }
@@ -246,6 +251,7 @@ private:
     std::unique_ptr<PipelineCache> pipeline_cache_;
     std::unique_ptr<FramebufferManager> fb_mgr_;
     std::unique_ptr<PainterCompute> painter_;
+    std::unique_ptr<AssetPipeline> asset_pipeline_;
 
     GpuState state_;
     std::unordered_map<uint32_t, Shader> shaders_;
