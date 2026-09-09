@@ -520,11 +520,14 @@ bool VulkanGpuExecutor::init(void* window_handle) {
     if(!vk_ctx_->init("MGD Odyssey", window_handle)) return false;
     recompiler_ = std::make_unique<ShaderRecompiler>(vk_ctx_.get());
     fb_mgr_ = std::make_unique<FramebufferManager>(512, 288, 1280, 720);
+    painter_ = std::make_unique<PainterCompute>();
+    if(!painter_->init(vk_ctx_.get(), fb_mgr_.get())) return false;
     return true;
 }
 
 void VulkanGpuExecutor::shutdown() {
     if(vk_ctx_) vk_ctx_->waitIdle();
+    painter_.reset();
     fb_mgr_.reset();
     recompiler_.reset();
     vk_ctx_.reset();
@@ -533,8 +536,12 @@ void VulkanGpuExecutor::shutdown() {
 bool VulkanGpuExecutor::execute(const uint8_t* cmd_buf, size_t size) {
     if(!cmd_buf || size<4) return false;
     if(!vk_ctx_) return false;
+    
+    // Begin frame for rascunho
+    fb_mgr_->beginFrame(state_.steps);
     vk_ctx_->beginFrame();
-    // Fase 1: so conta draws (sem submeter Vulkan ainda) — pipeline real na Fase 2/3
+    
+    // Execute rascunho command buffer
     size_t dwords = size/4;
     const uint32_t* cmds = reinterpret_cast<const uint32_t*>(cmd_buf);
     size_t parsed = MaxwellDecoder::parse(cmds, dwords, state_, shaders_, textures_, samplers_, render_targets_, unknown_ops_);
@@ -542,7 +549,26 @@ bool VulkanGpuExecutor::execute(const uint8_t* cmd_buf, size_t size) {
     draw_calls_ += state_.draw_count;
     compute_dispatches_ += state_.compute_dispatch_count;
     state_.draw_count=0; state_.compute_dispatch_count=0;
+    
     vk_ctx_->endFrame();
+    
+    // Execute Painter compute (rascunho -> final)
+    if (painter_ && fb_mgr_) {
+        auto* rough_hist = fb_mgr_->getCurrentHistory();
+        auto* prev_hist = fb_mgr_->getPrevHistory();
+        if (rough_hist && rough_hist->valid) {
+            VkCommandBuffer cb = vk_ctx_->beginSingleTimeCommands();
+            painter_->execute(rough_hist, prev_hist, cb);
+            vk_ctx_->endSingleTimeCommands(cb);
+        }
+    }
+    
+    fb_mgr_->endFrame(
+        rough_hist ? rough_hist->obj_id : std::vector<uint32_t>{},
+        rough_hist ? rough_hist->depth : std::vector<uint16_t>{},
+        std::vector<Vec3>{} // obj_positions - seria preenchido pelo rascunho real
+    );
+    
     return parsed>0;
 }
 

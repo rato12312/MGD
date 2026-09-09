@@ -22,6 +22,7 @@
 
 #include "Gpu.h"
 #include "core/gpu/FramebufferManager.h"
+#include "core/gpu/PainterCompute.h"
 
 namespace mgd {
 namespace gpu {
@@ -244,6 +245,7 @@ private:
     std::unique_ptr<ShaderRecompiler> recompiler_;
     std::unique_ptr<PipelineCache> pipeline_cache_;
     std::unique_ptr<FramebufferManager> fb_mgr_;
+    std::unique_ptr<PainterCompute> painter_;
 
     GpuState state_;
     std::unordered_map<uint32_t, Shader> shaders_;
