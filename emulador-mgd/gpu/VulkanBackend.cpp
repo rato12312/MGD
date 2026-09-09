@@ -984,6 +984,48 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
         case 0x83: // LSB
         case 0x84: // SHF (shift)
             break;
+
+        // ===== Memory (LD/ST global/shared/local) =====
+        case 0x90: // LD.E (load global)
+            {
+                uint32_t result = getNextId();
+                st.emitOp(SpvOpLoad, {uint32_type, result, getVar(src0)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x91: // ST.E (store global)
+            st.emitOp(SpvOpStore, {getVar(dst), getVar(src0)});
+            break;
+        case 0x92: // LDS (load shared)
+            {
+                uint32_t result = getNextId();
+                st.emitOp(SpvOpLoad, {uint32_type, result, getVar(src0)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x93: // STS (store shared)
+            st.emitOp(SpvOpStore, {getVar(dst), getVar(src0)});
+            break;
+        case 0x94: // ATOM (atomic)
+            {
+                uint32_t result = getNextId();
+                st.emitOp(SpvOpAtomicIAdd, {uint32_type, result, getVar(src0), getVar(src1), getVar(src0)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x95: // MEMBAR (memory barrier)
+            st.emitOp(SpvOpMemoryBarrier, {SpvScopeDevice, SpvMemorySemanticsAcquireReleaseMask});
+            break;
+        case 0x96: // SYNC (control barrier)
+            st.emitOp(SpvOpControlBarrier, {SpvScopeWorkgroup, SpvScopeWorkgroup, SpvMemorySemanticsAcquireReleaseMask});
+            break;
+        case 0x97: // TEXS / TLD (texture load)
+            {
+                uint32_t result = getNextId();
+                st.emitOp(SpvOpImageFetch, {vec4f, result, getVar(src1), getVar(src0)});
+                reg_to_id[dst] = result;
+            }
+            break;
             
         // ===== Special =====
         case 0x00: // MOV (register)
