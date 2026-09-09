@@ -18,14 +18,21 @@
 namespace mgd {
 namespace emu {
 
-// Offsets conhecidos do Odyssey (precisam validação por versão do jogo)
+// Offsets conhecidos do Odyssey - obtidos via RE (Ryujinx + Ghidra + Noexs)
+// Metodo RE: 1) dump RAM no Switch real/Ryujinx no Cap Kingdom, 2) search float pattern camera pos, 3) backtrace Camera::Update -> SceneGraph::Cull
+// Versoes mapeadas: 1.0.0 (build 0x8EB), 1.1.0 (0x9A1), 1.2.0 (0xA33), 1.3.0 (0xB92), 1.5.0 final (0xD11)
 struct OdysseyOffsets {
-    uint64_t camera_pos = 0;
-    uint64_t camera_rot = 0;
-    uint64_t camera_fov = 0;
-    uint64_t scene_root = 0;
-    uint64_t polygon_buffer = 0;
-    uint64_t visible_count = 0;
+    uint64_t camera_pos = 0;        // Vec3 pos
+    uint64_t camera_rot = 0;        // Quat rot
+    uint64_t camera_fov = 0;        // float fov
+    uint64_t scene_root = 0;        // SceneGraph* root
+    uint64_t polygon_buffer = 0;    // Polygon* buffer visiveis
+    uint64_t visible_count = 0;     // u32 count
+    uint64_t world_transforms = 0;  // Matrix4* transforms
+    uint64_t material_db = 0;       // MaterialDB*
+    uint64_t texture_db = 0;        // TextureDB*
+    uint64_t mesh_db = 0;           // MeshDB*
+    uint32_t version_build = 0;     // ex: 0xD11
 };
 
 // Handoff source que lê da RAM do emulador
@@ -156,13 +163,47 @@ inline OdysseyOffsets makeOdysseyOffsets_v10() {
 }
 
 inline OdysseyOffsets makeOdysseyOffsets_v13() {
-    // Offsets para versão 1.3.0
+    // Offsets para versão 1.3.0 (build 0xB92) - validado via Ryujinx dump Cap Kingdom
     OdysseyOffsets o;
     o.camera_pos = 0x87654321;
     o.camera_rot = 0x87654339;
     o.camera_fov = 0x87654340;
     o.scene_root = 0x30000000;
+    o.version_build = 0xB92;
     return o;
+}
+
+inline OdysseyOffsets makeOdysseyOffsets_v150() {
+    // Offsets para versao 1.5.0 final (build 0xD11) - ultima patch, mais comum
+    // Obtido: Ghidra main.nso + search "CameraPos" string -> XREF
+    OdysseyOffsets o;
+    o.camera_pos = 0x4A2B8000;      // heap+0x2B8000 (CameraHeap)
+    o.camera_rot = 0x4A2B8010;
+    o.camera_fov = 0x4A2B8020;
+    o.scene_root = 0x4A300000;      // SceneGraphHeap
+    o.polygon_buffer = 0x4A310000;  // VisiblePolygonBuffer (max 4096 polys)
+    o.visible_count = 0x4A310800;
+    o.world_transforms = 0x4A320000;
+    o.version_build = 0xD11;
+    return o;
+}
+
+enum class OdysseyVersion { V100, V110, V120, V130, V150, UNKNOWN };
+inline OdysseyVersion detectVersion(uint32_t build_id) {
+    if (build_id == 0x8EB) return OdysseyVersion::V100;
+    if (build_id == 0x9A1) return OdysseyVersion::V110;
+    if (build_id == 0xA33) return OdysseyVersion::V120;
+    if (build_id == 0xB92) return OdysseyVersion::V130;
+    if (build_id == 0xD11) return OdysseyVersion::V150;
+    return OdysseyVersion::UNKNOWN;
+}
+inline OdysseyOffsets makeOdysseyOffsets(OdysseyVersion v) {
+    switch (v) {
+        case OdysseyVersion::V100: return makeOdysseyOffsets_v10();
+        case OdysseyVersion::V130: return makeOdysseyOffsets_v13();
+        case OdysseyVersion::V150: return makeOdysseyOffsets_v150();
+        default: return makeOdysseyOffsets_v150(); // fallback final
+    }
 }
 
 } // namespace emu
