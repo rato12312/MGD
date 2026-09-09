@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">MGD Odyssey</string>
+    <string name="game_title">Super Mario Odyssey</string>
+    <string name="loading">Carregando...</string>
+    <string name="error_init">Erro ao inicializar</string>
+    <string name="error_keys">Chaves não encontradas</string>
+    <string name="error_nsp">Arquivo NSP inválido</string>
+    <string name="settings">Configurações</string>
+    <string name="graphics_quality">Qualidade Gráfica</string>
+    <string name="performance_mode">Modo Performance (Edge)</string>
+    <string name="balanced_mode">Modo Equilibrado (Cheap)</string>
+    <string name="quality_mode">Modo Qualidade (Full)</string>
+    <string name="resolution_scale">Escala de Resolução</string>
+    <string name="fps_counter">FPS: %1$d</string>
+    <string name="frame_time">Tempo de Frame: %1$.1f ms</string>
+    <string name="permission_storage">Permissão de armazenamento necessária para carregar o jogo</string>
+    <string name="permission_storage_rationale">O MGD Odyssey precisa acessar os arquivos do jogo (NSP, keys) no armazenamento</string>
+</resources>
