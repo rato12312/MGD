@@ -13,12 +13,11 @@ namespace mgd {
 namespace gpu {
 
 // ============================================================================
-// FSR 2.0 EASU Compute Shader SPIR-V (complete functional implementation)
+// FSR 2.0 EASU Compute Shader SPIR-V (minimal functional implementation)
 // ============================================================================
 
-// EASU Compute Shader SPIR-V (Edge-Adaptive Spatial Upsampling)
-// Based on AMD FidelityFX FSR 2.0 reference implementation
-// This is a functional implementation - in production, compile from GLSL via glslang
+// Minimal functional EASU Compute Shader SPIR-V
+// In production, compile from GLSL via glslangValidator
 static const uint32_t easu_cs_spirv[] = {
     // SPIR-V Header
     0x07230203, 0x00010000, 0x00080001, 0x00000080, 0x00000000, // Magic, Version, Generator, Bound, Schema
