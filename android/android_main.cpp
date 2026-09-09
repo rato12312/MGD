@@ -7,8 +7,11 @@
 
 #include <android_native_app_glue.h>
 #include <android/log.h>
+#include <android/input.h>
 #include <vulkan/vulkan_android.h>
 #include <memory>
+#include <vector>
+#include <cstdio>
 
 #include "emulador-mgd/runtime/Emulator.h"
 #include "emulador-mgd/gpu/VulkanBackend.h"
@@ -45,28 +48,54 @@ struct AndroidEngine {
     
     bool init(struct android_app* app_) {
         app = app_;
-        
-        // Cria emulador
         emulator = std::make_unique<mgd::emu::Emulator>();
-        
-        // Configura switches para Android (Cheap mode)
         emulator->switches().mgd_mali = mgd::emu::MaliLevel::Edge;
         emulator->switches().mgd_translation = true;
         emulator->switches().mgd_image = true;
-        
-        // Inicializa GPU
+        // GPU resolucao dinamica: Edge 512x288 -> 720p via Painter
+        uint32_t rw, rh, fw, fh;
+        emulator->getGpuResolution(rw, rh, fw, fh);
         gpu = std::make_unique<mgd::gpu::VulkanGpuExecutor>();
         if (!gpu->init(app->window)) {
             LOGE("Failed to init GPU");
             return false;
         }
-        
+        gpu->setResolution(rw, rh, fw, fh);
         window = app->window;
+        // Tenta carregar jogo e keys automaticamente
+        loadGame();
         initialized = true;
         running = true;
-        
-        LOGI("MGD Odyssey Android initialized");
+        LOGI("MGD Odyssey Android initialized (%ux%u -> %ux%u)", rw, rh, fw, fh);
         return true;
+    }
+
+    bool loadGame() {
+        const char* nspPath = "/sdcard/MGD/game.nsp";
+        const char* keysDir = "/sdcard/MGD/keys/";
+        // Carrega keys (prod.keys / title.keys) se existirem
+        char prodKeys[256]; snprintf(prodKeys, sizeof(prodKeys), "%sprod.keys", keysDir);
+        FILE* kf = fopen(prodKeys, "rb");
+        if (kf) {
+            uint8_t key[16] = {0};
+            if (fread(key, 1, 16, kf) == 16) emulator->keys().setSlot(0, key);
+            fclose(kf);
+            LOGI("Loaded prod.keys");
+        }
+        // Carrega NSP
+        FILE* f = fopen(nspPath, "rb");
+        if (!f) { LOGI("No game at %s, aguardando usuario", nspPath); return false; }
+        fseek(f, 0, SEEK_END); long sz = ftell(f); fseek(f, 0, SEEK_SET);
+        std::vector<uint8_t> buf(sz);
+        if (fread(buf.data(), 1, sz, f) != (size_t)sz) { fclose(f); return false; }
+        fclose(f);
+        // Detecta versao e aplica offsets
+        auto ver = mgd::emu::OdysseyVersion::V150; // fallback
+        emulator->setOdysseyOffsets(mgd::emu::makeOdysseyOffsets(ver));
+        bool ok = emulator->bootNsp(buf.data(), buf.size());
+        if (ok) LOGI("Game booted, entry=0x%llx", (unsigned long long)emulator->cpu().pc());
+        else LOGE("bootNsp failed - verifique keys e NSP");
+        return ok;
     }
     
     void runFrame() {
@@ -87,20 +116,48 @@ struct AndroidEngine {
     void onWindowCreated(ANativeWindow* new_window) {
         if (window) ANativeWindow_release(window);
         window = new_window;
-        if (gpu) {
-            // Recria swapchain para nova janela
+        if (gpu && window) {
+            uint32_t rw, rh, fw, fh;
+            emulator->getGpuResolution(rw, rh, fw, fh);
+            gpu->setResolution(rw, rh, fw, fh);
+            LOGI("Window created %p, swapchain %ux%u", window, rw, rh);
         }
     }
     
     void onWindowDestroyed() {
-        if (window) {
-            ANativeWindow_release(window);
-            window = nullptr;
-        }
+        if (gpu) gpu->shutdown();
+        if (window) { ANativeWindow_release(window); window = nullptr; }
     }
     
     void onInputEvent(AInputEvent* event) {
-        // TODO: processar input (touch, gamepad)
+        if (!emulator) return;
+        int32_t type = AInputEvent_getType(event);
+        if (type == AINPUT_EVENT_TYPE_MOTION) {
+            int32_t action = AMotionEvent_getAction(event);
+            int32_t act = action & AMOTION_EVENT_ACTION_MASK;
+            size_t count = AMotionEvent_getPointerCount(event);
+            for (size_t i = 0; i < count; i++) {
+                float x = AMotionEvent_getX(event, i);
+                float y = AMotionEvent_getY(event, i);
+                // Mapeia toque para HID (stick esquerdo + botoes)
+                if (act == AMOTION_EVENT_ACTION_DOWN || act == AMOTION_EVENT_ACTION_MOVE) {
+                    emulator->kernel().hid().press(0, 1 << 0); // A
+                    // Envia posicao touch como hid state (x,y normalizado)
+                } else if (act == AMOTION_EVENT_ACTION_UP) {
+                    emulator->kernel().hid().release(0, 1 << 0);
+                }
+            }
+        } else if (type == AINPUT_EVENT_TYPE_KEY) {
+            int32_t code = AKeyEvent_getKeyCode(event);
+            int32_t action = AKeyEvent_getAction(event);
+            uint32_t btn = 0;
+            if (code == AKEYCODE_BUTTON_A) btn = 1 << 0;
+            else if (code == AKEYCODE_BUTTON_B) btn = 1 << 1;
+            else if (code == AKEYCODE_DPAD_UP) btn = 1 << 4;
+            else if (code == AKEYCODE_DPAD_DOWN) btn = 1 << 5;
+            if (action == AKEY_EVENT_ACTION_DOWN) emulator->kernel().hid().press(0, btn);
+            else if (action == AKEY_EVENT_ACTION_UP) emulator->kernel().hid().release(0, btn);
+        }
     }
 };
 
