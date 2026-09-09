@@ -519,11 +519,13 @@ bool VulkanGpuExecutor::init(void* window_handle) {
     vk_ctx_ = std::make_unique<VulkanContext>();
     if(!vk_ctx_->init("MGD Odyssey", window_handle)) return false;
     recompiler_ = std::make_unique<ShaderRecompiler>(vk_ctx_.get());
+    fb_mgr_ = std::make_unique<FramebufferManager>(512, 288, 1280, 720);
     return true;
 }
 
 void VulkanGpuExecutor::shutdown() {
     if(vk_ctx_) vk_ctx_->waitIdle();
+    fb_mgr_.reset();
     recompiler_.reset();
     vk_ctx_.reset();
 }
