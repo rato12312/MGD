@@ -232,14 +232,13 @@ bool VulkanContext::createRenderPass() {
 bool VulkanContext::createFramebuffers() {
 #ifdef VK_VERSION_1_0
     if(device_==VK_NULL_HANDLE) return true;
-    // offscreen 512x288 (0.4x 1280x720)
-    auto color = createImage(512,288,VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_SAMPLED_BIT);
-    auto depth = createImage(512,288,VK_FORMAT_D16_UNORM, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    // offscreen rascunho: Full=1280x720, Cheap=512x288 (0.4x), Edge=512x288
+    auto color = createImage(roughW_,roughH_,VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_SAMPLED_BIT);
+    auto depth = createImage(roughW_,roughH_,VK_FORMAT_D16_UNORM, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     if(!color||!depth) return false;
-    // guarda views temporario p/ framebuffer
     VkImageView views[2] = {color->view, depth->view};
     VkFramebufferCreateInfo ci{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
-    ci.renderPass = render_pass_; ci.attachmentCount=2; ci.pAttachments=views; ci.width=512; ci.height=288; ci.layers=1;
+    ci.renderPass = render_pass_; ci.attachmentCount=2; ci.pAttachments=views; ci.width=roughW_; ci.height=roughH_; ci.layers=1;
     VkFramebuffer fb; if(vkCreateFramebuffer(device_,&ci,nullptr,&fb)!=VK_SUCCESS) return false;
     framebuffers_.push_back(fb);
     // mantem imagens vivas (vaza de proposito no rascunho; Painter vai gerenciar)
@@ -277,6 +276,17 @@ bool VulkanContext::createSyncObjects() {
     for(int i=0;i<2;i++){ vkCreateSemaphore(device_,&si,nullptr,&image_available_semaphores_[i]); vkCreateSemaphore(device_,&si,nullptr,&render_finished_semaphores_[i]); vkCreateFence(device_,&fi,nullptr,&in_flight_fences_[i]); }
 #endif
     return true;
+}
+
+void VulkanContext::setResolution(uint32_t roughW, uint32_t roughH, uint32_t finalW, uint32_t finalH) {
+    roughW_ = roughW; roughH_ = roughH; finalW_ = finalW; finalH_ = finalH;
+#ifdef VK_VERSION_1_0
+    if(device_ != VK_NULL_HANDLE) {
+        for(auto fb: framebuffers_) vkDestroyFramebuffer(device_, fb, nullptr);
+        framebuffers_.clear();
+        createFramebuffers();
+    }
+#endif
 }
 
 // ========== SHADER RECOMPILER (Maxwell -> SPIR-V, rascunho: shaders fixos minimos) ==========
@@ -1193,6 +1203,13 @@ void VulkanGpuExecutor::setAssetRegistry(core::AssetRegistry* registry, core::In
 
 bool VulkanGpuExecutor::uploadAllAssets() {
     return asset_pipeline_ && asset_pipeline_->uploadAllAssets();
+}
+
+void VulkanGpuExecutor::setResolution(uint32_t roughW, uint32_t roughH, uint32_t finalW, uint32_t finalH) {
+    if(vk_ctx_) vk_ctx_->setResolution(roughW, roughH, finalW, finalH);
+    // recria FramebufferManager e Painter com nova resolucao
+    fb_mgr_ = std::make_unique<FramebufferManager>(roughW, roughH, finalW, finalH);
+    if(painter_) { painter_->shutdown(); painter_->init(vk_ctx_.get(), fb_mgr_.get()); }
 }
 
 void VulkanGpuExecutor::shutdown() {

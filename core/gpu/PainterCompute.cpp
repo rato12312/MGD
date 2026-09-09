@@ -213,18 +213,6 @@ bool PainterCompute::execute(const FramebufferManager::FrameHistory* rough_histo
                              VkCommandBuffer cmd) {
     if (!rough_history || !rough_history->valid) return false;
     
-    // If FSR 1.0 is enabled and we have previous frame, use FSR 1.0 pipeline
-    if (use_fsr_ && prev_history && prev_history->valid) {
-        // For now, use the compute shader path
-        // In a real implementation, this would use the FSR 1.0 compute shader
-        // For now, fall through to the standard compute shader path
-    }
-    
-    if (!prev_history || !prev_history->valid) return false;
-    
-    // Update descriptor sets with current frame images
-    // (In real impl: update descriptor sets with current frame's image views)
-    
     PainterPushConstants pc{};
     pc.rough_w = fb_mgr_->roughWidth();
     pc.rough_h = fb_mgr_->roughHeight();
@@ -232,7 +220,10 @@ bool PainterCompute::execute(const FramebufferManager::FrameHistory* rough_histo
     pc.final_h = fb_mgr_->finalHeight();
     pc.scale_x = static_cast<float>(pc.final_w) / pc.rough_w;
     pc.scale_y = static_cast<float>(pc.final_h) / pc.rough_h;
-    pc.mode = use_fsr_ ? 3 : 0; // 3 = FSR 1.0 mode
+    bool isNative = (pc.rough_w == pc.final_w && pc.rough_h == pc.final_h);
+    // Passo 3: 720p nativo = RCAS+TAA leve, 0.4x = FSR 2.x EASU+RCAS+TAA
+    if (isNative) pc.mode = 1; // native TAA+RCAS
+    else pc.mode = use_fsr_ ? 3 : 0; // FSR 1.0 vs simples
     
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, layout_, 0, 1, &desc_sets_[0], 0, nullptr);

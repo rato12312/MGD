@@ -117,6 +117,8 @@ public:
     VkCommandBuffer beginSingleTimeCommands();
     void endSingleTimeCommands(VkCommandBuffer cmd);
 
+    void setResolution(uint32_t roughW, uint32_t roughH, uint32_t finalW, uint32_t finalH);
+
     // Getters
     VkInstance instance() const { return instance_; }
     VkPhysicalDevice physicalDevice() const { return physical_device_; }
@@ -172,6 +174,7 @@ private:
     std::vector<VkFence> in_flight_fences_;
     uint32_t current_frame_ = 0;
     bool frame_started_ = false;
+    uint32_t roughW_ = 512, roughH_ = 288, finalW_ = 1280, finalH_ = 720;
 };
 
 // ========== SHADER RECOMPILER (Maxwell → SPIR-V) ==========
@@ -239,6 +242,7 @@ public:
     // Asset Pipeline
     void setAssetRegistry(core::AssetRegistry* registry, core::Infector* infector);
     bool uploadAllAssets();
+    void setResolution(uint32_t roughW, uint32_t roughH, uint32_t finalW, uint32_t finalH);
 
     // Stats
     uint64_t totalDrawCalls() const { return draw_calls_; }

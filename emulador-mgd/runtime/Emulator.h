@@ -224,6 +224,12 @@ public:
         camera_query_.setViewDistance(view_dist);
         camera_query_.enableLOD(lod);
     }
+    // Passo 3: exposicao para GPU configurar resolucao (720p nativo vs 0.4x rascunho)
+    void getGpuResolution(uint32_t& roughW, uint32_t& roughH, uint32_t& finalW, uint32_t& finalH) const {
+        auto cm = switches_.cheapForLevel();
+        if (cm.resolution_factor >= 1.0f) { roughW = 1280; roughH = 720; finalW = 1280; finalH = 720; }
+        else { roughW = 512; roughH = 288; finalW = 1280; finalH = 720; }
+    }
 
 private:
     Cpu cpu_;
