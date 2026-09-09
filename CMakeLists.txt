@@ -161,6 +161,14 @@ target_link_libraries(mgd_tests mgd_core)
 target_compile_definitions(mgd_tests PRIVATE MGD_TESTING)
 add_test(NAME mgd_unit_tests COMMAND mgd_tests)
 
+# Integration tests (requer build completo com GPU)
+add_executable(mgd_tests_integration
+    tests/test_integration_complete.cpp
+)
+target_link_libraries(mgd_tests_integration mgd_core)
+target_compile_definitions(mgd_tests_integration PRIVATE MGD_TESTING)
+add_test(NAME mgd_integration_tests COMMAND mgd_tests_integration)
+
 # ========== BENCHMARK — consultador por polígonos ==========
 add_executable(benchmark_polygon tools/benchmark_polygon.cpp)
 target_link_libraries(benchmark_polygon mgd_core)

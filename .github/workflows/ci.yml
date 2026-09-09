@@ -1,0 +1,163 @@
+name: MGD Odyssey CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CMAKE_BUILD_TYPE: Release
+  CMAKE_CXX_FLAGS: "-std=c++17 -Wall -Wextra -O3 -DNDEBUG"
+
+jobs:
+  build-and-test:
+    name: Build and Test (Ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential cmake ninja-build \
+          libvulkan-dev vulkan-validationlayers-dev \
+          libsdl2-dev \
+          catch2-dev \
+          python3 python3-pip
+    
+    - name: Configure (Linux)
+      run: |
+        mkdir -p build_linux
+        cd build_linux
+        cmake -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_CXX_COMPILER=g++ \
+          -DMGD_BUILD_TESTS=ON \
+          ..
+    
+    - name: Build
+      run: |
+        cd build_linux
+        ninja -j$(nproc)
+    
+    - name: Run Tests
+      run: |
+        cd build_linux
+        ./mgd_tests --success
+    
+    - name: Benchmark
+      run: |
+        cd build_linux
+        ./mgd_tests "[benchmark]"
+
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install Dependencies
+      run: |
+        choco install cmake ninja vulkan-sdk --yes
+    
+    - name: Configure (Windows)
+      run: |
+        mkdir build_win
+        cd build_win
+        cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DMGD_BUILD_TESTS=ON ..
+    
+    - name: Build
+      run: |
+        cd build_win
+        ninja -j$(Get-ComputerInfo).CsProcessors.Count
+    
+    - name: Run Tests
+      run: |
+        cd build_win
+        .\mgd_tests.exe --success
+
+  android-build:
+    name: Android Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        api-level: 34
+        ndk-version: r26c
+    
+    - name: Configure Android
+      run: |
+        cd android
+        mkdir -p build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_TOOLCHAIN_FILE=${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake \
+          -DANDROID_ABI=arm64-v8a \
+          -DANDROID_PLATFORM=android-30 \
+          ..
+    
+    - name: Build Android
+      run: |
+        cd android/build
+        ninja -j$(nproc)
+    
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: mgd-odyssey-apk
+        path: android/app/build/outputs/apk/release/*.apk
+        retention-days: 7
+
+  clang-tidy:
+    name: Clang-Tidy
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Run Clang-Tidy
+      run: |
+        sudo apt-get update && sudo apt-get install -y clang-tidy
+        find . -name "*.cpp" -o -name "*.h" | grep -v build | xargs clang-tidy -p build_linux -checks='modernize-*,performance-*,readability-*,bugprone-*' 2>&1 | head -100
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Run Trivy
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload SARIF
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'trivy-results.sarif'
