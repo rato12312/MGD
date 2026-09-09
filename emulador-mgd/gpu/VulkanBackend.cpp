@@ -412,15 +412,74 @@ std::unique_ptr<CompiledPipeline> ShaderRecompiler::createGraphicsPipeline(const
     auto p = std::make_unique<CompiledPipeline>();
     p->vs_ir = vs_ir; p->fs_ir = fs_ir;
 #ifdef VK_VERSION_1_0
-    if(ctx_->device()==VK_NULL_HANDLE) return p; // stub
-    // cria pipeline layout vazio (push constants apenas: mvp 64 + object_id 4 + flags 4)
-    VkPushConstantRange pc{}; pc.stageFlags = VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT; pc.size = 72;
-    VkPipelineLayoutCreateInfo li{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO}; li.pushConstantRangeCount=1; li.pPushConstantRanges=&pc;
-    vkCreatePipelineLayout(ctx_->device(),&li,nullptr,&p->layout);
-    // pipeline grafico minimo (sem shader modules reais ainda — stub)
-    p->pipeline = VK_NULL_HANDLE;
-#else
-    (void)rp; (void)subpass;
+    if(ctx_->device()==VK_NULL_HANDLE) return p;
+    // Compile shaders to SPIR-V
+    std::vector<uint32_t> vs_spirv, fs_spirv;
+    compileShader(vs_ir, vs_spirv);
+    compileShader(fs_ir, fs_spirv);
+    
+    // Create shader modules
+    VkShaderModuleCreateInfo vsm{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    vsm.codeSize = vs_spirv.size() * 4; vsm.pCode = vs_spirv.data();
+    vkCreateShaderModule(ctx_->device(), &vsm, nullptr, &p->vs_module);
+    vsm.codeSize = fs_spirv.size() * 4; vsm.pCode = fs_spirv.data();
+    vkCreateShaderModule(ctx_->device(), &vsm, nullptr, &p->fs_module);
+    
+    // Pipeline layout with push constants: mvp(64) + object_id(4) + flags(4) + lod(4) + pad(4) = 80 bytes
+    VkPushConstantRange pc{};
+    pc.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    pc.offset = 0; pc.size = 80;
+    VkPipelineLayoutCreateInfo li{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    li.pushConstantRangeCount = 1; li.pPushConstantRanges = &pc;
+    vkCreatePipelineLayout(ctx_->device(), &li, nullptr, &p->layout);
+    
+    // Graphics pipeline: vertex input (position only), flat shading, depth test
+    VkPipelineShaderStageCreateInfo stages[2]{};
+    stages[0] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO}; stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT; stages[0].module = p->vs_module; stages[0].pName = "main";
+    stages[1] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO}; stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT; stages[1].module = p->fs_module; stages[1].pName = "main";
+    
+    // Vertex input: position only (vec3)
+    VkVertexInputBindingDescription vib{}; vib.binding = 0; vib.stride = 12; vib.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    VkVertexInputAttributeDescription via{}; via.location = 0; via.binding = 0; via.format = VK_FORMAT_R32G32B32_SFLOAT; via.offset = 0;
+    VkPipelineVertexInputStateCreateInfo vi{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+    vi.vertexBindingDescriptionCount = 1; vi.pVertexBindingDescriptions = &vib;
+    vi.vertexAttributeDescriptionCount = 1; vi.pVertexAttributeDescriptions = &via;
+    
+    VkPipelineInputAssemblyStateCreateInfo ia{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
+    ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    
+    VkPipelineViewportStateCreateInfo vp{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
+    vp.viewportCount = 1; vp.scissorCount = 1;
+    
+    VkPipelineRasterizationStateCreateInfo rs{VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
+    rs.polygonMode = VK_POLYGON_MODE_FILL; rs.cullMode = VK_CULL_MODE_BACK_BIT; rs.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rs.lineWidth = 1.0f;
+    
+    VkPipelineMultisampleStateCreateInfo ms{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
+    ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    
+    // Depth test enable
+    VkPipelineDepthStencilStateCreateInfo ds{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
+    ds.depthTestEnable = VK_TRUE; ds.depthWriteEnable = VK_TRUE; ds.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+    
+    // Color blend: flat color (no blending)
+    VkPipelineColorBlendAttachmentState ca{}; ca.blendEnable = VK_FALSE; ca.colorWriteMask = 0xF;
+    VkPipelineColorBlendStateCreateInfo cb{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
+    cb.attachmentCount = 1; cb.pAttachments = &ca;
+    
+    VkDynamicState dyn[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+    VkPipelineDynamicStateCreateInfo dy{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
+    dy.dynamicStateCount = 2; dy.pDynamicStates = dyn;
+    
+    VkGraphicsPipelineCreateInfo gp{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
+    gp.stageCount = 2; gp.pStages = stages;
+    gp.pVertexInputState = &vi; gp.pInputAssemblyState = &ia;
+    gp.pViewportState = &vp; gp.pRasterizationState = &rs;
+    gp.pMultisampleState = &ms; gp.pDepthStencilState = &ds;
+    gp.pColorBlendState = &cb; gp.pDynamicState = &dy;
+    gp.layout = p->layout; gp.renderPass = rp; gp.subpass = subpass;
+    
+    vkCreateGraphicsPipelines(ctx_->device(), VK_NULL_HANDLE, 1, &gp, nullptr, &p->pipeline);
 #endif
     return p;
 }
