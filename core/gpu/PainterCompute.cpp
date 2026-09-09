@@ -3,6 +3,7 @@
 
 #include "PainterCompute.h"
 #include "VulkanContext.h"
+#include "core/gpu/Fsr10.h"
 #include <cstring>
 
 namespace mgd {
@@ -114,6 +115,28 @@ static const uint32_t painter_cs_spirv[] = {
 bool PainterCompute::init(VulkanContext* ctx, FramebufferManager* fb_mgr) {
     ctx_ = ctx;
     fb_mgr_ = fb_mgr;
+    
+    // Initialize FSR constants
+    fsr_easu_const_.input_width = fb_mgr_->roughWidth();
+    fsr_easu_const_.input_height = fb_mgr_->roughHeight();
+    fsr_easu_const_.output_width = fb_mgr_->finalWidth();
+    fsr_easu_const_.output_height = fb_mgr_->finalHeight();
+    fsr_easu_const_.scale_x = static_cast<float>(fsr_easu_const_.output_width) / fsr_easu_const_.input_width;
+    fsr_easu_const_.scale_y = static_cast<float>(fsr_easu_const_.output_height) / fsr_easu_const_.input_height;
+    fsr_easu_const_.inv_scale_x = 1.0f / fsr_easu_const_.scale_x;
+    fsr_easu_const_.inv_scale_y = 1.0f / fsr_easu_const_.scale_y;
+    fsr_easu_const_.texel_size_x = 1.0f / fsr_easu_const_.input_width;
+    fsr_easu_const_.texel_size_y = 1.0f / fsr_easu_const_.input_height;
+    fsr_easu_const_.edge_threshold = 0.05f;
+    fsr_easu_const_.edge_threshold_min = 0.01f;
+    fsr_easu_const_.edge_threshold_max = 0.2f;
+    
+    fsr_rcas_const_.sharpness = 0.5f;
+    fsr_rcas_const_.scale_x = 1.0f;
+    fsr_rcas_const_.scale_y = 1.0f;
+    
+    use_fsr_ = true;
+    
     if (!createShaders(ctx)) return false;
     if (!createPipeline(ctx)) return false;
     if (!createDescriptorSets(ctx)) return false;
@@ -189,11 +212,19 @@ bool PainterCompute::execute(const FramebufferManager::FrameHistory* rough_histo
                              const FramebufferManager::FrameHistory* prev_history,
                              VkCommandBuffer cmd) {
     if (!rough_history || !rough_history->valid) return false;
+    
+    // If FSR 1.0 is enabled and we have previous frame, use FSR 1.0 pipeline
+    if (use_fsr_ && prev_history && prev_history->valid) {
+        // For now, use the compute shader path
+        // In a real implementation, this would use the FSR 1.0 compute shader
+        // For now, fall through to the standard compute shader path
+    }
+    
     if (!prev_history || !prev_history->valid) return false;
-
+    
     // Update descriptor sets with current frame images
     // (In real impl: update descriptor sets with current frame's image views)
-
+    
     PainterPushConstants pc{};
     pc.rough_w = fb_mgr_->roughWidth();
     pc.rough_h = fb_mgr_->roughHeight();
@@ -201,11 +232,12 @@ bool PainterCompute::execute(const FramebufferManager::FrameHistory* rough_histo
     pc.final_h = fb_mgr_->finalHeight();
     pc.scale_x = static_cast<float>(pc.final_w) / pc.rough_w;
     pc.scale_y = static_cast<float>(pc.final_h) / pc.rough_h;
-
+    pc.mode = use_fsr_ ? 3 : 0; // 3 = FSR 1.0 mode
+    
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, layout_, 0, 1, &desc_sets_[0], 0, nullptr);
     vkCmdPushConstants(cmd, layout_, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PainterPushConstants), &pc);
-
+    
     uint32_t groups_x = (fb_mgr_->finalWidth() + 15) / 16;
     uint32_t groups_y = (fb_mgr_->finalHeight() + 15) / 16;
     vkCmdDispatch(cmd, groups_x, groups_y, 1);

@@ -3,12 +3,14 @@
 // Chaveiro: slots de chave AES-128 setados pelo USUÁRIO (nunca embarcadas).
 // Descriptografa seção com CTR 128-bit explícito (sem adivinhar layout NCA).
 // Suporta: header key (XTS), section keys (CTR), title keys.
+// NEON acceleration para ARM64 (AES/SHA hardware acceleration).
 
 #include <cstdint>
 #include <cstring>
 #include <vector>
 
 #include "Aes.h"
+#include "AesNeon.h"
 
 namespace mgd {
 namespace emu {
@@ -33,7 +35,14 @@ public:
     bool cryptSection(const uint8_t* in, uint8_t* out, size_t len, int slot,
                       const uint8_t ctr[16]) const {
         if (!hasSlot(slot)) return false;
+        
+#if MGD_HAS_NEON_CRYPTO
+        ensureNeonKey(slot);
+        // Use NEON-accelerated AES CTR
+        aes::cryptCtrNeon(neok_[slot], ctr, in, out, len);
+#else
         aes::cryptCtrFull(keys_[slot], ctr, in, out, len);
+#endif
         return true;
     }
 
@@ -111,6 +120,19 @@ private:
 
     uint8_t keys_[SLOTS][16] = {};
     bool have_[SLOTS] = {};
+
+    // NEON-accelerated key expansion (cached per slot)
+    mutable uint8x16_t neok_[SLOTS][11];
+    mutable bool neok_valid_[SLOTS] = {};
+
+    void ensureNeonKey(int slot) const {
+#if MGD_HAS_NEON_CRYPTO
+        if (!neok_valid_[slot]) {
+            aes::expandKeyNeon(keys_[slot], const_cast<uint8x16_t*>(neok_[slot]));
+            neok_valid_[slot] = true;
+        }
+#endif
+    }
 };
 
 } // namespace emu

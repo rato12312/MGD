@@ -12,6 +12,7 @@
 #include <cstdint>
 
 #include "core/gpu/FramebufferManager.h"
+#include "core/gpu/Fsr10.h"
 
 namespace mgd {
 namespace gpu {
@@ -29,7 +30,7 @@ struct PainterPushConstants {
     float edge_threshold = 0.05f;   // detecção de borda no depth
     float detail_strength = 0.5f;   // síntese de detalhe
     uint32_t frame_index = 0;
-    int mode = 0; // 0=temporal upscale, 1=edge recon, 2=detail synth
+    int mode = 0; // 0=temporal upscale, 1=edge recon, 2=detail synth, 3=FSR 1.0
 };
 
 // Painter compute pipeline
@@ -47,6 +48,10 @@ public:
     bool execute(const FramebufferManager::FrameHistory* rough_history,
                  const FramebufferManager::FrameHistory* prev_history,
                  VkCommandBuffer cmd);
+
+    // FSR 1.0 controls
+    void setFSREnabled(bool enabled) { use_fsr_ = enabled; }
+    void setFSRSharpness(float sharpness) { fsr_rcas_const_.sharpness = std::clamp(sharpness, 0.0f, 1.0f); }
 
     // Pipeline access
     VkPipeline pipeline() const { return pipeline_; }
@@ -67,6 +72,11 @@ private:
     VkShaderModule cs_module_ = VK_NULL_HANDLE;
     VkBuffer push_buffer_ = VK_NULL_HANDLE;
     VkDeviceMemory push_memory_ = VK_NULL_HANDLE;
+    
+    // FSR 1.0 pipeline
+    bool use_fsr_ = true;
+    FsrEasuConstants fsr_easu_const_;
+    FsrRcasConstants fsr_rcas_const_;
 };
 
 } // namespace gpu
