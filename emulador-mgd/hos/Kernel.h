@@ -358,18 +358,53 @@ private:
     }
 
     SvcResult svcSendSyncRequest(SvcArgs& args) {
-        // X0 = handle, X1..X7 = send buffers (stub: apenas marca pendente)
+        // X0 = handle, X1..X7 = message + buffer descriptors
+        // args.x[1] = message pointer (guest), args.x[2..7] = buffer descriptors
         uint32_t h = static_cast<uint32_t>(args.x[0]);
         uint32_t tag;
         if (!getHandle(h, tag)) return RESULT_INVALID_HANDLE;
-        // Encontra sessão pelo tag (simplificado)
+        
+        if (!ram_ || args.x[1] == 0) return RESULT_INVALID_HANDLE;
+        
+        // Parse message from guest memory
+        uint64_t msg_ptr = args.x[1];
+        if (msg_ptr + 32 > ram_size_) return RESULT_INVALID_HANDLE;
+        
+        IpcMessage req;
+        uint8_t* msg_base = ram_ + msg_ptr;
+        req.cmd = *reinterpret_cast<uint32_t*>(msg_base);
+        uint32_t payload_size = *reinterpret_cast<uint32_t*>(msg_base + 4);
+        uint32_t num_buffers = *reinterpret_cast<uint32_t*>(msg_base + 8);
+        
+        if (payload_size > 0 && msg_ptr + 12 + payload_size <= ram_size_) {
+            req.payload.assign(msg_base + 12, msg_base + 12 + payload_size);
+        }
+        
+        // Parse buffer descriptors (X2..X7)
+        for (int i = 0; i < 6 && num_buffers > 0; i++) {
+            uint64_t buf_desc_ptr = args.x[2 + i];
+            if (buf_desc_ptr == 0 || buf_desc_ptr + 24 > ram_size_) break;
+            uint8_t* buf_desc = ram_ + buf_desc_ptr;
+            IpcMessage::Buffer buf;
+            buf.guest_ptr = *reinterpret_cast<uint64_t*>(buf_desc);
+            buf.size = *reinterpret_cast<uint64_t*>(buf_desc + 8);
+            buf.kind = *reinterpret_cast<uint32_t*>(buf_desc + 16);
+            buf.flags = *reinterpret_cast<uint32_t*>(buf_desc + 20);
+            // Map host pointer for direct access
+            if (buf.guest_ptr != 0 && buf.size != 0 && buf.guest_ptr + buf.size <= ram_size_) {
+                buf.host_ptr = ram_ + buf.guest_ptr;
+            }
+            req.buffers.push_back(buf);
+            num_buffers--;
+        }
+        
+        // Encontra sessão pelo tag
         for (const auto& kv : services_.allSessions()) {
-            uint32_t st;
-            if (kv.second->recvRequest(*reinterpret_cast<IpcMessage*>(&args.x[1]))) {
-                // stub: ecoa de volta
+            if (kv.second->sendRequest(req)) {
+                // Stub: ecoa de volta com mesmo cmd
                 IpcMessage rep;
-                rep.cmd = 1;
-                rep.payload = {0};
+                rep.cmd = req.cmd;
+                rep.payload = {1}; // success
                 kv.second->sendReply(rep);
                 break;
             }
@@ -379,8 +414,52 @@ private:
 
     SvcResult svcReplyAndReceive(SvcArgs& args) {
         // X0 = handles array ptr, X1 = count, X2 = timeout
-        // Stub: apenas ok
+        // X3 = reply message ptr, X4..X9 = reply buffer descriptors
+        // Stub: processa uma resposta pendente e devolve o próximo pedido
         (void)args.x[0]; (void)args.x[1]; (void)args.x[2];
+        
+        // Se há uma resposta para enviar (X3), processa
+        if (ram_ && args.x[3] != 0 && args.x[3] + 12 <= ram_size_) {
+            uint64_t reply_ptr = args.x[3];
+            uint8_t* reply_base = ram_ + reply_ptr;
+            uint32_t reply_cmd = *reinterpret_cast<uint32_t*>(reply_base);
+            uint32_t reply_payload_size = *reinterpret_cast<uint32_t*>(reply_base + 4);
+            uint32_t reply_num_buffers = *reinterpret_cast<uint32_t*>(reply_base + 8);
+            
+            IpcMessage rep;
+            rep.cmd = reply_cmd;
+            if (reply_payload_size > 0 && reply_ptr + 12 + reply_payload_size <= ram_size_) {
+                rep.payload.assign(reply_base + 12, reply_base + 12 + reply_payload_size);
+            }
+            
+            // Parse reply buffer descriptors
+            for (int i = 0; i < 6 && reply_num_buffers > 0; i++) {
+                uint64_t buf_desc_ptr = args.x[4 + i];
+                if (buf_desc_ptr == 0 || buf_desc_ptr + 24 > ram_size_) break;
+                uint8_t* buf_desc = ram_ + buf_desc_ptr;
+                IpcMessage::Buffer buf;
+                buf.guest_ptr = *reinterpret_cast<uint64_t*>(buf_desc);
+                buf.size = *reinterpret_cast<uint64_t*>(buf_desc + 8);
+                buf.kind = *reinterpret_cast<uint32_t*>(buf_desc + 16);
+                buf.flags = *reinterpret_cast<uint32_t*>(buf_desc + 20);
+                if (buf.guest_ptr != 0 && buf.size != 0 && buf.guest_ptr + buf.size <= ram_size_) {
+                    buf.host_ptr = ram_ + buf.guest_ptr;
+                }
+                rep.buffers.push_back(buf);
+                reply_num_buffers--;
+            }
+            
+            // Envia a resposta para a sessão correspondente
+            // (simplificado: envia para primeira sessão disponível)
+            for (const auto& kv : services_.allSessions()) {
+                if (kv.second->sendReply(rep)) break;
+            }
+        }
+        
+        // Agora espera o próximo pedido (simplificado: retorna vazio)
+        // Em implementação real, bloquearia a thread até chegar pedido
+        args.out[0] = 0; // handle do próximo pedido
+        args.out[1] = 0;
         return RESULT_OK;
     }
 

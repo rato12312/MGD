@@ -214,6 +214,49 @@ private:
         std::unordered_map<uint32_t, uint32_t> reg_to_id; // Maxwell reg -> SPIR-V id
         std::unordered_map<uint32_t, uint32_t> pred_regs; // predicate registers
         ShaderStage stage;
+        
+        // SPIR-V type IDs
+        uint32_t void_type = 0;
+        uint32_t bool_type = 0;
+        uint32_t int32_type = 0;
+        uint32_t uint32_type = 0;
+        uint32_t int16_type = 0;
+        uint32_t float32_type = 0;
+        uint32_t float16_type = 0;
+        uint32_t vec2f = 0, vec3f = 0, vec4f = 0;
+        uint32_t vec2i = 0, vec3i = 0, vec4i = 0;
+        uint32_t vec2u = 0, vec3u = 0, vec4u = 0;
+        uint32_t mat2x2 = 0, mat3x3 = 0, mat4x4 = 0;
+        uint32_t mat2x3 = 0, mat3x2 = 0, mat2x4 = 0, mat4x2 = 0, mat3x4 = 0, mat4x3 = 0;
+        uint32_t sampler_type = 0;
+        uint32_t img2d = 0, img2d_array = 0, img3d = 0, imgcube = 0, img2d_depth = 0, img2d_ms = 0;
+        uint32_t sampled_img2d = 0, sampled_img2d_array = 0, sampled_img3d = 0, sampled_imgcube = 0, sampled_img2d_depth = 0;
+        uint32_t storage_img2d_rgba8 = 0, storage_img2d_rgba16f = 0, storage_img2d_r32f = 0;
+        uint32_t push_constant_struct = 0;
+        uint32_t push_ptr_type = 0;
+        uint32_t push_var = 0;
+        uint32_t push_var2 = 0;
+        uint32_t void_func_type = 0;
+        uint32_t in_pos = 0;
+        uint32_t out_pos = 0;
+        uint32_t out_obj_id = 0;
+        uint32_t out_color = 0;
+        uint32_t out_depth = 0;
+        uint32_t out_obj_id_frag = 0;
+        uint32_t rough_color_var = 0;
+        uint32_t rough_depth_var = 0;
+        uint32_t rough_obj_id_var = 0;
+        uint32_t prev_frame_var = 0;
+        uint32_t motion_vectors_var = 0;
+        uint32_t prev_obj_id_var = 0;
+        uint32_t output_image_var = 0;
+        uint32_t main_label = 0;
+        
+        // Methods
+        void emitOp(uint32_t opcode, const std::vector<uint32_t>& operands);
+        uint32_t getNextId() { return next_id++; }
+        uint32_t getOrCreateVar(uint32_t maxwell_reg);
+        void translateInstruction();
     };
 
     void emitOp(TranslatorState& st, uint32_t opcode, const std::vector<uint32_t>& operands);

@@ -19,6 +19,9 @@ struct IpcMessage {
         uint64_t guest_ptr = 0;
         uint64_t size = 0;
         uint32_t kind = 0; // 0=X(envia) 1=A(recebe) 2=B(mapa) 3=W(escrita)
+        uint32_t flags = 0; // Buffer flags
+        // Host-side mapping (preenchido pelo kernel no send/receive)
+        uint8_t* host_ptr = nullptr;
     };
     std::vector<Buffer> buffers;
 };
@@ -50,6 +53,16 @@ public:
         return true;
     }
     size_t pendingRequests() const { return to_server_.size(); }
+
+    // Buffer translation helpers (chamado pelo kernel)
+    static void translateBuffers(const IpcMessage& msg, uint8_t* ram, uint64_t ram_size,
+                                 std::vector<std::pair<uint64_t, uint8_t*>>& out_mappings) {
+        for (const auto& buf : msg.buffers) {
+            if (buf.guest_ptr == 0 || buf.size == 0) continue;
+            if (buf.guest_ptr + buf.size > ram_size) continue;
+            out_mappings.emplace_back(buf.guest_ptr, ram + buf.guest_ptr);
+        }
+    }
 
 private:
     static constexpr size_t kMaxQueue = 64;

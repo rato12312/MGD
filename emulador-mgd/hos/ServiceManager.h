@@ -21,11 +21,11 @@ public:
         ports_.registerPort("sm:");
     }
 
-    bool publish(const std::string& name) { return ports_.registerPort(name); }
+    bool publish(const std::string& name, uint32_t max_sessions = 8) { return ports_.registerPort(name, max_sessions); }
 
     // IPC Port operations
     uint32_t createPort(const std::string& name, uint32_t maxSessions) {
-        ports_.registerPort(name);
+        ports_.registerPort(name, maxSessions);
         port_max_sessions_[name] = maxSessions;
         return static_cast<uint32_t>(ports_.portCount());
     }
