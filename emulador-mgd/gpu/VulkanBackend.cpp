@@ -1116,6 +1116,12 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
             
 // ===== Memory (LD/ST global/shared/local) =====
         case 0x90: // LD.E (load global)
+        case 0x92: // LDG (load global with cache modifier)
+        case 0x93: // LDG.CA (constant cache)
+        case 0x93: // LDG.CG (global cache)
+        case 0x94: // LDG.CS (streaming cache)
+        case 0x95: // LDG.WT (write-through)
+        case 0x96: // LDG.WB (write-back)
             {
                 uint32_t result = getNextId();
                 emitOp(SpvOpLoad, {uint32_type, result, getVar(src0)});
@@ -1123,6 +1129,9 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
             }
             break;
         case 0x91: // ST.E (store global)
+        case 0x95: // STG (store global with cache)
+        case 0x96: // STG.WB (write-back)
+        case 0x97: // STG.WT (write-through)
             emitOp(SpvOpStore, {getVar(dst), getVar(src0)});
             break;
         case 0x92: // LDS (load shared)
@@ -1136,6 +1145,100 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
             emitOp(SpvOpStore, {getVar(dst), getVar(src0)});
             break;
         case 0x94: // ATOM (atomic)
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpAtomicIAdd, {uint32_type, result, getVar(src0), getVar(src1), getVar(src0)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        // ===== Atomic Operations (ATOMS) =====
+        case 0x99: // ATOMS.ADD
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpAtomicIAdd, {uint32_type, result, getVar(src0), getVar(src1), getVar(src0)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x9A: // ATOMS.CAS (compare-and-swap)
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpAtomicCompareExchange, {uint32_type, result, getVar(src0), getVar(src1), getVar(src2)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x9B: // ATOMS.EXCH (exchange)
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpAtomicExchange, {uint32_type, result, getVar(src0), getVar(src1)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x9C: // ATOMS.MIN
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpAtomicSMin, {int32_type, getNextId(), getVar(src0), getVar(src1)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x9D: // ATOMS.MAX
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpAtomicSMax, {int32_type, getNextId(), getVar(src0), getVar(src1)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x9E: // ATOMS.AND
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpAtomicAnd, {uint32_type, getNextId(), getVar(src0), getVar(src1)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x9F: // ATOMS.OR
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpAtomicOr, {uint32_type, getNextId(), getVar(src0), getVar(src1)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0xA0: // ATOMS.XOR
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpAtomicXor, {uint32_type, getNextId(), getVar(src0), getVar(src1)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0xA1: // ATOMS.INC
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpAtomicIAdd, {uint32_type, result, getVar(src0), getConstUInt(1), getVar(src0)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0xA2: // ATOMS.DEC
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpAtomicISub, {uint32_type, result, getVar(src0), getConstInt(1), getVar(src0)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x91: // ST.E (store global)
+        case 0x95: // STG (store global with cache)
+        case 0x96: // STG.WB (write-back)
+        case 0x97: // STG.WT (write-through)
+            emitOp(SpvOpStore, {getVar(dst), getVar(src0)});
+            break;
+        case 0x92: // LDS (load shared)
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpLoad, {uint32_type, result, getVar(src0)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x93: // STS (store shared)
+            emitOp(SpvOpStore, {getVar(dst), getVar(src0)});
+            break;
+        case 0x94: // ATOM (atomic) - legacy
             {
                 uint32_t result = getNextId();
                 emitOp(SpvOpAtomicIAdd, {uint32_type, result, getVar(src0), getVar(src1), getVar(src0)});
@@ -1258,7 +1361,7 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
         // ===== Barrier =====
         case 0x9E: // BARRIER (barrier synchronization) - already handled
 
-        // ===== Texture =====
+// ===== Texture =====
         case 0x21: // TEXL (LOD bias)
             {
                 uint32_t coord = getVar(src0);
@@ -1266,6 +1369,36 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
                 uint32_t lod = getVar(src2);
                 uint32_t result = getNextId();
                 emitOp(SpvOpImageSampleExplicitLod, {vec4f, result, tex, coord, SpvImageOperandsLodMask, lod});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x22: // TXD (derivatives)
+            {
+                uint32_t coord = getVar(src0);
+                uint32_t tex = getVar(src1);
+                uint32_t ddx = getVar(src2);
+                uint32_t ddy = getVar(src3); // different encoding for TXD
+                uint32_t result = getNextId();
+                emitOp(SpvOpImageSampleExplicitLod, {vec4f, result, tex, coord, SpvImageOperandsGradMask, ddx, ddy});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x23: // TXF (texel fetch)
+            {
+                uint32_t coord = getVar(src0);
+                uint32_t tex = getVar(src1);
+                uint32_t lod = getVar(src2);
+                uint32_t result = getNextId();
+                emitOp(SpvOpImageFetch, {vec4f, result, tex, coord, lod, 0});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x24: // TXQ (texture query)
+            {
+                uint32_t tex = getVar(src0);
+                uint32_t lod = getVar(src1);
+                uint32_t result = getNextId();
+                emitOp(SpvOpImageQuerySizeLod, {vec4f, result, tex, lod, 0});
                 reg_to_id[dst] = result;
             }
             break;
@@ -1318,10 +1451,132 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
             reg_to_id[dst] = getVar(src0);
             break;
             
-        default: {
-            // Unknown: emit NOP
+        // ===== Additional Texture Operations =====
+        case 0x25: // TXQ (texture query)
+            {
+                uint32_t tex = getVar(src0);
+                uint32_t lod = getVar(src1);
+                uint32_t result = getNextId();
+                emitOp(SpvOpImageQuerySizeLod, {vec4f, result, tex, lod, 0});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x25: // TEXS (texture sample with shadow)
+        case 0x26: // TEXD (depth comparison)
+        case 0x27: // TEXD (depth comparison)
+        case 0x28: // TEXL.D (LOD bias with depth)
+            break;
+            
+        // ===== More Control Flow =====
+        case 0x44: // CALL (indirect)
+            {
+                uint32_t target = getVar(src0);
+                emitOp(SpvOpBranch, {target});
+            }
+            break;
+        case 0x45: // RET (return) - already handled
+        case 0x46: // BRKPT (breakpoint)
+            emitOp(SpvOpDebugBreak, {});
+            break;
+        case 0x47: // JMP (jump)
+            {
+                uint32_t target_label = getNextId();
+                emitOp(SpvOpBranch, {target_label});
+            }
+            break;
+        case 0x48: // SSY (set sync) - warp sync
+            emitOp(SpvOpControlBarrier, {SpvScopeWorkgroup, SpvScopeWorkgroup, SpvMemorySemanticsAcquireReleaseMask});
+            break;
+        case 0x49: // SYNC (warp sync) - already handled
+        case 0x4A: // NOP
             emitOp(SpvOpNop, {});
             break;
+        case 0x4B: // TRAP (trap/exception)
+            emitOp(SpvOpKill, {});
+            break.
+        case 0x4C: // CALL (indirect)
+        case 0x4D: // RET (return) - already handled
+            break.
+        case 0x4E: // CONT (continue)
+        case 0x4F: // BREAK (break)
+            // These would need loop context - simplified for now
+            emitOp(SpvOpNop, {});
+            break.
+            
+        // ===== Video/DP Operations =====
+        case 0xB6: // VADD (vector add)
+        case 0xB7: // VSUB (vector subtract)
+        case 0xB8: // VMUL (vector multiply)
+        case 0xB9: // VMAD (vector multiply-add)
+        case 0xBA: // VDIV (vector divide)
+        case 0xBB: // VRCP (vector reciprocal)
+        case 0xBC: // VSQRT (vector sqrt)
+        case 0xBD: // VRSQ (vector reciprocal sqrt)
+        case 0xBE: // VSIN (vector sin)
+        case 0xBF: // VCOS (vector cos)
+        case 0xC0: // VLG2 (vector log2)
+        case 0xC1: // VEX2 (vector exp2)
+            // Vector operations - simplified for now
+            emitOp(SpvOpNop, {});
+            break.
+            
+        // ===== DP2A/DOT Product =====
+        case 0xC2: // DP2A (dot product accumulate)
+        case 0xC3: // DP4A (4-element dot product accumulate)
+            {
+                uint32_t result = getNextId();
+                // DP4A: result = a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w + c
+                // Simplified for now
+                emitOp(SpvOpNop, {});
+                reg_to_id[dst] = result.
+            }
+            break.
+            
+        // ===== Surface/Texture =====
+        case 0xD0: // SULD (surface load)
+        case 0xD1: // SUST (surface store)
+        case 0xD2: // SUATOM (surface atomic)
+        case 0xD3: // SURED (surface reduction)
+        case 0xD4: // SULD.CA (surface load constant cache)
+        case 0xD5: // SUST.CA (surface store constant cache)
+            break.
+            
+        // ===== More Control Flow =====
+        case 0x50: // EXIT (exit thread) - already handled
+        case 0x51: // RET (return) - already handled
+        case 0x52: // BRA (branch) - already handled
+        case 0x53: // BRX (branch predicate) - already handled
+        case 0x54: // CALL (call) - already handled
+        case 0x55: // RET (return) - already handled
+        case 0x56: // JMP (jump)
+            {
+                uint32_t target_label = getNextId();
+                emitOp(SpvOpBranch, {target_label});
+            }
+            break.
+        case 0x57: // BRKPT (breakpoint)
+            emitOp(SpvOpDebugBreak, {}).
+            break.
+        case 0x58: // SSY (set sync)
+            emitOp(SpvOpControlBarrier, {SpvScopeWorkgroup, SpvScopeWorkgroup, SpvMemorySemanticsAcquireReleaseMask}).
+            break.
+        case 0x59: // SYNC (warp sync) - already handled
+        case 0x5A: // NOP
+            emitOp(SpvOpNop, {}).
+            break.
+        case 0x5B: // TRAP (trap/exception)
+            emitOp(SpvOpKill, {}).
+            break.
+        case 0x5C: // CONT (continue)
+        case 0x5D: // BREAK (break)
+            // These would need loop context - simplified for now
+            emitOp(SpvOpNop, {}).
+            break.
+            
+        default: {
+            // Unknown: emit NOP
+            emitOp(SpvOpNop, {}).
+            break.
         }
     }
     
