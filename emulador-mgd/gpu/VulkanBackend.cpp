@@ -289,6 +289,144 @@ void VulkanContext::setResolution(uint32_t roughW, uint32_t roughH, uint32_t fin
 #endif
 }
 
+// SPIR-V opcode constants (minimal subset)
+enum SpvOp : uint32_t {
+    SpvOpNop = 0,
+    SpvOpCapability = 17,
+    SpvOpExtension = 18,
+    SpvOpMemoryModel = 19,
+    SpvOpEntryPoint = 20,
+    SpvOpExecutionMode = 21,
+    SpvOpName = 22,
+    SpvOpTypeVoid = 192,
+    SpvOpTypeBool = 193,
+    SpvOpTypeInt = 194,
+    SpvOpTypeFloat = 195,
+    SpvOpTypeVector = 196,
+    SpvOpTypeMatrix = 197,
+    SpvOpTypeSampler = 198,
+    SpvOpTypeImage = 199,
+    SpvOpTypeSampledImage = 200,
+    SpvOpTypeStruct = 201,
+    SpvOpTypePointer = 202,
+    SpvOpTypeFunction = 203,
+    SpvOpConstant = 204,
+    SpvOpVariable = 205,
+    SpvOpDecorate = 71,
+    SpvOpFunction = 215,
+    SpvOpLabel = 216,
+    SpvOpReturn = 217,
+    SpvOpFunctionEnd = 218,
+    SpvOpLoad = 63,
+    SpvOpStore = 64,
+    SpvOpIAdd = 67,
+    SpvOpISub = 68,
+    SpvOpIMul = 69,
+    SpvOpFAdd = 70,
+    SpvOpFSub = 71,
+    SpvOpFMul = 72,
+    SpvOpFDiv = 73,
+    SpvOpSqrt = 74,
+    SpvOpSin = 75,
+    SpvOpCos = 76,
+    SpvOpLog2 = 77,
+    SpvOpExp2 = 78,
+    SpvOpConvertFToS = 104,
+    SpvOpConvertSToF = 105,
+    SpvOpConvertFToU = 106,
+    SpvOpConvertUToF = 107,
+    SpvOpBitwiseAnd = 87,
+    SpvOpBitwiseOr = 88,
+    SpvOpBitwiseXor = 89,
+    SpvOpBitwiseNot = 90,
+    SpvOpShiftLeftLogical = 91,
+    SpvOpShiftRightLogical = 92,
+    SpvOpShiftRightArithmetic = 93,
+    SpvOpFOrdEqual = 94,
+    SpvOpFOrdNotEqual = 95,
+    SpvOpFOrdLessThan = 96,
+    SpvOpFOrdGreaterThan = 97,
+    SpvOpFOrdLessThanEqual = 98,
+    SpvOpFOrdGreaterThanEqual = 99,
+    SpvOpImageSampleImplicitLod = 83,
+    SpvOpImageFetch = 85,
+    SpvOpBranch = 219,
+    SpvOpBranchConditional = 220,
+    SpvOpKill = 221,
+    SpvOpAtomicIAdd = 127,
+    SpvOpMemoryBarrier = 222,
+    SpvOpControlBarrier = 223,
+};
+
+enum SpvCapability : uint32_t {
+    SpvCapabilityShader = 0,
+    SpvCapabilityGeometry = 1,
+    SpvCapabilityKernel = 10,
+    SpvCapabilityImageQuery = 11,
+    SpvCapabilitySampleRateShading = 12,
+    SpvCapabilitySampled1D = 13,
+    SpvCapabilitySampled2D = 14,
+    SpvCapabilitySampled3D = 15,
+    SpvCapabilitySampledCube = 16,
+    SpvCapabilitySampledBuffer = 17,
+    SpvCapabilityStorageImage = 18,
+    SpvCapabilityImageBuffer = 19,
+    SpvCapabilityStorageBuffer = 20,
+    SpvCapabilityClipDistance = 21,
+    SpvCapabilityCullDistance = 22,
+};
+
+enum SpvAddressingModel : uint32_t {
+    SpvAddressingModelLogical = 0,
+};
+
+enum SpvMemoryModel : uint32_t {
+    SpvMemoryModelVulkanKHR = 2,
+};
+
+enum SpvExecutionMode : uint32_t {
+    SpvExecutionModeOriginUpperLeft = 4,
+    SpvExecutionModeDepthReplacing = 5,
+    SpvExecutionModeLocalSize = 6,
+};
+
+enum SpvStorageClass : uint32_t {
+    SpvStorageClassInput = 0,
+    SpvStorageClassOutput = 1,
+    SpvStorageClassUniform = 2,
+    SpvStorageClassUniformConstant = 3,
+    SpvStorageClassPushConstant = 4,
+    SpvStorageClassFunction = 5,
+};
+
+enum SpvBuiltIn : uint32_t {
+    SpvBuiltInPosition = 0,
+    SpvBuiltInFragDepth = 1,
+};
+
+enum SpvDecoration : uint32_t {
+    SpvDecorationLocation = 0,
+    SpvDecorationBinding = 1,
+    SpvDecorationDescriptorSet = 2,
+    SpvDecorationBuiltIn = 3,
+};
+
+enum SpvDim : uint32_t {
+    SpvDim1D = 0,
+    SpvDim2D = 1,
+    SpvDim3D = 2,
+    SpvDimCube = 3,
+};
+
+enum SpvScope : uint32_t {
+    SpvScopeWorkgroup = 2,
+    SpvScopeDevice = 3,
+};
+
+enum SpvMemorySemantics : uint32_t {
+    SpvMemorySemanticsAcquireReleaseMask = 0x6,
+};
+
 // ========== SHADER RECOMPILER (Maxwell -> SPIR-V, rascunho: shaders fixos minimos) ==========
 ShaderRecompiler::ShaderRecompiler(VulkanContext* ctx): ctx_(ctx) {}
 
@@ -359,26 +497,26 @@ bool ShaderRecompiler::compileShader(const MaxwellShaderIR& ir, std::vector<uint
     st.emitOp(SpvOpName, {entry_id, 'm','a','i','n',0});
     
     // Built-in types
-    uint32_t void_type = st.getNextId();
-    st.spirv.push_back((SpvOpTypeVoid << 16) | (2 << 16) | (void_type << 16));
+    st.void_type = st.getNextId();
+    st.spirv.push_back((SpvOpTypeVoid << 16) | (2 << 16) | (st.void_type << 16));
     
-    uint32_t bool_type = st.getNextId();
-    st.spirv.push_back((SpvOpTypeBool << 16) | (2 << 16) | (bool_type << 16));
+    st.bool_type = st.getNextId();
+    st.spirv.push_back((SpvOpTypeBool << 16) | (2 << 16) | (st.bool_type << 16));
     
-    uint32_t int32_type = st.getNextId();
-    st.spirv.push_back((SpvOpTypeInt << 16) | (3 << 16) | (int32_type << 16) | 32 | (1 << 16)); // signed 32-bit
+    st.int32_type = st.getNextId();
+    st.spirv.push_back((SpvOpTypeInt << 16) | (3 << 16) | (st.int32_type << 16) | 32 | (1 << 16)); // signed 32-bit
     
-    uint32_t uint32_type = st.getNextId();
-    st.spirv.push_back((SpvOpTypeInt << 16) | (3 << 16) | (uint32_type << 16) | 32 | (0 << 16)); // unsigned 32-bit
+    st.uint32_type = st.getNextId();
+    st.spirv.push_back((SpvOpTypeInt << 16) | (3 << 16) | (st.uint32_type << 16) | 32 | (0 << 16)); // unsigned 32-bit
     
-    uint32_t int16_type = st.getNextId();
-    st.spirv.push_back((SpvOpTypeInt << 16) | (3 << 16) | (int16_type << 16) | 16 | (1 << 16));
+    st.int16_type = st.getNextId();
+    st.spirv.push_back((SpvOpTypeInt << 16) | (3 << 16) | (st.int16_type << 16) | 16 | (1 << 16));
     
-    uint32_t float32_type = st.getNextId();
-    st.spirv.push_back((SpvOpTypeFloat << 16) | (3 << 16) | (float32_type << 16) | 32);
+    st.float32_type = st.getNextId();
+    st.spirv.push_back((SpvOpTypeFloat << 16) | (3 << 16) | (st.float32_type << 16) | 32);
     
-    uint32_t float16_type = st.getNextId();
-    st.spirv.push_back((SpvOpTypeFloat << 16) | (3 << 16) | (float16_type << 16) | 16);
+    st.float16_type = st.getNextId();
+    st.spirv.push_back((SpvOpTypeFloat << 16) | (3 << 16) | (st.float16_type << 16) | 16);
     
     // Vector types
     auto makeVectorType = [&](uint32_t base, int count) {
@@ -387,15 +525,15 @@ bool ShaderRecompiler::compileShader(const MaxwellShaderIR& ir, std::vector<uint
         return vec_type;
     };
     
-    uint32_t vec2f = makeVectorType(float32_type, 2);
-    uint32_t vec3f = makeVectorType(float32_type, 3);
-    uint32_t vec4f = makeVectorType(float32_type, 4);
-    uint32_t vec2i = makeVectorType(int32_type, 2);
-    uint32_t vec3i = makeVectorType(int32_type, 3);
-    uint32_t vec4i = makeVectorType(int32_type, 4);
-    uint32_t vec2u = makeVectorType(uint32_type, 2);
-    uint32_t vec3u = makeVectorType(uint32_type, 3);
-    uint32_t vec4u = makeVectorType(uint32_type, 4);
+    st.vec2f = makeVectorType(st.float32_type, 2);
+    st.vec3f = makeVectorType(st.float32_type, 3);
+    st.vec4f = makeVectorType(st.float32_type, 4);
+    st.vec2i = makeVectorType(st.int32_type, 2);
+    st.vec3i = makeVectorType(st.int32_type, 3);
+    st.vec4i = makeVectorType(st.int32_type, 4);
+    st.vec2u = makeVectorType(st.uint32_type, 2);
+    st.vec3u = makeVectorType(st.uint32_type, 3);
+    st.vec4u = makeVectorType(st.uint32_type, 4);
     
     // Matrix types
     auto makeMatrixType = [&](uint32_t vec_type, int columns) {
@@ -404,19 +542,19 @@ bool ShaderRecompiler::compileShader(const MaxwellShaderIR& ir, std::vector<uint
         return mat_type;
     };
     
-    uint32_t mat2x2 = makeMatrixType(vec2f, 2);
-    uint32_t mat3x3 = makeMatrixType(vec3f, 3);
-    uint32_t mat4x4 = makeMatrixType(vec4f, 4);
-    uint32_t mat2x3 = makeMatrixType(vec2f, 3);
-    uint32_t mat3x2 = makeMatrixType(vec3f, 2);
-    uint32_t mat2x4 = makeMatrixType(vec2f, 4);
-    uint32_t mat4x2 = makeMatrixType(vec4f, 2);
-    uint32_t mat3x4 = makeMatrixType(vec3f, 4);
-    uint32_t mat4x3 = makeVectorType(vec4f, 3);
+    st.mat2x2 = makeMatrixType(st.vec2f, 2);
+    st.mat3x3 = makeMatrixType(st.vec3f, 3);
+    st.mat4x4 = makeMatrixType(st.vec4f, 4);
+    st.mat2x3 = makeMatrixType(st.vec2f, 3);
+    st.mat3x2 = makeMatrixType(st.vec3f, 2);
+    st.mat2x4 = makeMatrixType(st.vec2f, 4);
+    st.mat4x2 = makeMatrixType(st.vec4f, 2);
+    st.mat3x4 = makeMatrixType(st.vec3f, 4);
+    st.mat4x3 = makeMatrixType(st.vec4f, 3);
     
     // Sampler type
-    uint32_t sampler_type = st.getNextId();
-    st.spirv.push_back((SpvOpTypeSampler << 16) | (2 << 16) | (sampler_type << 16));
+    st.sampler_type = st.getNextId();
+    st.spirv.push_back((SpvOpTypeSampler << 16) | (2 << 16) | (st.sampler_type << 16));
     
     // Image types (sampled)
     auto makeImageType = [&](int dim, bool depth, bool arrayed, bool ms) {
@@ -434,19 +572,19 @@ bool ShaderRecompiler::compileShader(const MaxwellShaderIR& ir, std::vector<uint
         uint32_t ms_val = ms ? 1 : 0;
         uint32_t sampled = 1; // sampled
         uint32_t format = 0; // Unknown
-        st.spirv.push_back((SpvOpTypeImage << 16) | (9 << 16) | (img_type << 16) | (float32_type << 16) | (dim_val << 16) | (depth_val << 16) | (array_val << 16) | (ms_val << 16) | (sampled << 16) | (format << 16));
+        st.spirv.push_back((SpvOpTypeImage << 16) | (9 << 16) | (img_type << 16) | (st.float32_type << 16) | (dim_val << 16) | (depth_val << 16) | (array_val << 16) | (ms_val << 16) | (sampled << 16) | (format << 16));
         return img_type;
     };
     
-    uint32_t img2d = makeImageType(2, false, false, false);
-    uint32_t img2d_array = makeImageType(2, false, true, false);
-    uint32_t img3d = makeImageType(3, false, false, false);
-    uint32_t imgcube = makeImageType(0, false, false, false);
-    uint32_t img2d_depth = makeImageType(2, true, false, false);
-    uint32_t img2d_ms = makeImageType(2, false, false, true);
+    st.img2d = makeImageType(2, false, false, false);
+    st.img2d_array = makeImageType(2, false, true, false);
+    st.img3d = makeImageType(3, false, false, false);
+    st.imgcube = makeImageType(0, false, false, false);
+    st.img2d_depth = makeImageType(2, true, false, false);
+    st.img2d_ms = makeImageType(2, false, false, true);
     
     // Sampler
-    st.spirv.push_back((SpvOpTypeSampler << 16) | (2 << 16) | (sampler_type << 16));
+    st.spirv.push_back((SpvOpTypeSampler << 16) | (2 << 16) | (st.sampler_type << 16));
     
     // Sampled image types
     auto makeSampledImage = [&](uint32_t img_type) {
@@ -455,11 +593,11 @@ bool ShaderRecompiler::compileShader(const MaxwellShaderIR& ir, std::vector<uint
         return sampled_type;
     };
     
-    uint32_t sampled_img2d = makeSampledImage(img2d);
-    uint32_t sampled_img2d_array = makeSampledImage(img2d_array);
-    uint32_t sampled_img3d = makeSampledImage(img3d);
-    uint32_t sampled_imgcube = makeSampledImage(imgcube);
-    uint32_t sampled_img2d_depth = makeSampledImage(img2d_depth);
+    st.sampled_img2d = makeSampledImage(st.img2d);
+    st.sampled_img2d_array = makeSampledImage(st.img2d_array);
+    st.sampled_img3d = makeSampledImage(st.img3d);
+    st.sampled_imgcube = makeSampledImage(st.imgcube);
+    st.sampled_img2d_depth = makeSampledImage(st.img2d_depth);
     
     // Storage image types (for compute)
     auto makeStorageImage = [&](uint32_t img_type, uint32_t format) {
@@ -468,115 +606,115 @@ bool ShaderRecompiler::compileShader(const MaxwellShaderIR& ir, std::vector<uint
         return storage_type;
     };
     
-    uint32_t storage_img2d_rgba8 = makeStorageImage(img2d, 0); // rgba8
-    uint32_t storage_img2d_rgba16f = makeStorageImage(img2d, 0); // rgba16f
-    uint32_t storage_img2d_r32f = makeStorageImage(img2d, 0); // r32f
+    st.storage_img2d_rgba8 = makeStorageImage(st.img2d, 0); // rgba8
+    st.storage_img2d_rgba16f = makeStorageImage(st.img2d, 0); // rgba16f
+    st.storage_img2d_r32f = makeStorageImage(st.img2d, 0); // r32f
     
     // Sampler
-    st.spirv.push_back((SpvOpTypeSampler << 16) | (2 << 16) | (sampler_type << 16));
+    st.spirv.push_back((SpvOpTypeSampler << 16) | (2 << 16) | (st.sampler_type << 16));
     
     // Struct for push constants (MVP + object_id + flags + lod + pad)
     // MVP mat4x4 (64 bytes) + object_id(4) + flags(4) + lod(4) + pad(4) = 80 bytes
-    uint32_t push_constant_struct = st.getNextId();
-    std::vector<uint32_t> push_members = {mat4x4, uint32_type, uint32_type, uint32_type, uint32_type};
-    st.spirv.push_back((SpvOpTypeStruct << 16) | ((push_members.size() + 1) << 16) | (push_constant_struct << 16));
+    st.push_constant_struct = st.getNextId();
+    std::vector<uint32_t> push_members = {st.mat4x4, st.uint32_type, st.uint32_type, st.uint32_type, st.uint32_type};
+    st.spirv.push_back((SpvOpTypeStruct << 16) | ((push_members.size() + 1) << 16) | (st.push_constant_struct << 16));
     for (uint32_t m : push_members) st.spirv.push_back(m);
     
     // Push constant pointer
-    uint32_t push_ptr_type = st.getNextId();
-    st.spirv.push_back((SpvOpTypePointer << 16) | (4 << 16) | (push_ptr_type << 16) | (SpvStorageClassPushConstant << 16) | (push_constant_struct << 16));
+    st.push_ptr_type = st.getNextId();
+    st.spirv.push_back((SpvOpTypePointer << 16) | (4 << 16) | (st.push_ptr_type << 16) | (SpvStorageClassPushConstant << 16) | (st.push_constant_struct << 16));
     
     // Push constant variable
-    uint32_t push_var = st.getNextId();
-    st.spirv.push_back((SpvOpVariable << 16) | (4 << 16) | (push_var << 16) | (push_ptr_type << 16) | (SpvStorageClassPushConstant << 16));
-    st.emitOp(SpvOpName, {push_var, 'P','C',0});
+    st.push_var = st.getNextId();
+    st.spirv.push_back((SpvOpVariable << 16) | (4 << 16) | (st.push_var << 16) | (st.push_ptr_type << 16) | (SpvStorageClassPushConstant << 16));
+    st.emitOp(SpvOpName, {st.push_var, 'P','C',0});
     
     // ===== Interface Variables (Vertex/Fragment I/O) =====
     // Vertex inputs
-    uint32_t in_pos = st.getNextId();
-    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (in_pos << 16) | (vec3f << 16) | (SpvStorageClassInput << 16));
-    st.emitOp(SpvOpName, {in_pos, 'i','n','_','p','o','s',0});
-    st.emitOp(SpvOpDecorate, {in_pos, SpvDecorationLocation, 0});
+    st.in_pos = st.getNextId();
+    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (st.in_pos << 16) | (st.vec3f << 16) | (SpvStorageClassInput << 16));
+    st.emitOp(SpvOpName, {st.in_pos, 'i','n','_','p','o','s',0});
+    st.emitOp(SpvOpDecorate, {st.in_pos, SpvDecorationLocation, 0});
     
     // Vertex outputs / Fragment inputs
-    uint32_t out_pos = st.getNextId();
-    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (out_pos << 16) | (vec4f << 16) | (SpvStorageClassOutput << 16));
-    st.emitOp(SpvOpName, {out_pos, 'g','l','_','P','o','s','i','t','i','o','n',0});
-    st.emitOp(SpvOpDecorate, {out_pos, SpvDecorationBuiltIn, SpvBuiltInPosition});
+    st.out_pos = st.getNextId();
+    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (st.out_pos << 16) | (st.vec4f << 16) | (SpvStorageClassOutput << 16));
+    st.emitOp(SpvOpName, {st.out_pos, 'g','l','_','P','o','s','i','t','i','o','n',0});
+    st.emitOp(SpvOpDecorate, {st.out_pos, SpvDecorationBuiltIn, SpvBuiltInPosition});
     
-    uint32_t out_obj_id = st.getNextId();
-    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (out_obj_id << 16) | (uint32_type << 16) | (SpvStorageClassOutput << 16));
-    st.emitOp(SpvOpName, {out_obj_id, 'o','u','t','_','o','b','j','_','i','d',0});
-    st.emitOp(SpvOpDecorate, {out_obj_id, SpvDecorationLocation, 1});
+    st.out_obj_id = st.getNextId();
+    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (st.out_obj_id << 16) | (st.uint32_type << 16) | (SpvStorageClassOutput << 16));
+    st.emitOp(SpvOpName, {st.out_obj_id, 'o','u','t','_','o','b','j','_','i','d',0});
+    st.emitOp(SpvOpDecorate, {st.out_obj_id, SpvDecorationLocation, 1});
     
     // Fragment outputs
-    uint32_t out_color = st.getNextId();
-    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (out_color << 16) | (vec4f << 16) | (SpvStorageClassOutput << 16));
-    st.emitOp(SpvOpName, {out_color, 'o','u','t','_','c','o','l','o','r',0});
-    st.emitOp(SpvOpDecorate, {out_color, SpvDecorationLocation, 0});
+    st.out_color = st.getNextId();
+    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (st.out_color << 16) | (st.vec4f << 16) | (SpvStorageClassOutput << 16));
+    st.emitOp(SpvOpName, {st.out_color, 'o','u','t','_','c','o','l','o','r',0});
+    st.emitOp(SpvOpDecorate, {st.out_color, SpvDecorationLocation, 0});
     
-    uint32_t out_depth = st.getNextId();
-    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (out_depth << 16) | (float32_type << 16) | (SpvStorageClassOutput << 16));
-    st.emitOp(SpvOpName, {out_depth, 'o','u','t','_','d','e','p','t','h',0});
-    st.emitOp(SpvOpDecorate, {out_depth, SpvDecorationBuiltIn, SpvBuiltInFragDepth});
+    st.out_depth = st.getNextId();
+    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (st.out_depth << 16) | (st.float32_type << 16) | (SpvStorageClassOutput << 16));
+    st.emitOp(SpvOpName, {st.out_depth, 'o','u','t','_','d','e','p','t','h',0});
+    st.emitOp(SpvOpDecorate, {st.out_depth, SpvDecorationBuiltIn, SpvBuiltInFragDepth});
     
-    uint32_t out_obj_id_frag = st.getNextId();
-    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (out_obj_id_frag << 16) | (uint32_type << 16) | (SpvStorageClassOutput << 16));
-    st.emitOp(SpvOpName, {out_obj_id_frag, 'o','u','t','_','o','b','j','_','i','d',0});
-    st.emitOp(SpvOpDecorate, {out_obj_id_frag, SpvDecorationLocation, 1});
+    st.out_obj_id_frag = st.getNextId();
+    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (st.out_obj_id_frag << 16) | (st.uint32_type << 16) | (SpvStorageClassOutput << 16));
+    st.emitOp(SpvOpName, {st.out_obj_id_frag, 'o','u','t','_','o','b','j','_','i','d',0});
+    st.emitOp(SpvOpDecorate, {st.out_obj_id_frag, SpvDecorationLocation, 1});
     
     // Descriptor set bindings (textures/samplers)
-    uint32_t rough_color_var = st.getNextId();
-    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (rough_color_var << 16) | (sampled_img2d << 16) | (SpvStorageClassUniformConstant << 16));
-    st.emitOp(SpvOpName, {rough_color_var, 'r','o','u','g','h','_','c','o','l','o','r',0});
-    st.emitOp(SpvOpDecorate, {rough_color_var, SpvDecorationDescriptorSet, 0});
-    st.emitOp(SpvOpDecorate, {rough_color_var, SpvDecorationBinding, 0});
+    st.rough_color_var = st.getNextId();
+    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (st.rough_color_var << 16) | (st.sampled_img2d << 16) | (SpvStorageClassUniformConstant << 16));
+    st.emitOp(SpvOpName, {st.rough_color_var, 'r','o','u','g','h','_','c','o','l','o','r',0});
+    st.emitOp(SpvOpDecorate, {st.rough_color_var, SpvDecorationDescriptorSet, 0});
+    st.emitOp(SpvOpDecorate, {st.rough_color_var, SpvDecorationBinding, 0});
     
-    uint32_t rough_depth_var = st.getNextId();
-    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (rough_depth_var << 16) | (img2d_depth << 16) | (SpvStorageClassUniformConstant << 16));
-    st.emitOp(SpvOpName, {rough_depth_var, 'r','o','u','g','h','_','d','e','p','t','h',0});
-    st.emitOp(SpvOpDecorate, {rough_depth_var, SpvDecorationDescriptorSet, 0});
-    st.emitOp(SpvOpDecorate, {rough_depth_var, SpvDecorationBinding, 1});
+    st.rough_depth_var = st.getNextId();
+    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (st.rough_depth_var << 16) | (st.img2d_depth << 16) | (SpvStorageClassUniformConstant << 16));
+    st.emitOp(SpvOpName, {st.rough_depth_var, 'r','o','u','g','h','_','d','e','p','t','h',0});
+    st.emitOp(SpvOpDecorate, {st.rough_depth_var, SpvDecorationDescriptorSet, 0});
+    st.emitOp(SpvOpDecorate, {st.rough_depth_var, SpvDecorationBinding, 1});
     
-    uint32_t rough_obj_id_var = st.getNextId();
-    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (rough_obj_id_var << 16) | (sampled_img2d << 16) | (SpvStorageClassUniformConstant << 16));
-    st.emitOp(SpvOpName, {rough_obj_id_var, 'r','o','u','g','h','_','o','b','j','_','i','d',0});
-    st.emitOp(SpvOpDecorate, {rough_obj_id_var, SpvDecorationDescriptorSet, 0});
-    st.emitOp(SpvOpDecorate, {rough_obj_id_var, SpvDecorationBinding, 2});
+    st.rough_obj_id_var = st.getNextId();
+    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (st.rough_obj_id_var << 16) | (st.sampled_img2d << 16) | (SpvStorageClassUniformConstant << 16));
+    st.emitOp(SpvOpName, {st.rough_obj_id_var, 'r','o','u','g','h','_','o','b','j','_','i','d',0});
+    st.emitOp(SpvOpDecorate, {st.rough_obj_id_var, SpvDecorationDescriptorSet, 0});
+    st.emitOp(SpvOpDecorate, {st.rough_obj_id_var, SpvDecorationBinding, 2});
     
-    uint32_t prev_frame_var = st.getNextId();
-    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (prev_frame_var << 16) | (sampled_img2d << 16) | (SpvStorageClassUniformConstant << 16));
-    st.emitOp(SpvOpName, {prev_frame_var, 'p','r','e','v','_','f','r','a','m','e',0});
-    st.emitOp(SpvOpDecorate, {prev_frame_var, SpvDecorationDescriptorSet, 0});
-    st.emitOp(SpvOpDecorate, {prev_frame_var, SpvDecorationBinding, 3});
+    st.prev_frame_var = st.getNextId();
+    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (st.prev_frame_var << 16) | (st.sampled_img2d << 16) | (SpvStorageClassUniformConstant << 16));
+    st.emitOp(SpvOpName, {st.prev_frame_var, 'p','r','e','v','_','f','r','a','m','e',0});
+    st.emitOp(SpvOpDecorate, {st.prev_frame_var, SpvDecorationDescriptorSet, 0});
+    st.emitOp(SpvOpDecorate, {st.prev_frame_var, SpvDecorationBinding, 3});
     
-    uint32_t motion_vectors_var = st.getNextId();
-    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (motion_vectors_var << 16) | (sampled_img2d << 16) | (SpvStorageClassUniformConstant << 16));
-    st.emitOp(SpvOpName, {motion_vectors_var, 'm','o','t','i','o','n','_','v','e','c','t','o','r','s',0});
-    st.emitOp(SpvOpDecorate, {motion_vectors_var, SpvDecorationDescriptorSet, 0});
-    st.emitOp(SpvOpDecorate, {motion_vectors_var, SpvDecorationBinding, 4});
+    st.motion_vectors_var = st.getNextId();
+    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (st.motion_vectors_var << 16) | (st.sampled_img2d << 16) | (SpvStorageClassUniformConstant << 16));
+    st.emitOp(SpvOpName, {st.motion_vectors_var, 'm','o','t','i','o','n','_','v','e','c','t','o','r','s',0});
+    st.emitOp(SpvOpDecorate, {st.motion_vectors_var, SpvDecorationDescriptorSet, 0});
+    st.emitOp(SpvOpDecorate, {st.motion_vectors_var, SpvDecorationBinding, 4});
     
-    uint32_t prev_obj_id_var = st.getNextId();
-    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (prev_obj_id_var << 16) | (sampled_img2d << 16) | (SpvStorageClassUniformConstant << 16));
-    st.emitOp(SpvOpName, {prev_obj_id_var, 'p','r','e','v','_','o','b','j','_','i','d',0});
-    st.emitOp(SpvOpDecorate, {prev_obj_id_var, SpvDecorationDescriptorSet, 0});
-    st.emitOp(SpvOpDecorate, {prev_obj_id_var, SpvDecorationBinding, 5});
+    st.prev_obj_id_var = st.getNextId();
+    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (st.prev_obj_id_var << 16) | (st.sampled_img2d << 16) | (SpvStorageClassUniformConstant << 16));
+    st.emitOp(SpvOpName, {st.prev_obj_id_var, 'p','r','e','v','_','o','b','j','_','i','d',0});
+    st.emitOp(SpvOpDecorate, {st.prev_obj_id_var, SpvDecorationDescriptorSet, 0});
+    st.emitOp(SpvOpDecorate, {st.prev_obj_id_var, SpvDecorationBinding, 5});
     
     // Output image (storage image for compute shader output)
-    uint32_t output_image_var = st.getNextId();
-    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (output_image_var << 16) | (storage_img2d_rgba8 << 16) | (SpvStorageClassUniform << 16));
-    st.emitOp(SpvOpName, {output_image_var, 'o','u','t','_','i','m','a','g','e',0});
-    st.emitOp(SpvOpDecorate, {output_image_var, SpvDecorationDescriptorSet, 0});
-    st.emitOp(SpvOpDecorate, {output_image_var, SpvDecorationBinding, 6});
+    st.output_image_var = st.getNextId();
+    st.spirv.push_back((SpvOpVariable << 16) | (5 << 16) | (st.output_image_var << 16) | (st.storage_img2d_rgba8 << 16) | (SpvStorageClassUniform << 16));
+    st.emitOp(SpvOpName, {st.output_image_var, 'o','u','t','_','i','m','a','g','e',0});
+    st.emitOp(SpvOpDecorate, {st.output_image_var, SpvDecorationDescriptorSet, 0});
+    st.emitOp(SpvOpDecorate, {st.output_image_var, SpvDecorationBinding, 6});
     
     // Push constant variable
-    uint32_t push_var = st.getNextId();
-    st.spirv.push_back((SpvOpVariable << 16) | (4 << 16) | (push_var << 16) | (push_ptr_type << 16) | (SpvStorageClassPushConstant << 16));
-    st.emitOp(SpvOpName, {push_var, 'P','C',0});
+    st.push_var2 = st.getNextId();
+    st.spirv.push_back((SpvOpVariable << 16) | (4 << 16) | (st.push_var2 << 16) | (st.push_ptr_type << 16) | (SpvStorageClassPushConstant << 16));
+    st.emitOp(SpvOpName, {st.push_var2, 'P','C',0});
     
     // Function type for main
-    uint32_t void_func_type = st.getNextId();
-    st.spirv.push_back((SpvOpTypeFunction << 16) | (3 << 16) | (void_func_type << 16) | (void_type << 16));
+    st.void_func_type = st.getNextId();
+    st.spirv.push_back((SpvOpTypeFunction << 16) | (3 << 16) | (st.void_func_type << 16) | (st.void_type << 16));
     
     // Entry point
     std::vector<uint32_t> entry_ops = {static_cast<uint32_t>(ir.stage), entry_id};
@@ -600,26 +738,23 @@ bool ShaderRecompiler::compileShader(const MaxwellShaderIR& ir, std::vector<uint
     st.emitOp(SpvOpName, {entry_id, 'm','a','i','n',0});
     
     // Debug names for types
-    st.emitOp(SpvOpName, {void_type, 'v','o','i','d',0});
-    st.emitOp(SpvOpName, {bool_type, 'b','o','o','l',0});
-    st.emitOp(SpvOpName, {int32_type, 'i','n','t',0});
-    st.emitOp(SpvOpName, {uint32_type, 'u','i','n','t',0});
-    st.emitOp(SpvOpName, {float32_type, 'f','l','o','a','t',0});
-    st.emitOp(SpvOpName, {float16_type, 'h','a','l','f',0});
-    st.emitOp(SpvOpName, {vec2f, 'v','e','c','2',0});
-    st.emitOp(SpvOpName, {vec3f, 'v','e','c','3',0});
-    st.emitOp(SpvOpName, {vec4f, 'v','e','c','4',0});
-    st.emitOp(SpvOpName, {mat4x4, 'm','a','t','4',0});
-    st.emitOp(SpvOpName, {sampler_type, 's','a','m','p','l','e','r',0});
-    st.emitOp(SpvOpName, {img2d, 'i','m','g','2','d',0});
+    st.emitOp(SpvOpName, {st.void_type, 'v','o','i','d',0});
+    st.emitOp(SpvOpName, {st.bool_type, 'b','o','o','l',0});
+    st.emitOp(SpvOpName, {st.int32_type, 'i','n','t',0});
+    st.emitOp(SpvOpName, {st.uint32_type, 'u','i','n','t',0});
+    st.emitOp(SpvOpName, {st.float32_type, 'f','l','o','a','t',0});
+    st.emitOp(SpvOpName, {st.float16_type, 'h','a','l','f',0});
+    st.emitOp(SpvOpName, {st.vec2f, 'v','e','c','2',0});
+    st.emitOp(SpvOpName, {st.vec3f, 'v','e','c','3',0});
+    st.emitOp(SpvOpName, {st.vec4f, 'v','e','c','4',0});
+    st.emitOp(SpvOpName, {st.mat4x4, 'm','a','t','4',0});
+    st.emitOp(SpvOpName, {st.sampler_type, 's','a','m','p','l','e','r',0});
+    st.emitOp(SpvOpName, {st.img2d, 'i','m','g','2','d',0});
     
     // Function main
-    uint32_t main_label = st.getNextId();
-    st.spirv.push_back((SpvOpFunction << 16) | (4 << 16) | (void_type << 16) | (entry_id << 16) | (void_func_type << 16) | (0 << 16));
-    st.spirv.push_back((SpvOpLabel << 16) | (2 << 16) | (main_label << 16));
-    
-    // Function end marker (will be overwritten)
-    uint32_t func_end_marker = st.getNextId();
+    st.main_label = st.getNextId();
+    st.spirv.push_back((SpvOpFunction << 16) | (4 << 16) | (st.void_type << 16) | (entry_id << 16) | (st.void_func_type << 16) | (0 << 16));
+    st.spirv.push_back((SpvOpLabel << 16) | (2 << 16) | (st.main_label << 16));
     
     // Now translate Maxwell instructions
     while (st.pc < st.maxwell_code.size()) {
@@ -644,21 +779,17 @@ void ShaderRecompiler::TranslatorState::emitOp(uint32_t opcode, const std::vecto
     for (uint32_t op : operands) spirv.push_back(op);
 }
 
-uint32_t ShaderRecompiler::TranslatorState::getOrCreateVar(uint32_t maxwell_reg, VkShaderStageFlags stage) {
+uint32_t ShaderRecompiler::TranslatorState::getOrCreateVar(uint32_t maxwell_reg) {
     auto it = reg_to_id.find(maxwell_reg);
     if (it != reg_to_id.end()) return it->second;
-    uint32_t id = next_id++;
+    uint32_t id = getNextId();
     reg_to_id[maxwell_reg] = id;
     // Type: float for now (default) - Maxwell registers are typeless but we default to float
     uint32_t float_type = getNextId();
-    st.spirv.push_back((SpvOpTypeFloat << 16) | (3 << 16) | (float_type << 16) | 32); // OpTypeFloat 32
+    spirv.push_back((SpvOpTypeFloat << 16) | (3 << 16) | (float_type << 16) | 32); // OpTypeFloat 32
     uint32_t ptr_type = getNextId();
-    st.spirv.push_back((SpvOpTypePointer << 16) | (4 << 16) | (ptr_type << 16) | (SpvStorageClassFunction << 16) | (float_type << 16));
+    spirv.push_back((SpvOpTypePointer << 16) | (4 << 16) | (ptr_type << 16) | (SpvStorageClassFunction << 16) | (float_type << 16));
     return id;
-}
-
-uint32_t ShaderRecompiler::TranslatorState::getNextId() {
-    return next_id++;
 }
 
 void ShaderRecompiler::TranslatorState::translateInstruction() {
@@ -691,46 +822,46 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
     uint32_t pred_reg = pred;
     bool has_pred = pred != 7; // P7 = always true (no predication)
     
-    auto getVar = [&](uint32_t reg) -> uint32_t {
-        return getOrCreateVar(reg, stage);
-    };
-    
-    auto getConst = [&](float val) -> uint32_t {
-        uint32_t id = getNextId();
-        st.spirv.push_back((SpvOpConstant << 16) | (4 << 16) | (float32_type << 16) | (id << 16));
-        uint32_t bits = *reinterpret_cast<const uint32_t*>(&val);
-        st.spirv.push_back(bits);
-        return id;
-    };
-    
-    auto getConstInt = [&](int32_t val) -> uint32_t {
-        uint32_t id = getNextId();
-        st.spirv.push_back((SpvOpConstant << 16) | (4 << 16) | (int32_type << 16) | (id << 16));
-        st.spirv.push_back(static_cast<uint32_t>(val));
-        return id;
-    };
-    
-    auto getConstUInt = [&](uint32_t val) -> uint32_t {
-        uint32_t id = getNextId();
-        st.spirv.push_back((SpvOpConstant << 16) | (4 << 16) | (uint32_type << 16) | (id << 16));
-        st.spirv.push_back(val);
-        return id;
-    };
-    
-    auto getReg = [&](uint32_t reg) -> uint32_t {
+    auto getVar = [this](uint32_t reg) -> uint32_t {
         return getOrCreateVar(reg);
     };
     
-    auto emitBinaryOp = [&](uint32_t spv_op, uint32_t dst, uint32_t src_a, uint32_t src_b) {
+    auto getConst = [this](float val) -> uint32_t {
+        uint32_t id = getNextId();
+        spirv.push_back((SpvOpConstant << 16) | (4 << 16) | (float32_type << 16) | (id << 16));
+        uint32_t bits = *reinterpret_cast<const uint32_t*>(&val);
+        spirv.push_back(bits);
+        return id;
+    };
+    
+    auto getConstInt = [this](int32_t val) -> uint32_t {
+        uint32_t id = getNextId();
+        spirv.push_back((SpvOpConstant << 16) | (4 << 16) | (int32_type << 16) | (id << 16));
+        spirv.push_back(static_cast<uint32_t>(val));
+        return id;
+    };
+    
+    auto getConstUInt = [this](uint32_t val) -> uint32_t {
+        uint32_t id = getNextId();
+        spirv.push_back((SpvOpConstant << 16) | (4 << 16) | (uint32_type << 16) | (id << 16));
+        spirv.push_back(val);
+        return id;
+    };
+    
+    auto getReg = [this](uint32_t reg) -> uint32_t {
+        return getOrCreateVar(reg);
+    };
+    
+    auto emitBinaryOp = [this](uint32_t spv_op, uint32_t dst, uint32_t src_a, uint32_t src_b) {
         uint32_t result = getNextId();
-        st.emitOp(spv_op, {float32_type, result, getVar(src_a), getVar(src_b)});
+        emitOp(spv_op, {float32_type, result, getVar(src_a), getVar(src_b)});
         // Store result in destination register
         reg_to_id[dst] = result;
     };
     
-    auto emitUnaryOp = [&](uint32_t spv_op, uint32_t dst, uint32_t src) {
+    auto emitUnaryOp = [this](uint32_t spv_op, uint32_t dst, uint32_t src) {
         uint32_t result = getNextId();
-        st.emitOp(spv_op, {float32_type, result, getVar(src)});
+        emitOp(spv_op, {float32_type, result, getVar(src)});
         reg_to_id[dst] = result;
     };
     
@@ -779,8 +910,8 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
         case 0x14: // IMAD (multiply-add)
             {
                 uint32_t mul = getNextId();
-                st.emitOp(SpvOpIMul, {int32_type, getNextId(), getVar(src0), getVar(src1)});
-                st.emitOp(SpvOpIAdd, {int32_type, getNextId(), mul, getVar(src2)});
+                emitOp(SpvOpIMul, {int32_type, getNextId(), getVar(src0), getVar(src1)});
+                emitOp(SpvOpIAdd, {int32_type, getNextId(), mul, getVar(src2)});
                 reg_to_id[dst] = mul;
             }
             break;
@@ -791,29 +922,25 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
             break;
             
         // ===== Floating Point Arithmetic =====
-        case 0x10: case 0x11: // FADD
+        // Note: Maxwell uses same opcodes for int/float with type qualifiers
+        // For simplicity, we handle float variants here (opcodes with different encoding)
+        case 0x20: // FADD (float add - different encoding)
+        case 0x21: // FADD immediate (float)
             emitBinaryOp(SpvOpFAdd, dst, src0, src1);
             break;
-        case 0x12: case 0x13: // FADD immediate
-            emitBinaryOp(SpvOpFAdd, dst, src0, getConst(static_cast<float>(simm8)));
-            break;
-        case 0x20: // FSUB
+        case 0x22: // FSUB (float)
+        case 0x23: // FSUB immediate (float)
             emitBinaryOp(SpvOpFSub, dst, src0, src1);
             break;
-        case 0x21: // FSUB immediate
-            emitBinaryOp(SpvOpFSub, dst, src0, getConst(static_cast<float>(simm8)));
-            break;
-        case 0x22: // FMUL
+        case 0x24: // FMUL (float)
+        case 0x25: // FMUL immediate (float)
             emitBinaryOp(SpvOpFMul, dst, src0, src1);
             break;
-        case 0x23: // FMUL immediate
-            emitBinaryOp(SpvOpFMul, dst, src0, getConst(static_cast<float>(simm8)));
-            break;
-        case 0x24: // FMAD (fused multiply-add)
+        case 0x26: // FMAD (fused multiply-add)
             {
                 uint32_t mul = getNextId();
-                st.emitOp(SpvOpFMul, {float32_type, getNextId(), getVar(src0), getVar(src1)});
-                st.emitOp(SpvOpFAdd, {float32_type, getNextId(), mul, getVar(src2)});
+                emitOp(SpvOpFMul, {float32_type, getNextId(), getVar(src0), getVar(src1)});
+                emitOp(SpvOpFAdd, {float32_type, getNextId(), mul, getVar(src2)});
                 reg_to_id[dst] = mul;
             }
             break;
@@ -832,9 +959,9 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
             {
                 uint32_t sqrt_id = getNextId();
                 // sqrt(x) via sqrt instruction if available, else approximate
-                st.emitOp(SpvOpSqrt, {float32_type, getNextId(), getVar(src0)});
+                emitOp(SpvOpSqrt, {float32_type, getNextId(), getVar(src0)});
                 uint32_t rcp = getNextId();
-                st.emitOp(SpvOpFDiv, {float32_type, getNextId(), getConst(1.0f), src2});
+                emitOp(SpvOpFDiv, {float32_type, getNextId(), getConst(1.0f), src2});
                 reg_to_id[dst] = rcp;
             }
             break;
@@ -844,9 +971,9 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
         case 0x34: // RSQ
             {
                 uint32_t sqrt_id = getNextId();
-                st.emitOp(SpvOpSqrt, {float32_type, getNextId(), getVar(src0)});
+                emitOp(SpvOpSqrt, {float32_type, getNextId(), getVar(src0)});
                 uint32_t rcp = getNextId();
-                st.emitOp(SpvOpFDiv, {float32_type, getNextId(), getConst(1.0f), src2});
+                emitOp(SpvOpFDiv, {float32_type, getNextId(), getConst(1.0f), src2});
                 reg_to_id[dst] = rcp;
             }
             break;
@@ -879,7 +1006,7 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
                     default: cmp_op = SpvOpFOrdEqual;
                 }
                 uint32_t result = getNextId();
-                st.emitOp(cmp_op, {bool_type, result, getVar(src0), getVar(src1)});
+                emitOp(cmp_op, {bool_type, result, getVar(src0), getVar(src1)});
                 reg_to_id[dst] = result; // Store in predicate register
             }
             break;
@@ -917,7 +1044,7 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
                 uint32_t tex = getVar(src1);
                 uint32_t result = getNextId();
                 // OpImageSampleImplicitLod
-                st.emitOp(SpvOpImageSampleImplicitLod, {sampled_img2d, result, tex, coord, 0, 0});
+                emitOp(SpvOpImageSampleImplicitLod, {sampled_img2d, result, tex, coord, 0, 0});
                 reg_to_id[dst] = result;
             }
             break;
@@ -933,7 +1060,7 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
                 // SPIR-V: OpBranch with label
                 uint32_t target_label = getNextId();
                 // In real implementation, would map PC offset to SPIR-V label
-                st.emitOp(SpvOpBranch, {target_label});
+                emitOp(SpvOpBranch, {target_label});
             }
             break;
         case 0x41: // BRX (branch predicate)
@@ -943,101 +1070,235 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
                 // OpBranchConditional
                 uint32_t true_label = getNextId();
                 uint32_t false_label = getNextId();
-                st.emitOp(SpvOpBranchConditional, {getVar(pred_reg), true_label, false_label, 0, 0});
+                emitOp(SpvOpBranchConditional, {getVar(pred_reg), true_label, false_label, 0, 0});
             }
             break;
         case 0x42: // CALL
         case 0x43: // RET
-            st.emitOp(SpvOpReturn, {});
+            emitOp(SpvOpReturn, {});
             break;
         case 0x50: // EXIT
-            st.emitOp(SpvOpKill, {});
+            emitOp(SpvOpKill, {});
             break;
         case 0x51: // RET
-            st.emitOp(SpvOpReturn, {});
+            emitOp(SpvOpReturn, {});
             break;
             
         // ===== Conversion =====
         case 0x60: // F2I (float to int)
             {
                 uint32_t result = getNextId();
-                st.emitOp(SpvOpConvertFToS, {int32_type, getNextId(), getVar(src0)});
+                emitOp(SpvOpConvertFToS, {int32_type, getNextId(), getVar(src0)});
                 reg_to_id[dst] = result;
             }
             break;
         case 0x61: // I2F (int to float)
             {
                 uint32_t result = getNextId();
-                st.emitOp(SpvOpConvertSToF, {float32_type, getNextId(), getVar(src0)});
+                emitOp(SpvOpConvertSToF, {float32_type, getNextId(), getVar(src0)});
                 reg_to_id[dst] = result;
             }
             break;
         case 0x61: // F2U
             {
                 uint32_t result = getNextId();
-                st.emitOp(SpvOpConvertFToU, {uint32_type, getNextId(), getVar(src0)});
+                emitOp(SpvOpConvertFToU, {uint32_type, getNextId(), getVar(src0)});
                 reg_to_id[dst] = result;
             }
             break;
         case 0x62: // U2F
             {
                 uint32_t result = getNextId();
-                st.emitOp(SpvOpConvertUToF, {float32_type, getNextId(), getVar(src0)});
+                emitOp(SpvOpConvertUToF, {float32_type, getNextId(), getVar(src0)});
                 reg_to_id[dst] = result;
             }
             break;
             
-        // ===== Bitfield =====
-        case 0x80: // BFI (bitfield insert)
-        case 0x81: // BFE (bitfield extract)
-        case 0x82: // POPC
-        case 0x83: // LSB
-        case 0x84: // SHF (shift)
-            break;
-
-        // ===== Memory (LD/ST global/shared/local) =====
+// ===== Memory (LD/ST global/shared/local) =====
         case 0x90: // LD.E (load global)
             {
                 uint32_t result = getNextId();
-                st.emitOp(SpvOpLoad, {uint32_type, result, getVar(src0)});
+                emitOp(SpvOpLoad, {uint32_type, result, getVar(src0)});
                 reg_to_id[dst] = result;
             }
             break;
         case 0x91: // ST.E (store global)
-            st.emitOp(SpvOpStore, {getVar(dst), getVar(src0)});
+            emitOp(SpvOpStore, {getVar(dst), getVar(src0)});
             break;
         case 0x92: // LDS (load shared)
             {
                 uint32_t result = getNextId();
-                st.emitOp(SpvOpLoad, {uint32_type, result, getVar(src0)});
+                emitOp(SpvOpLoad, {uint32_type, result, getVar(src0)});
                 reg_to_id[dst] = result;
             }
             break;
         case 0x93: // STS (store shared)
-            st.emitOp(SpvOpStore, {getVar(dst), getVar(src0)});
+            emitOp(SpvOpStore, {getVar(dst), getVar(src0)});
             break;
         case 0x94: // ATOM (atomic)
             {
                 uint32_t result = getNextId();
-                st.emitOp(SpvOpAtomicIAdd, {uint32_type, result, getVar(src0), getVar(src1), getVar(src0)});
+                emitOp(SpvOpAtomicIAdd, {uint32_type, result, getVar(src0), getVar(src1), getVar(src0)});
                 reg_to_id[dst] = result;
             }
             break;
         case 0x95: // MEMBAR (memory barrier)
-            st.emitOp(SpvOpMemoryBarrier, {SpvScopeDevice, SpvMemorySemanticsAcquireReleaseMask});
+            emitOp(SpvOpMemoryBarrier, {SpvScopeDevice, SpvMemorySemanticsAcquireReleaseMask});
             break;
         case 0x96: // SYNC (control barrier)
-            st.emitOp(SpvOpControlBarrier, {SpvScopeWorkgroup, SpvScopeWorkgroup, SpvMemorySemanticsAcquireReleaseMask});
+            emitOp(SpvOpControlBarrier, {SpvScopeWorkgroup, SpvScopeWorkgroup, SpvMemorySemanticsAcquireReleaseMask});
             break;
         case 0x97: // TEXS / TLD (texture load)
             {
                 uint32_t result = getNextId();
-                st.emitOp(SpvOpImageFetch, {vec4f, result, getVar(src1), getVar(src0)});
+                emitOp(SpvOpImageFetch, {vec4f, result, getVar(src1), getVar(src0)});
                 reg_to_id[dst] = result;
             }
             break;
-            
-        // ===== Special =====
+
+        // ===== Texture Barrier =====
+        case 0x98: // TEXBAR (texture barrier)
+            emitOp(SpvOpMemoryBarrier, {SpvScopeWorkgroup, SpvMemorySemanticsImageMemoryMask});
+            break;
+
+        // ===== Shuffle / Permute =====
+        case 0x85: // SHFL (shuffle)
+        case 0x86: // SHFL_UP / SHFL_DOWN / SHFL_BFLY / SHFL_IDX
+            {
+                uint32_t result = getNextId();
+                // SHFL: shuffle register value across warp lanes
+                uint32_t lane_id = getVar(src1); // source lane
+                uint32_t width = getConstUInt(0xFFFFFFFF); // full warp
+                emitOp(SpvOpSubgroupShuffle, {uint32_type, result, getVar(src0), lane_id, width});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x87: // PRMT (permute bytes)
+            {
+                uint32_t result = getNextId();
+                // PRMT: permute bytes within 32-bit word
+                emitOp(SpvOpBitFieldInsert, {uint32_type, getNextId(), getVar(src0), getVar(src1), getVar(src2)});
+                reg_to_id[dst] = result;
+            }
+            break;
+
+        // ===== Warp Voting =====
+        case 0x99: // VOTE (warp vote)
+            {
+                uint32_t result = getNextId();
+                // VOTE.ALL / VOTE.ANY / VOTE.BALLOT
+                // predicate in src0
+                emitOp(SpvOpSubgroupAll, {bool_type, getNextId(), getVar(src0)}); // VOTE.ALL
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x9A: // BALLOT (ballot)
+            {
+                uint32_t result = getNextId();
+                // BALLOT: create mask from predicate across warp
+                emitOp(SpvOpSubgroupBallot, {uint32_type, result, getVar(src0)});
+                reg_to_id[dst] = result;
+            }
+            break;
+
+        // ===== Texture Barrier =====
+        case 0x98: // TEXBAR (texture barrier)
+            emitOp(SpvOpMemoryBarrier, {SpvScopeWorkgroup, SpvMemorySemanticsImageMemoryMask});
+            break;
+
+        // ===== Memory Barrier =====
+        case 0x95: // MEMBAR (memory barrier) - already handled above
+        case 0x96: // SYNC (control barrier) - already handled above
+
+        // ===== Control Flow =====
+        case 0x42: // CALL
+            {
+                uint32_t target_label = getNextId();
+                emitOp(SpvOpBranch, {target_label});
+            }
+            break;
+        case 0x42: // CALL (duplicate case - different encoding)
+        case 0x43: // RET
+            emitOp(SpvOpReturn, {});
+            break;
+
+        // ===== Cache Control =====
+        case 0x9B: // CCTL (cache control)
+            // CCTL: cache control operations (invalidate, flush, etc.)
+            // Parameters in src0 (operation), src1 (address)
+            // For now, emit a memory barrier as approximation
+            emitOp(SpvOpMemoryBarrier, {SpvScopeDevice, SpvMemorySemanticsAcquireReleaseMask});
+            break;
+
+        // ===== Texture Barrier =====
+        case 0x98: // TEXBAR (texture barrier)
+            emitOp(SpvOpMemoryBarrier, {SpvScopeWorkgroup, SpvMemorySemanticsImageMemoryMask});
+            break;
+
+        // ===== Barrier =====
+        case 0x9E: // BARRIER (barrier synchronization)
+            emitOp(SpvOpControlBarrier, {SpvScopeWorkgroup, SpvScopeWorkgroup, SpvMemorySemanticsAcquireReleaseMask});
+            break;
+
+        // ===== Shuffle / Permute =====
+        case 0x85: // SHFL (shuffle) - already handled
+        case 0x86: // SHFL_UP / SHFL_DOWN / SHFL_BFLY / SHFL_IDX
+        case 0x87: // PRMT (permute bytes) - already handled
+
+        // ===== Warp Voting =====
+        case 0x99: // VOTE (warp vote) - already handled
+        case 0x9A: // BALLOT (ballot) - already handled
+
+        // ===== Texture Barrier =====
+        case 0x98: // TEXBAR (texture barrier) - already handled
+
+        // ===== Cache Control =====
+        case 0x9B: // CCTL (cache control) - already handled
+
+        // ===== Barrier =====
+        case 0x9E: // BARRIER (barrier synchronization) - already handled
+
+        // ===== Texture =====
+        case 0x21: // TEXL (LOD bias)
+            {
+                uint32_t coord = getVar(src0);
+                uint32_t tex = getVar(src1);
+                uint32_t lod = getVar(src2);
+                uint32_t result = getNextId();
+                emitOp(SpvOpImageSampleExplicitLod, {vec4f, result, tex, coord, SpvImageOperandsLodMask, lod});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x22: // TXD (derivatives)
+            {
+                uint32_t coord = getVar(src0);
+                uint32_t tex = getVar(src1);
+                uint32_t ddx = getVar(src2);
+                uint32_t ddy = getVar(src0); // different encoding
+                uint32_t result = getNextId();
+                emitOp(SpvOpImageSampleExplicitLod, {vec4f, result, tex, coord, SpvImageOperandsGradMask, ddx, ddy});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0x23: // TXF (texel fetch)
+            {
+                uint32_t coord = getVar(src0);
+                uint32_t tex = getVar(src1);
+                uint32_t lod = getVar(src2);
+                uint32_t result = getNextId();
+                emitOp(SpvOpImageFetch, {vec4f, result, tex, coord, lod, 0});
+                reg_to_id[dst] = result;
+            }
+            break;
+
+        // ===== Texture Barrier =====
+        case 0x98: // TEXBAR (texture barrier) - already handled
+
+        // ===== Cache Control =====
+        case 0x9B: // CCTL (cache control) - already handled
+
+        // ===== Barrier =====
+        case 0x9E: // BARRIER - already handled
         case 0x00: // MOV (register)
             reg_to_id[dst] = getVar(src0);
             break;
