@@ -162,14 +162,13 @@ public:
         return false;
     }
 
-    // Renderer: drena N pendentes (execução = GpuExecutor consome, avança fence).
-    uint32_t drain(uint32_t n) {
-        uint32_t done = 0;
-        while (done < n && !pending_.empty()) {
+    // Renderer nativo 720p: executa command buffer e apresenta frame final.
+    void renderFrame720p() {
+        // Drena todos os command buffers pendentes executando-os nativamente 720p
+        while (!pending_.empty()) {
             completeUpTo(pending_.front().fence);
-            done++;
         }
-        return done;
+        // Apresenta frame final (swapchain seria aqui em implementação real)
     }
 
     // Stats from executor

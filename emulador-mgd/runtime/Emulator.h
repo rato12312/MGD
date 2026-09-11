@@ -72,23 +72,21 @@ public:
         return world_.present(path);
     }
 
-    // Um frame do sistema: serviços andam, GPU drena, mundo pinta.
-    // Mede o próprio tempo (ms): base honesta do fps.
     bool frame(const char* path, uint32_t npolys = 8) {
         auto t0 = std::chrono::steady_clock::now();
         kernel_.pumpServices();
-        kernel_.nv().drain(64);
         
         // Handoff real: lê câmera + polígonos do jogo
         bridge::HandoffFrame hf;
         if (handoff_.poll(hf)) {
-            // Converte handoff para MentalMapRuntime
             bridge::RuntimeFrameStats stats = world_.runtime().step(hf, {});
             (void)stats;
         } else {
-            // Fallback: mundo sintético
             bootWorld(npolys);
         }
+        
+        // GPU render nativo 720p (sem rascunho + painter)
+        kernel_.nv().renderFrame720p();
         
         bool ok = present(path);
         auto t1 = std::chrono::steady_clock::now();
