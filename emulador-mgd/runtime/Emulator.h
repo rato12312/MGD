@@ -76,17 +76,25 @@ public:
         auto t0 = std::chrono::steady_clock::now();
         kernel_.pumpServices();
         
-        // Handoff real: lê câmera + polígonos do jogo
+        // 1. Handoff real: lê câmera + polígonos do jogo
         bridge::HandoffFrame hf;
-        if (handoff_.poll(hf)) {
-            bridge::RuntimeFrameStats stats = world_.runtime().step(hf, {});
-            (void)stats;
+        bool has_handoff = handoff_.poll(hf);
+        
+        // 2. Mental Map + Camera -> frustum culling -> visible polygons
+        bridge::RuntimeFrameStats stats;
+        if (has_handoff) {
+            stats = world_.runtime().step(hf, {});
         } else {
             bootWorld(npolys);
         }
         
-        // GPU render nativo 720p (sem rascunho + painter)
-        kernel_.nv().renderFrame720p();
+        // 3. Mali render nativo na resolução configurada
+        // O mental map + camera já filtraram o que é visível
+        kernel_.nv().renderFrameNative();
+        
+        // Painter opcional: só faz upscale se resolução final > resolução render
+        // Por enquanto: render nativo 720p, sem upscale forçado
+        // TODO: FSR 2.x como post-process opcional
         
         bool ok = present(path);
         auto t1 = std::chrono::steady_clock::now();
@@ -227,6 +235,15 @@ public:
         auto cm = switches_.cheapForLevel();
         if (cm.resolution_factor >= 1.0f) { roughW = 1280; roughH = 720; finalW = 1280; finalH = 720; }
         else { roughW = 512; roughH = 288; finalW = 1280; finalH = 720; }
+    }
+
+// Quality preset system
+    void setQualityPreset(NvService::QualityPreset preset) {
+        kernel_.nv().setQualityPreset(preset);
+    }
+    
+    NvService::QualityPreset getQualityPreset() const {
+        return NvService::QualityPreset::Performance; // default
     }
 
 private:

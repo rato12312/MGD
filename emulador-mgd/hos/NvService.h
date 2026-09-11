@@ -162,14 +162,80 @@ public:
         return false;
     }
 
-    // Renderer nativo 720p: executa command buffer e apresenta frame final.
-    void renderFrame720p() {
-        // Drena todos os command buffers pendentes executando-os nativamente 720p
+    // ===== Quality Presets =====
+    enum class QualityPreset {
+        Ultra,      // 720p nativo, sem upscale
+        Quality,    // 960x540 -> FSR 2.x Quality -> 720p
+        Balanced,   // 854x480 -> FSR 2.x Balanced
+        Performance // 512x288 -> FSR 2.x Performance (atual)
+    };
+
+    struct QualityConfig {
+        uint32_t rough_w = 512;
+        uint32_t rough_h = 288;
+        uint32_t final_w = 1280;
+        uint32_t final_h = 720;
+        bool use_fsr = false;
+        float sharpness = 0.5f;
+    };
+
+    // Renderer nativo na resolução configurada
+    void renderFrameNative() {
+        // Drena todos os command buffers pendentes executando-os nativamente
         while (!pending_.empty()) {
             completeUpTo(pending_.front().fence);
         }
-        // Apresenta frame final (swapchain seria aqui em implementação real)
+        // Resolução final já configurada via setQualityPreset
     }
+
+    // Presets de qualidade
+    void setQualityPreset(QualityPreset preset) {
+        switch (preset) {
+            case QualityPreset::Ultra:
+                rough_w_ = 1280; rough_h_ = 720;
+                final_w_ = 1280; final_h_ = 720;
+                use_fsr_ = false; sharpness_ = 0.0f;
+                break;
+            case QualityPreset::Quality:
+                rough_w_ = 960; rough_h_ = 540;
+                final_w_ = 1280; final_h_ = 720;
+                use_fsr_ = true; sharpness_ = 0.3f;
+                break;
+            case QualityPreset::Balanced:
+                rough_w_ = 854; rough_h_ = 480;
+                final_w_ = 1280; final_h_ = 720;
+                use_fsr_ = true; sharpness_ = 0.5f;
+                break;
+            case QualityPreset::Performance:
+                rough_w_ = 512; rough_h_ = 288;
+                final_w_ = 1280; final_h_ = 720;
+                use_fsr_ = true; sharpness_ = 0.7f;
+                break;
+        }
+        // Recria framebuffer com nova resolução
+        // TODO: recriar framebuffers se resolução mudou
+    }
+
+    void setQualityPreset(QualityPreset preset);
+    uint32_t roughWidth() const { return rough_w_; }
+    uint32_t roughHeight() const { return rough_h_; }
+    uint32_t finalWidth() const { return final_w_; }
+    uint32_t finalHeight() const { return final_h_; }
+    bool useFSR() const { return use_fsr_; }
+    float sharpness() const { return sharpness_; }
+
+    // Renderer nativo na resolução configurada
+    void renderFrameNative() {
+        while (!pending_.empty()) {
+            completeUpTo(pending_.front().fence);
+        }
+    }
+
+private:
+    uint32_t rough_w_ = 512, rough_h_ = 288;
+    uint32_t final_w_ = 1280, final_h_ = 720;
+    bool use_fsr_ = true;
+    float sharpness_ = 0.5f;
 
     // Stats from executor
     uint64_t drawCalls() const { return executor_.totalDrawCalls(); }
