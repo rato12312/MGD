@@ -11,7 +11,7 @@ VulkanContext::VulkanContext() {}
 VulkanContext::~VulkanContext() { shutdown(); }
 
 bool VulkanContext::init(const char* app_name, void* window_handle) {
-#ifdef VK_VERSION_1_0
+    #ifdef VK_VERSION_1_0
     if (!createInstance(app_name)) return false;
     if (!pickPhysicalDevice()) return false;
     if (!createLogicalDevice()) return false;
@@ -23,10 +23,47 @@ bool VulkanContext::init(const char* app_name, void* window_handle) {
     if (!createCommandBuffers()) return false;
     if (!createSyncObjects()) return false;
     return true;
-#else
+    #else
     (void)app_name; (void)window_handle;
     return true; // sem SDK: stub ok (CI nao quebra)
-#endif
+    #endif
+}
+
+bool VulkanContext::initFromExisting(VkDevice device, VkPhysicalDevice physical_device,
+                                     VkQueue graphics_queue, VkQueue present_queue,
+                                     VkSurfaceKHR surface, VkSwapchainKHR swapchain) {
+    #ifdef VK_VERSION_1_0
+    device_ = device;
+    physical_device_ = physical_device;
+    graphics_queue_ = graphics_queue;
+    present_queue_ = present_queue;
+    surface_ = surface;
+    swapchain_ = swapchain;
+    
+    // Descobre queue families
+    uint32_t qn = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(physical_device_, &qn, nullptr);
+    std::vector<VkQueueFamilyProperties> qs(qn);
+    vkGetPhysicalDeviceQueueFamilyProperties(physical_device_, &qn, qs.data());
+    for (uint32_t i = 0; i < qn; i++) {
+        if (qs[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+            graphics_queue_family_ = i;
+            compute_queue_family_ = i;
+            break;
+        }
+    }
+    
+    // Cria render pass, framebuffers, command pool, etc.
+    if (!createRenderPass()) return false;
+    if (!createFramebuffers()) return false;
+    if (!createCommandPool()) return false;
+    if (!createCommandBuffers()) return false;
+    if (!createSyncObjects()) return false;
+    
+    return true;
+    #else
+    return true;
+    #endif
 }
 
 void VulkanContext::shutdown() {
@@ -207,7 +244,80 @@ bool VulkanContext::createLogicalDevice() {
 #endif
 }
 bool VulkanContext::createSurface(void*) { return true; }
-bool VulkanContext::createSwapchain() { return true; }
+bool VulkanContext::createSwapchain() {
+#ifdef VK_VERSION_1_0
+    if(device_==VK_NULL_HANDLE) return true;
+    
+    // Swapchain para apresentação na tela (full resolution)
+    VkSurfaceCapabilitiesKHR caps;
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device_, surface_, &caps);
+    
+    VkFormat swapchain_format = VK_FORMAT_B8G8R8A8_SRGB;
+    VkColorSpaceKHR color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+    
+    VkExtent2D extent = {finalW_, finalH_};
+    if (caps.currentExtent.width != UINT32_MAX) {
+        extent = caps.currentExtent;
+    } else {
+        extent = {finalW_, finalH_};
+    }
+    
+    uint32_t image_count = caps.minImageCount + 1;
+    if (caps.maxImageCount > 0 && image_count > caps.maxImageCount) {
+        image_count = caps.maxImageCount;
+    }
+    
+    VkSwapchainCreateInfoKHR ci{VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
+    ci.surface = surface_;
+    ci.minImageCount = image_count;
+    ci.imageFormat = swapchain_format;
+    ci.imageColorSpace = color_space;
+    ci.imageExtent = extent;
+    ci.imageArrayLayers = 1;
+    ci.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    ci.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    ci.preTransform = caps.currentTransform;
+    ci.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    ci.presentMode = VK_PRESENT_MODE_FIFO_KHR; // VSync
+    ci.clipped = VK_TRUE;
+    ci.oldSwapchain = swapchain_;
+    
+    VkSwapchainKHR old_swapchain = swapchain_;
+    if (vkCreateSwapchainKHR(device_, &ci, nullptr, &swapchain_) != VK_SUCCESS) {
+        return false;
+    }
+    
+    // Destroy old swapchain
+    if (old_swapchain != VK_NULL_HANDLE) {
+        vkDestroySwapchainKHR(device_, old_swapchain, nullptr);
+    }
+    
+    // Get swapchain images
+    uint32_t image_count = 0;
+    vkGetSwapchainImagesKHR(device_, swapchain_, &image_count, nullptr);
+    swapchain_images_.resize(image_count);
+    vkGetSwapchainImagesKHR(device_, swapchain_, &image_count, swapchain_images_.data());
+    
+    // Create image views
+    swapchain_image_views_.resize(image_count);
+    for (uint32_t i = 0; i < image_count; i++) {
+        VkImageViewCreateInfo iv{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+        iv.image = swapchain_images_[i];
+        iv.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        iv.format = swapchain_format_;
+        iv.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        iv.subresourceRange.levelCount = 1;
+        iv.subresourceRange.layerCount = 1;
+        if (vkCreateImageView(device_, &iv, nullptr, &swapchain_image_views_[i]) != VK_SUCCESS) {
+            return false;
+        }
+    }
+    
+    return true;
+#else
+    return true;
+#endif
+}
 bool VulkanContext::createRenderPass() {
 #ifdef VK_VERSION_1_0
     if(device_==VK_NULL_HANDLE) return true;
@@ -232,14 +342,34 @@ bool VulkanContext::createRenderPass() {
 bool VulkanContext::createFramebuffers() {
 #ifdef VK_VERSION_1_0
     if(device_==VK_NULL_HANDLE) return true;
-    // offscreen rascunho: Full=1280x720, Cheap=512x288 (0.4x), Edge=512x288
-    auto color = createImage(roughW_,roughH_,VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_SAMPLED_BIT);
-    auto depth = createImage(roughW_,roughH_,VK_FORMAT_D16_UNORM, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    
+    // Se temos swapchain images, usa elas para framebuffers de apresentação
+    if (!swapchain_images_.empty()) {
+        framebuffers_.resize(swapchain_images_.size());
+        for (size_t i = 0; i < swapchain_images_.size(); i++) {
+            VkImageView attachments[] = {swapchain_image_views_[i]};
+            VkFramebufferCreateInfo fbci{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
+            fbci.renderPass = render_pass_;
+            fbci.attachmentCount = 1;
+            fbci.pAttachments = &swapchain_image_views_[i];
+            fbci.width = swapchain_extent_.width;
+            fbci.height = swapchain_extent_.height;
+            fbci.layers = 1;
+            VkFramebuffer fb;
+            if (vkCreateFramebuffer(device_, &fbci, nullptr, &fb) != VK_SUCCESS) return false;
+            framebuffers_.push_back(fb);
+        }
+        return true;
+    }
+    
+    // Fallback: offscreen rascunho (para rascunho 0.4x)
+    auto color = createImage(roughW_, roughH_, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_SAMPLED_BIT);
+    auto depth = createImage(roughW_, roughH_, VK_FORMAT_D16_UNORM, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     if(!color||!depth) return false;
     VkImageView views[2] = {color->view, depth->view};
-    VkFramebufferCreateInfo ci{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
-    ci.renderPass = render_pass_; ci.attachmentCount=2; ci.pAttachments=views; ci.width=roughW_; ci.height=roughH_; ci.layers=1;
-    VkFramebuffer fb; if(vkCreateFramebuffer(device_,&ci,nullptr,&fb)!=VK_SUCCESS) return false;
+    VkFramebufferCreateInfo fbci{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
+    fbci.renderPass = render_pass_; fbci.attachmentCount=2; fbci.pAttachments=views; fbci.width=roughW_; fbci.height=roughH_; fbci.layers=1;
+    VkFramebuffer fb; if(vkCreateFramebuffer(device_,&fbci,nullptr,&fb)!=VK_SUCCESS) return false;
     framebuffers_.push_back(fb);
     // mantem imagens vivas (vaza de proposito no rascunho; Painter vai gerenciar)
     (void)color.release(); (void)depth.release();
@@ -282,10 +412,46 @@ void VulkanContext::setResolution(uint32_t roughW, uint32_t roughH, uint32_t fin
     roughW_ = roughW; roughH_ = roughH; finalW_ = finalW; finalH_ = finalH;
 #ifdef VK_VERSION_1_0
     if(device_ != VK_NULL_HANDLE) {
-        for(auto fb: framebuffers_) vkDestroyFramebuffer(device_, fb, nullptr);
-        framebuffers_.clear();
-        createFramebuffers();
+        // Se temos swapchain, recria com nova resolução
+        if (!swapchain_images_.empty()) {
+            recreateSwapchain();
+        } else {
+            for(auto fb: framebuffers_) vkDestroyFramebuffer(device_, fb, nullptr);
+            framebuffers_.clear();
+            createFramebuffers();
+        }
     }
+#endif
+}
+}
+
+bool VulkanContext::recreateSwapchain() {
+#ifdef VK_VERSION_1_0
+    if(device_ == VK_NULL_HANDLE) return true;
+    
+    // Destroi framebuffers antigos
+    for(auto fb: framebuffers_) vkDestroyFramebuffer(device_, fb, nullptr);
+    framebuffers_.clear();
+    
+    // Destroi image views antigas
+    for(auto view : swapchain_image_views_) vkDestroyImageView(device_, view, nullptr);
+    swapchain_image_views.clear();
+    
+    // Destroi swapchain antigo
+    if (swapchain_ != VK_NULL_HANDLE) {
+        vkDestroySwapchainKHR(device_, swapchain_, nullptr);
+        swapchain_ = VK_NULL_HANDLE;
+    }
+    
+    // Recria swapchain
+    if (!createSwapchain()) return false;
+    
+    // Recria framebuffers
+    if (!createFramebuffers()) return false;
+    
+    return true;
+#else
+    return true;
 #endif
 }
 
@@ -1705,6 +1871,19 @@ VulkanGpuExecutor::~VulkanGpuExecutor() { shutdown(); }
 bool VulkanGpuExecutor::init(void* window_handle) {
     vk_ctx_ = std::make_unique<VulkanContext>();
     if(!vk_ctx_->init("MGD Odyssey", window_handle)) return false;
+    recompiler_ = std::make_unique<ShaderRecompiler>(vk_ctx_.get());
+    fb_mgr_ = std::make_unique<FramebufferManager>(512, 288, 1280, 720);
+    painter_ = std::make_unique<PainterCompute>();
+    if(!painter_->init(vk_ctx_.get(), fb_mgr_.get())) return false;
+    asset_pipeline_ = std::make_unique<AssetPipeline>();
+    return true;
+}
+
+bool VulkanGpuExecutor::initFromExisting(VkDevice device, VkPhysicalDevice physical_device,
+                                         VkQueue graphics_queue, VkQueue present_queue,
+                                         VkSurfaceKHR surface, VkSwapchainKHR swapchain) {
+    vk_ctx_ = std::make_unique<VulkanContext>();
+    if(!vk_ctx_->initFromExisting(device, physical_device, graphics_queue, present_queue, surface, swapchain)) return false;
     recompiler_ = std::make_unique<ShaderRecompiler>(vk_ctx_.get());
     fb_mgr_ = std::make_unique<FramebufferManager>(512, 288, 1280, 720);
     painter_ = std::make_unique<PainterCompute>();

@@ -561,7 +561,7 @@ struct AndroidEngine {
     }
     
     void runFrame() {
-        if (!initialized || !running) return;
+        if (!initialized || !running || !gpu) return;
         
         // Frame do emulador
         char frame_path[64];
@@ -572,7 +572,88 @@ struct AndroidEngine {
             frame_count++;
         }
         
-        // TODO: apresentar frame final na tela via Vulkan swapchain
+        // Apresenta frame final na tela via Vulkan swapchain
+        presentFrame();
+    }
+    
+    void presentFrame() {
+        if (!gpu || !gpu->vk_ctx_ || device == VK_NULL_HANDLE) return;
+        
+        VkResult result;
+        
+        // Wait for fence
+        vkWaitForFences(device, 1, &in_flight_fences[current_frame], VK_TRUE, UINT64_MAX);
+        vkResetFences(device, 1, &in_flight_fences[current_frame]);
+        
+        // Acquire next image
+        uint32_t image_index;
+        VkResult acquire_result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, 
+                                                          image_available_semaphores[current_frame], 
+                                                          VK_NULL_HANDLE, &image_index);
+        if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR || acquire_result == VK_SUBOPTIMAL_KHR) {
+            // Recreate swapchain
+            createSwapchain();
+            return;
+        } else if (acquire_result != VK_SUCCESS) {
+            LOGE("Failed to acquire swapchain image: %d", acquire_result);
+            return;
+        }
+        
+        // Record command buffer
+        VkCommandBuffer cmd = command_buffers[current_frame];
+        VkCommandBufferBeginInfo cbbi{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+        cbbi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        vkBeginCommandBuffer(cmd, &cbbi);
+        
+        // Begin render pass
+        VkRenderPassBeginInfo rpbi{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+        rpbi.renderPass = render_pass;
+        rpbi.framebuffer = framebuffers[image_index];
+        rpbi.renderArea.offset = {0, 0};
+        rpbi.renderArea.extent = swapchain_extent;
+        VkClearValue clear_color{{{0.0f, 0.0f, 0.0f, 1.0f}}};
+        rpbi.clearValueCount = 1;
+        rpbi.pClearValues = &clear_color;
+        vkCmdBeginRenderPass(command_buffers[current_frame], &rpbi, VK_SUBPASS_CONTENTS_INLINE);
+        
+        // Draw the Painter's output texture as a full-screen quad
+        // For now, just clear to a color
+        vkCmdEndRenderPass(cmd);
+        vkEndCommandBuffer(cmd);
+        
+        // Submit
+        VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        VkSubmitInfo si{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+        si.waitSemaphoreCount = 1;
+        si.pWaitSemaphores = &image_available_semaphores[current_frame];
+        si.pWaitDstStageMask = &wait_stage;
+        si.commandBufferCount = 1;
+        si.pCommandBuffers = &cmd;
+        si.signalSemaphoreCount = 1;
+        si.pSignalSemaphores = &render_finished_semaphores[current_frame];
+        
+        VkResult submit_result = vkQueueSubmit(graphics_queue, 1, &si, in_flight_fences[current_frame]);
+        if (submit_result != VK_SUCCESS) {
+            LOGE("Failed to submit command buffer: %d", submit_result);
+            return;
+        }
+        
+        // Present
+        VkPresentInfoKHR pi{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
+        pi.waitSemaphoreCount = 1;
+        pi.pWaitSemaphores = &render_finished_semaphores[current_frame];
+        pi.swapchainCount = 1;
+        pi.pSwapchains = &swapchain;
+        pi.pImageIndices = &image_index;
+        
+        VkResult present_result = vkQueuePresentKHR(present_queue, &pi);
+        if (present_result == VK_ERROR_OUT_OF_DATE_KHR || present_result == VK_SUBOPTIMAL_KHR) {
+            createSwapchain();
+        } else if (present_result != VK_SUCCESS) {
+            LOGE("Failed to present: %d", present_result);
+        }
+        
+        current_frame = (current_frame + 1) % 2;
     }
     
     void onWindowCreated(ANativeWindow* new_window) {
@@ -581,7 +662,12 @@ struct AndroidEngine {
         if (gpu && window) {
             uint32_t rw, rh, fw, fh;
             emulator->getGpuResolution(rw, rh, fw, fh);
+            
+            // Recria swapchain com nova janela
             gpu->setResolution(rw, rh, fw, fh);
+            if (gpu->vk_ctx_) {
+                gpu->vk_ctx_->recreateSwapchain(app->window);
+            }
             LOGI("Window created %p, swapchain %ux%u", window, rw, rh);
         }
     }

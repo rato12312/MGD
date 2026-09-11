@@ -117,7 +117,17 @@ public:
     VkCommandBuffer beginSingleTimeCommands();
     void endSingleTimeCommands(VkCommandBuffer cmd);
 
+    VkCommandBuffer currentCommandBuffer() const { return command_buffers_[current_frame_]; }
+
     void setResolution(uint32_t roughW, uint32_t roughH, uint32_t finalW, uint32_t finalH);
+
+    // Recria swapchain (para resize de janela)
+    bool recreateSwapchain();
+
+    // Inicializa com device/swapchain existentes (para Android)
+    bool initFromExisting(VkDevice device, VkPhysicalDevice physical_device,
+                          VkQueue graphics_queue, VkQueue present_queue,
+                          VkSurfaceKHR surface, VkSwapchainKHR swapchain);
 
     // Getters
     VkInstance instance() const { return instance_; }
@@ -275,6 +285,11 @@ public:
 
     // Executa command buffer Maxwell (tradução + submit Vulkan)
     bool execute(const uint8_t* cmd_buf, size_t size);
+
+    // Inicializa com device/swapchain existentes (para Android)
+    bool initFromExisting(VkDevice device, VkPhysicalDevice physical_device,
+                          VkQueue graphics_queue, VkQueue present_queue,
+                          VkSurfaceKHR surface, VkSwapchainKHR swapchain);
 
     // Resource creation (chamado via IPC do jogo)
     uint32_t createTexture(uint32_t w, uint32_t h, TexFormat fmt, const uint8_t* data, size_t size);
