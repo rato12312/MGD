@@ -177,21 +177,179 @@ public:
         return kernel_.runThreads(cpu_, maxSteps, quantum);
     }
 
-    // Save state: congela CPU + RAM (kernel/mundo ficam de fora, honesto).
+    // Save state: congela CPU + RAM + Kernel + Applets + Mundo + MFO.
     struct Snapshot {
         Cpu::State cpu;
         std::vector<uint8_t> ram;
+        
+        // Kernel state
+        struct KernelState {
+            std::unordered_map<uint64_t, Kernel::Process> processes;
+            std::unordered_map<uint32_t, uint32_t> handles;
+            uint64_t next_pid = 1;
+            uint32_t next_handle = 1;
+            uint64_t heap_base = 0;
+            uint64_t heap_size = 0;
+            uint64_t last_mem_attr = 0;
+            bool exited = false;
+            uint64_t slept_ns = 0;
+            
+            // Scheduler state
+            struct ThreadState {
+                uint64_t id;
+                uint64_t entry;
+                uint64_t sp;
+                uint32_t priority;
+                Cpu::State cpu_state;
+            };
+            std::vector<ThreadState> threads;
+            uint64_t current_thread = 0;
+            
+            // Service state
+            struct ServiceState {
+                std::string name;
+                std::vector<std::pair<uint32_t, std::shared_ptr<Session>>> sessions;
+            };
+            std::vector<ServiceState> services;
+        } kernel;
+        
+        // Applet state
+        struct AppletState {
+            uint64_t id;
+            std::string name;
+            uint64_t program_id;
+            uint64_t entry_point;
+            uint64_t stack_top;
+            uint8_t state; // AppletState enum
+            std::vector<uint8_t> nso_blob;
+        };
+        std::vector<AppletState> applets;
+        std::vector<uint64_t> applet_stack;
+        uint64_t next_applet = 1;
+        
+        // World state
+        struct WorldState {
+            struct CheapMode {
+                float resolution_factor;
+                bool shadows;
+                bool anti_aliasing;
+                bool post_processing;
+                bool frame_reuse_static;
+                bool lod_aggressive;
+            } cheap;
+            
+            // MentalMapRuntime state
+            struct MentalMapState {
+                // Simplified: just frame count
+                uint64_t frame_index = 0;
+            } mental_map;
+        } world;
+        
+        // MFO state
+        struct MFOState {
+            uint64_t frame_index = 0;
+            std::vector<uint32_t> dirty_tiles;
+            std::vector<uint32_t> rebuild_tiles;
+            std::vector<uint32_t> reuse_tiles;
+        } mfo;
+        
+        // Frame info
+        uint64_t frame_index = 0;
+        double avg_ms = 0.0;
+        uint64_t frames = 0;
     };
     Snapshot snapshot() const {
         Snapshot s;
         s.cpu = cpu_.save();
         s.ram.assign(cpu_.ram(), cpu_.ram() + cpu_.ramSize());
+        s.frame_index = frames_;
+        s.avg_ms = avg_ms_;
+        s.frames = frames_;
+        
+        // Kernel state
+        s.kernel.processes = kernel_.getProcessesForSnapshot();
+        s.kernel.handles = kernel_.getHandlesForSnapshot();
+        s.kernel.next_pid = kernel_.getNextPid();
+        s.kernel.next_handle = kernel_.getNextHandle();
+        s.kernel.heap_base = kernel_.heapBase();
+        s.kernel.heap_size = kernel_.heapSize();
+        s.kernel.last_mem_attr = kernel_.lastMemAttr();
+        s.kernel.exited = kernel_.exited();
+        s.kernel.slept_ns = kernel_.sleptNs();
+        s.kernel.threads = kernel_.getThreadsForSnapshot();
+        s.kernel.current_thread = kernel_.getCurrentThreadId();
+        s.kernel.services = kernel_.getServicesForSnapshot();
+        
+        // Applet state
+        auto applets = kernel_.applet().getAppletsForSnapshot();
+        s.applets.reserve(applets.size());
+        for (const auto& a : applets) {
+            Snapshot::AppletState as;
+            as.id = a.id;
+            as.name = a.name;
+            as.program_id = a.program_id;
+            as.entry_point = a.entry_point;
+            as.stack_top = a.stack_top;
+            as.state = static_cast<uint8_t>(a.state);
+            as.nso_blob = a.nso_blob;
+            s.applets.push_back(std::move(as));
+        }
+        s.applet_stack = kernel_.applet().stack();
+        s.next_applet = kernel_.applet().getNextAppletId();
+        
+        // World state
+        s.world.cheap = world_.cheap();
+        s.world.mental_map.frame_index = world_.runtime().getFrameIndex();
+        
+        // MFO state
+        if (mfo_manager_) {
+            s.mfo.frame_index = mfo_manager_->getFrameIndex();
+            auto output = mfo_manager_->getLastOutput();
+            s.mfo.dirty_tiles = output.dirty_tile_indices;
+            s.mfo.rebuild_tiles = output.rebuild_tile_indices;
+            s.mfo.reuse_tiles = output.reuse_tile_indices;
+        }
+        
         return s;
     }
+    
     bool restore(const Snapshot& s) {
         if (s.ram.size() != cpu_.ramSize()) return false;
         cpu_.load(s.cpu);
         std::memcpy(cpu_.ram(), s.ram.data(), s.ram.size());
+        frames_ = s.frames;
+        avg_ms_ = s.avg_ms;
+        frames_ = s.frames;
+        
+        // Restore kernel state
+        kernel_.restoreProcesses(s.kernel.processes);
+        kernel_.restoreHandles(s.kernel.handles);
+        kernel_.setNextPid(s.kernel.next_pid);
+        kernel_.setNextHandle(s.kernel.next_handle);
+        kernel_.setHeapBase(s.kernel.heap_base);
+        kernel_.setHeapSize(s.kernel.heap_size);
+        kernel_.setLastMemAttr(s.kernel.last_mem_attr);
+        kernel_.setExited(s.kernel.exited);
+        kernel_.setSleptNs(s.kernel.slept_ns);
+        kernel_.restoreThreads(s.kernel.threads, s.kernel.current_thread);
+        kernel_.restoreServices(s.kernel.services);
+        
+        // Restore applet state
+        for (const auto& a : s.applets) {
+            kernel_.applet().restoreApplet(a);
+        }
+        kernel_.applet().restoreStack(s.applet_stack);
+        kernel_.applet().setNextAppletId(s.next_applet);
+        
+        // Restore world state
+        world_.cheap(s.world.cheap);
+        world_.runtime().setFrameIndex(s.world.mental_map.frame_index);
+        
+        // Restore MFO state
+        if (mfo_manager_) {
+            mfo_manager_->restoreState(s.mfo);
+        }
+        
         return true;
     }
 

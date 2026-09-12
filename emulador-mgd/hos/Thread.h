@@ -85,6 +85,42 @@ public:
         return current_id_;
     }
 
+    // Snapshot support
+    struct ThreadSnapshot {
+        uint64_t id;
+        uint64_t entry;
+        uint64_t sp;
+        uint32_t priority;
+        Cpu::State cpu_state;
+    };
+    std::vector<ThreadSnapshot> getThreadsForSnapshot() const {
+        std::vector<ThreadSnapshot> out;
+        out.reserve(queue_.size());
+        for (const auto& t : queue_) {
+            out.push_back({t.id, t.ctx.pc, t.ctx.sp, t.prio, t.ctx});
+        }
+        return out;
+    }
+    uint64_t getCurrentThreadId() const {
+        return current_id_;
+    }
+    void restoreThreads(const std::vector<ThreadSnapshot>& snapshots, uint64_t current) {
+        queue_.clear();
+        next_id_ = 0;
+        for (const auto& s : snapshots) {
+            Thread t;
+            t.id = s.id;
+            t.ctx = s.cpu_state;
+            t.prio = s.priority;
+            t.wake_at = elapsed_;
+            t.aspace = nullptr;
+            t.finished = false;
+            queue_.push_back(t);
+            if (s.id > next_id_) next_id_ = s.id;
+        }
+        current_id_ = current;
+    }
+
 private:
     // Índice da pronta com menor prio, ou -1 se todas dormem.
     int pickReady() const {

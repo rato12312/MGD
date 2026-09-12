@@ -216,6 +216,7 @@ add_executable(mgd_tests
     tests/test_nca_decrypt.cpp
     tests/test_ipc_buffers.cpp
     tests/test_applet_service.cpp
+    tests/test_save_state.cpp
 )
 target_link_libraries(mgd_tests mgd_core)
 target_compile_definitions(mgd_tests PRIVATE MGD_TESTING)

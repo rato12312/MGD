@@ -208,6 +208,42 @@ public:
         return nullptr;
     }
 
+    // Snapshot support
+    struct AppletSnapshot {
+        uint64_t id;
+        std::string name;
+        uint64_t program_id;
+        uint64_t entry_point;
+        uint64_t stack_top;
+        uint8_t state;
+        std::vector<uint8_t> nso_blob;
+    };
+    std::vector<Kernel::AppletSnapshot> getAppletsForSnapshot() const {
+        std::vector<Kernel::AppletSnapshot> out;
+        out.reserve(applets_.size());
+        for (const auto& [id, a] : applets_) {
+            out.push_back({a.id, a.name, a.program_id, a.entry_point, a.stack_top, 
+                          static_cast<uint8_t>(a.state), a.nso_blob});
+        }
+        return out;
+    }
+    std::vector<uint64_t> stack() const { return stack_; }
+    uint64_t getNextAppletId() const { return next_applet_; }
+    
+    void restoreApplet(const Kernel::AppletSnapshot& a) {
+        Applet applet;
+        applet.id = a.id;
+        applet.name = a.name;
+        applet.program_id = a.program_id;
+        applet.entry_point = a.entry_point;
+        applet.stack_top = a.stack_top;
+        applet.state = static_cast<AppletState>(a.state);
+        applet.nso_blob = a.nso_blob;
+        applets_[a.id] = std::move(applet);
+    }
+    void restoreStack(const std::vector<uint64_t>& s) { stack_ = s; }
+    void setNextAppletId(uint64_t v) { next_applet_ = v; }
+
 private:
     static uint32_t rd32(const std::vector<uint8_t>& v, size_t o) {
         uint32_t r = 0;

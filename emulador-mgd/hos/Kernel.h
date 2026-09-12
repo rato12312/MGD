@@ -214,7 +214,63 @@ public:
     FatalService& fatal() { return fatal_; }
     PmService& pm() { return pm_; }
 
-    SvcResult call(uint32_t num, SvcArgs& args) {
+    // Snapshot support
+    std::unordered_map<uint64_t, Process> getProcessesForSnapshot() const { return processes_; }
+    std::unordered_map<uint32_t, uint32_t> getHandlesForSnapshot() const { return handles_; }
+    uint64_t getNextPid() const { return next_pid_; }
+    uint32_t getNextHandle() const { return next_handle_; }
+    uint64_t heapBase() const { return heap_base_; }
+    uint64_t heapSize() const { return heap_size_; }
+    uint64_t lastMemAttr() const { return last_mem_attr_; }
+    bool exited() const { return exited_; }
+    uint64_t sleptNs() const { return slept_ns_; }
+    
+    struct ThreadSnapshot {
+        uint64_t id;
+        uint64_t entry;
+        uint64_t sp;
+        uint32_t priority;
+        Cpu::State cpu_state;
+    };
+    std::vector<ThreadSnapshot> getThreadsForSnapshot() const { return sched_.getThreadsForSnapshot(); }
+    uint64_t getCurrentThreadId() const { return sched_.getCurrentThreadId(); }
+    
+    struct ServiceSnapshot {
+        std::string name;
+        std::vector<std::pair<uint32_t, std::shared_ptr<Session>>> sessions;
+    };
+    std::vector<ServiceSnapshot> getServicesForSnapshot() const { return services_.getServicesForSnapshot(); }
+    
+    void restoreProcesses(const std::unordered_map<uint64_t, Process>& p) { processes_ = p; }
+    void restoreHandles(const std::unordered_map<uint32_t, uint32_t>& h) { handles_ = h; }
+    void setNextPid(uint64_t v) { next_pid_ = v; }
+    void setNextHandle(uint32_t v) { next_handle_ = v; }
+    void setHeapBase(uint64_t v) { heap_base_ = v; }
+    void setHeapSize(uint64_t v) { heap_size_ = v; }
+    void setLastMemAttr(uint64_t v) { last_mem_attr_ = v; }
+    void setExited(bool v) { exited_ = v; }
+    void setSleptNs(uint64_t v) { slept_ns_ = v; }
+    void restoreThreads(const std::vector<ThreadSnapshot>& threads, uint64_t current) { sched_.restoreThreads(threads, current); }
+    void restoreServices(const std::vector<ServiceSnapshot>& services) { services_.restoreServices(services); }
+
+    // Applet snapshot
+    struct AppletSnapshot {
+        uint64_t id;
+        std::string name;
+        uint64_t program_id;
+        uint64_t entry_point;
+        uint64_t stack_top;
+        uint8_t state;
+        std::vector<uint8_t> nso_blob;
+    };
+    std::vector<AppletSnapshot> getAppletsForSnapshot() const { return applet_.getAppletsForSnapshot(); }
+    std::vector<uint64_t> getAppletStack() const { return applet_.stack(); }
+    uint64_t getNextAppletId() const { return applet_.getNextAppletId(); }
+    void restoreApplet(const AppletSnapshot& a) { applet_.restoreApplet(a); }
+    void restoreAppletStack(const std::vector<uint64_t>& s) { applet_.restoreStack(s); }
+    void setNextAppletId(uint64_t v) { applet_.setNextAppletId(v); }
+
+private:
         switch (num) {
             case SVC_SET_HEAP_SIZE: {
                 heap_size_ = args.x[1];

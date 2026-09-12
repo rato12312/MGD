@@ -72,6 +72,37 @@ public:
 
     size_t sessionCount() const { return sessions_.size(); }
 
+    // Snapshot support
+    struct ServiceSnapshot {
+        std::string name;
+        std::vector<std::pair<uint32_t, std::shared_ptr<Session>>> sessions;
+    };
+    std::vector<ServiceSnapshot> getServicesForSnapshot() const {
+        std::vector<ServiceSnapshot> out;
+        out.reserve(port_max_sessions_.size());
+        for (const auto& [name, max_sessions] : port_max_sessions_) {
+            ServiceSnapshot ss;
+            ss.name = name;
+            ss.sessions = allSessions(); // simplified: all sessions
+            out.push_back(std::move(ss));
+        }
+        return out;
+    }
+    void restoreServices(const std::vector<ServiceSnapshot>& snapshots) {
+        sessions_.clear();
+        port_max_sessions_.clear();
+        next_session_ = 1;
+        for (const auto& ss : snapshots) {
+            if (ss.name == "sm:") continue; // skip sm:
+            ports_.registerPort(ss.name, 8);
+            port_max_sessions_[ss.name] = 8;
+            for (const auto& [id, session] : ss.sessions) {
+                if (id >= next_session_) next_session_ = id + 1;
+                sessions_[id] = {session, session, ss.name}; // simplified
+            }
+        }
+    }
+
 private:
     struct SessionPair {
         std::shared_ptr<Session> client;
