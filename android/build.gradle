@@ -1,86 +1,22 @@
-// MGD Odyssey Android - Build Configuration
-
-plugins {
-    id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
-}
-
-android {
-    namespace 'com.mgd.odyssey'
-    compileSdk 34
-
-    defaultConfig {
-        applicationId "com.mgd.odyssey"
-        minSdk 30  // Android 11+
-        targetSdk 34
-        versionCode 1
-        versionName "1.0"
-
-        // Native library
-        externalNativeBuild {
-            cmake {
-                cppFlags "-std=c++17 -frtti -fexceptions"
-                arguments "-DANDROID_STL=c++17_shared",
-                         "-DANDROID_PLATFORM=android-30",
-                         "-DCMAKE_BUILD_TYPE=Release"
-            }
-        }
-
-        ndk {
-            abiFilters 'arm64-v8a'  // A15 é ARM64
-        }
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
     }
-
-    buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-        debug {
-            debuggable true
-            jniDebuggable true
-        }
-    }
-
-    externalNativeBuild {
-        cmake {
-            path file("../android/CMakeLists.txt")
-            version "3.22.1"
-        }
-    }
-
-    packagingOptions {
-        jniLibs {
-            useLegacyPackaging = true
-        }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.1.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0"
     }
 }
 
-dependencies {
-    implementation "androidx.core:core-ktx:1.12.0"
-    implementation "androidx.appcompat:appcompat:1.6.1"
-    implementation "com.google.android.material:material:1.11.0"
-    implementation "androidx.activity:activity:1.8.2"
-    
-    // GameActivity para melhor suporte a jogos
-    implementation "com.google.android.games:game-activity:1.2.2"
-    
-    // Vulkan
-    implementation "androidx.vulkan:vulkan:1.3.266"
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
 }
 
-android {
-    // Permissões necessárias
-    defaultConfig {
-        // Permissão para ler/gravar arquivos do jogo
-        manifestPlaceholders = [
-            PERMISSIONS: '''
-                <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-                <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-                <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
-                <uses-feature android:name="android.hardware.vulkan.version" android:required="true" />
-                <uses-feature android:name="android.hardware.vulkan.compute" android:required="true" />
-            '''
-        ]
-    }
+task clean(type: Delete) {
+    delete rootProject.buildDir
 }
