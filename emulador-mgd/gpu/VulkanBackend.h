@@ -354,6 +354,10 @@ private:
     bool bindPipeline();
     bool updateDescriptors();
     bool pushConstants();
+    
+    // Real Vulkan execution
+    void executeDrawCommands(VkCommandBuffer cb);
+    void executeComputeDispatches(VkCommandBuffer cb);
 };
 
 } // namespace gpu

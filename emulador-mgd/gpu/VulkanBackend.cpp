@@ -2007,10 +2007,10 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
             {
                 uint32_t result = getNextId();
                 emitOp(SpvOpNop, {}); // Placeholder - needs subgroup extension
-                reg_to_id[dst] = result;
+reg_to_id[dst] = result;
             }
-break;
-        
+            break;
+            
         // ===== Surface/Texture =====
         case 0xD0: // SULD (surface load)
         case 0xD1: // SUST (surface store)
@@ -2255,18 +2255,67 @@ bool VulkanGpuExecutor::execute(const uint8_t* cmd_buf, size_t size) {
     if(!cmd_buf || size<4) return false;
     if(!vk_ctx_) return false;
 
-    // Begin frame for rascunho
+    // Begin frame
     fb_mgr_->beginFrame(state_.frame_index++);
     vk_ctx_->beginFrame();
     
-    // Execute rascunho command buffer
+    // Parse Maxwell command buffer
     size_t dwords = size/4;
     const uint32_t* cmds = reinterpret_cast<const uint32_t*>(cmd_buf);
     size_t parsed = MaxwellDecoder::parse(cmds, dwords, state_, shaders_, textures_, samplers_, render_targets_, unknown_ops_);
     bytes_executed_ += parsed*4;
+    
+    // Get current Vulkan command buffer
+    VkCommandBuffer cb = vk_ctx_->currentCommandBuffer();
+    
+    // Begin render pass for rough framebuffer (512x288)
+    if (fb_mgr_ && fb_mgr_->getCurrentHistory()) {
+        VkRenderPassBeginInfo rp_info{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+        rp_info.renderPass = vk_ctx_->renderPass();
+        rp_info.framebuffer = vk_ctx_->framebuffers()[vk_ctx_->currentFrame()];
+        rp_info.renderArea.offset = {0, 0};
+        rp_info.renderArea.extent = {static_cast<uint32_t>(fb_mgr_->roughWidth()), static_cast<uint32_t>(fb_mgr_->roughHeight())};
+        
+        VkClearValue clear_values[2] = {};
+        clear_values[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        clear_values[1].depthStencil = {1.0f, 0};
+        rp_info.clearValueCount = 2;
+        rp_info.pClearValues = clear_values;
+        
+        vkCmdBeginRenderPass(cb, &rp_info, VK_SUBPASS_CONTENTS_INLINE);
+        
+        // Set viewport and scissor
+        VkViewport viewport{};
+        viewport.x = static_cast<float>(state_.viewport_x);
+        viewport.y = static_cast<float>(state_.viewport_y);
+        viewport.width = static_cast<float>(state_.viewport_w);
+        viewport.height = static_cast<float>(state_.viewport_h);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(cb, 0, 1, &viewport);
+        
+        VkRect2D scissor{};
+        scissor.offset = {static_cast<int32_t>(state_.scissor_x), static_cast<int32_t>(state_.scissor_y)};
+        scissor.extent = {state_.scissor_w, state_.scissor_h};
+        vkCmdSetScissor(cb, 0, 1, &scissor);
+        
+        // Execute draws from parsed state
+        if (state_.draw_count > 0) {
+            executeDrawCommands(cb);
+        }
+        
+        vkCmdEndRenderPass(cb);
+    }
+    
+    // Execute compute dispatches
+    if (state_.compute_dispatch_count > 0) {
+        executeComputeDispatches(cb);
+    }
+    
     draw_calls_ += state_.draw_count;
     compute_dispatches_ += state_.compute_dispatch_count;
-    state_.draw_count=0; state_.compute_dispatch_count=0;
+    state_.draw_count = 0; 
+    state_.compute_dispatch_count = 0;
     
     vk_ctx_->endFrame();
     
@@ -2275,19 +2324,95 @@ bool VulkanGpuExecutor::execute(const uint8_t* cmd_buf, size_t size) {
         auto* rough_hist = fb_mgr_->getCurrentHistory();
         auto* prev_hist = fb_mgr_->getPrevHistory();
         if (rough_hist && rough_hist->valid) {
-            VkCommandBuffer cb = vk_ctx_->beginSingleTimeCommands();
-            painter_->execute(rough_hist, prev_hist, cb);
-            vk_ctx_->endSingleTimeCommands(cb);
+            VkCommandBuffer painter_cb = vk_ctx_->beginSingleTimeCommands();
+            painter_->execute(rough_hist, prev_hist, painter_cb);
+            vk_ctx_->endSingleTimeCommands(painter_cb);
         }
     }
     
     fb_mgr_->endFrame(
-        rough_hist ? rough_hist->obj_id : std::vector<uint32_t>{},
-        rough_hist ? rough_hist->depth : std::vector<uint16_t>{},
-        std::vector<Vec3>{} // obj_positions - seria preenchido pelo rascunho real
+        state_.draw_count > 0 ? std::vector<uint32_t>{} : std::vector<uint32_t>{},
+        std::vector<uint16_t>{},
+        std::vector<Vec3>{}
     );
     
-    return parsed>0;
+    return parsed > 0;
+}
+
+// Execute draw commands (Vulkan submission)
+void VulkanGpuExecutor::executeDrawCommands(VkCommandBuffer cb) {
+    if (!state_.vs || !state_.fs) return;
+    
+    // Get or create pipeline for this shader pair
+    uint64_t vs_hash = 0, fs_hash = 0;
+    for (uint32_t w : state_.vs->bytecode) vs_hash = vs_hash * 31 + w;
+    for (uint32_t w : state_.fs->bytecode) fs_hash = fs_hash * 31 + w;
+    
+    auto* pipeline = recompiler_->getOrCreateGraphicsPipeline(vs_hash, fs_hash, vk_ctx_->renderPass());
+    if (!pipeline || !pipeline->pipeline) return;
+    
+    vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
+    
+    // Bind vertex buffers
+    for (size_t i = 0; i < state_.vertex_buffers.size(); ++i) {
+        const auto& vb = state_.vertex_buffers[i];
+        // In real implementation, would bind actual Vulkan buffer
+        // For now, we track that draw was submitted
+    }
+    
+    // Bind index buffer if present
+    if (state_.index_buffer.gpu_addr != 0) {
+        // vkCmdBindIndexBuffer(...)
+    }
+    
+    // Bind descriptor sets (textures, samplers, constant buffers)
+    // For now, we use the pipeline's descriptor sets
+    if (!pipeline->desc_sets.empty()) {
+        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->layout, 0, 
+                                static_cast<uint32_t>(pipeline->desc_sets.size()), pipeline->desc_sets.data(), 0, nullptr);
+    }
+    
+    // Push constants (MVP matrix, object_id, etc.)
+    if (pipeline->layout) {
+        // MVP matrix would come from constant buffer or push constants
+        // Simplified: push identity matrix
+        float mvp[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+        uint32_t push_data[20];
+        std::memcpy(push_data, mvp, 64);
+        push_data[16] = 1; // object_id
+        push_data[17] = 0; // flags
+        push_data[18] = 0; // lod
+        push_data[19] = 0; // pad
+        vkCmdPushConstants(cb, pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 80, push_data);
+    }
+    
+    // Execute draw
+    if (state_.index_buffer.gpu_addr != 0) {
+        vkCmdDrawIndexed(cb, state_.draw_count, 1, 0, 0, 0);
+    } else {
+        vkCmdDraw(cb, state_.draw_count, 1, 0, 0);
+    }
+}
+
+void VulkanGpuExecutor::executeComputeDispatches(VkCommandBuffer cb) {
+    if (!state_.cs) return;
+    
+    uint64_t cs_hash = 0;
+    for (uint32_t w : state_.cs->bytecode) cs_hash = cs_hash * 31 + w;
+    
+    auto* pipeline = recompiler_->getOrCreateComputePipeline(cs_hash);
+    if (!pipeline || !pipeline->pipeline) return;
+    
+    vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->pipeline);
+    
+    // Bind descriptor sets for compute
+    if (!pipeline->desc_sets.empty()) {
+        vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->layout, 0,
+                                static_cast<uint32_t>(pipeline->desc_sets.size()), pipeline->desc_sets.data(), 0, nullptr);
+    }
+    
+    // Dispatch (simplified: single dispatch with accumulated counts)
+    vkCmdDispatch(cb, 1, 1, 1);
 }
 
 uint32_t VulkanGpuExecutor::createTexture(uint32_t w, uint32_t h, TexFormat fmt, const uint8_t* data, size_t size) {
