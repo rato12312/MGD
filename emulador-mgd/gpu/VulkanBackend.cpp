@@ -1670,35 +1670,347 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
             emitOp(SpvOpNop, {});
             break;
             
-        // ===== Video/DP Operations =====
-        case 0xB6: // VADD (vector add)
-        case 0xB7: // VSUB (vector subtract)
-        case 0xB8: // VMUL (vector multiply)
-        case 0xB9: // VMAD (vector multiply-add)
-        case 0xBA: // VDIV (vector divide)
-        case 0xBB: // VRCP (vector reciprocal)
-        case 0xBC: // VSQRT (vector sqrt)
-        case 0xBD: // VRSQ (vector reciprocal sqrt)
-        case 0xBE: // VSIN (vector sin)
-        case 0xBF: // VCOS (vector cos)
-        case 0xC0: // VLG2 (vector log2)
-        case 0xC1: // VEX2 (vector exp2)
-            // Vector operations - simplified for now
-            emitOp(SpvOpNop, {});
+        // ===== NEON Vector Operations (Maxwell ISA) =====
+        // NEON registers: V0-V31 (128-bit each = 4xf32, 2xf64, 8xi16, 16xi8, etc.)
+        // Mapping: scalar ops use .f32/.f64/.i32/.i16/.i8 suffixes, vector ops use .v4f32/.v2f64/.v8i16/.v16i8
+        
+        // Helper for vector binary ops
+        auto emitVectorBinaryOp = [&](uint32_t spv_op, uint32_t vec_type, uint32_t dst, uint32_t src0, uint32_t src1) {
+            uint32_t result = getNextId();
+            emitOp(spv_op, {vec_type, result, getVar(src0), getVar(src1)});
+            reg_to_id[dst] = result;
+        };
+        
+        auto emitVectorUnaryOp = [&](uint32_t spv_op, uint32_t vec_type, uint32_t dst, uint32_t src) {
+            uint32_t result = getNextId();
+            emitOp(spv_op, {vec_type, result, getVar(src)});
+            reg_to_id[dst] = result;
+        };
+        
+        auto emitVectorTernaryOp = [&](uint32_t spv_op_mul, uint32_t spv_op_add, uint32_t vec_type, 
+                                        uint32_t dst, uint32_t src0, uint32_t src1, uint32_t src2) {
+            uint32_t mul = getNextId();
+            emitOp(spv_op_mul, {vec_type, getNextId(), getVar(src0), getVar(src1)});
+            emitOp(spv_op_add, {vec_type, getNextId(), mul, getVar(src2)});
+            reg_to_id[dst] = mul;
+        };
+
+        // ----- Vector FP Arithmetic (v4f32) -----
+        case 0xB6: // VADD.f32 (vector add)
+            emitVectorBinaryOp(SpvOpFAdd, vec4f, dst, src0, src1);
             break;
-            
-        // ===== DP2A/DOT Product =====
-        case 0xC2: // DP2A (dot product accumulate)
-        case 0xC3: // DP4A (4-element dot product accumulate)
+        case 0xB7: // VSUB.f32 (vector subtract)
+            emitVectorBinaryOp(SpvOpFSub, vec4f, dst, src0, src1);
+            break;
+        case 0xB8: // VMUL.f32 (vector multiply)
+            emitVectorBinaryOp(SpvOpFMul, vec4f, dst, src0, src1);
+            break;
+        case 0xB9: // VMAD/FMLA.f32 (vector fused multiply-add)
+            emitVectorTernaryOp(SpvOpFMul, SpvOpFAdd, vec4f, dst, src0, src1, src2);
+            break;
+        case 0xBA: // VDIV.f32 (vector divide)
+            emitVectorBinaryOp(SpvOpFDiv, vec4f, dst, src0, src1);
+            break;
+        case 0xBB: // VRCP.f32 (vector reciprocal estimate)
             {
                 uint32_t result = getNextId();
-                // DP4A: result = a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w + c
-                // Simplified for now
-                emitOp(SpvOpNop, {});
-                reg_to_id[dst] = result.
+                uint32_t one = getConst(1.0f);
+                emitOp(SpvOpFDiv, {vec4f, result, one, getVar(src0)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0xBC: // VSQRT.f32 (vector sqrt)
+            emitVectorUnaryOp(SpvOpSqrt, vec4f, dst, src0);
+            break;
+        case 0xBD: // VRSQ.f32 (vector reciprocal sqrt estimate)
+            {
+                uint32_t result = getNextId();
+                uint32_t one = getConst(1.0f);
+                uint32_t sqrt_val = getNextId();
+                emitOp(SpvOpSqrt, {vec4f, sqrt_val, getVar(src0)});
+                emitOp(SpvOpFDiv, {vec4f, result, one, sqrt_val});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0xBE: // VSIN.f32 (vector sin)
+            emitVectorUnaryOp(SpvOpSin, vec4f, dst, src0);
+            break;
+        case 0xBF: // VCOS.f32 (vector cos)
+            emitVectorUnaryOp(SpvOpCos, vec4f, dst, src0);
+            break;
+        case 0xC0: // VLG2.f32 (vector log2)
+            emitVectorUnaryOp(SpvOpLog2, vec4f, dst, src0);
+            break;
+        case 0xC1: // VEX2.f32 (vector exp2)
+            emitVectorUnaryOp(SpvOpExp2, vec4f, dst, src0);
+            break;
+            
+        // ----- Vector FP Arithmetic (v2f64) -----
+        case 0xE0: // VADD.f64
+            emitVectorBinaryOp(SpvOpFAdd, vec2f, dst, src0, src1); // vec2f used as v2f64 proxy
+            break;
+        case 0xE1: // VSUB.f64
+            emitVectorBinaryOp(SpvOpFSub, vec2f, dst, src0, src1);
+            break;
+        case 0xE2: // VMUL.f64
+            emitVectorBinaryOp(SpvOpFMul, vec2f, dst, src0, src1);
+            break;
+        case 0xE3: // VMAD/FMLA.f64
+            emitVectorTernaryOp(SpvOpFMul, SpvOpFAdd, vec2f, dst, src0, src1, src2);
+            break;
+        case 0xE4: // VDIV.f64
+            emitVectorBinaryOp(SpvOpFDiv, vec2f, dst, src0, src1);
+            break;
+        case 0xE5: // VSQRT.f64
+            emitVectorUnaryOp(SpvOpSqrt, vec2f, dst, src0);
+            break;
+            
+        // ----- Vector Integer Arithmetic (v8i16 / v16i8) -----
+        case 0xC4: // VADD.i16 / VADD.i8
+            emitVectorBinaryOp(SpvOpIAdd, vec4i, dst, src0, src1); // proxy
+            break;
+        case 0xC5: // VSUB.i16 / VSUB.i8
+            emitVectorBinaryOp(SpvOpISub, vec4i, dst, src0, src1);
+            break;
+        case 0xC6: // VMUL.i16
+            emitVectorBinaryOp(SpvOpIMul, vec4i, dst, src0, src1);
+            break;
+        case 0xC7: // VMLA.i16 (integer multiply-add)
+            {
+                uint32_t mul = getNextId();
+                emitOp(SpvOpIMul, {vec4i, getNextId(), getVar(src0), getVar(src1)});
+                emitOp(SpvOpIAdd, {vec4i, getNextId(), mul, getVar(src2)});
+                reg_to_id[dst] = mul;
             }
             break;
             
+        // ----- Saturating Arithmetic -----
+        case 0xC8: // SQADD (signed saturating add)
+        case 0xC9: // UQADD (unsigned saturating add)
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpIAdd, {vec4i, result, getVar(src0), getVar(src1)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0xCA: // SQSUB (signed saturating sub)
+        case 0xCB: // UQSUB (unsigned saturating sub)
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpISub, {vec4i, result, getVar(src0), getVar(src1)});
+                reg_to_id[dst] = result;
+            }
+            break;
+            
+        // ----- Vector Comparison -----
+        case 0xCC: // FCMEQ.f32 (vector compare equal)
+            emitVectorBinaryOp(SpvOpFOrdEqual, vec4f, dst, src0, src1);
+            break;
+        case 0xCD: // FCMGT.f32 (vector compare greater than)
+            emitVectorBinaryOp(SpvOpFOrdGreaterThan, vec4f, dst, src0, src1);
+            break;
+        case 0xCE: // FCMGE.f32 (vector compare greater equal)
+            emitVectorBinaryOp(SpvOpFOrdGreaterThanEqual, vec4f, dst, src0, src1);
+            break;
+        case 0xCF: // FCMLT.f32 (vector compare less than)
+            emitVectorBinaryOp(SpvOpFOrdLessThan, vec4f, dst, src0, src1);
+            break;
+        case 0xD0: // FCMLE.f32 (vector compare less equal)
+            emitVectorBinaryOp(SpvOpFOrdLessThanEqual, vec4f, dst, src0, src1);
+            break;
+            
+        // ----- Vector Min/Max -----
+        case 0xD1: // FMAX.f32 / FMAXNM.f32
+            emitVectorBinaryOp(SpvOpFMax, vec4f, dst, src0, src1);
+            break;
+        case 0xD2: // FMIN.f32 / FMINNM.f32
+            emitVectorBinaryOp(SpvOpFMin, vec4f, dst, src0, src1);
+            break;
+            
+        // ----- Vector Rounding -----
+        case 0xD3: // FRINTN (round to nearest even)
+        case 0xD4: // FRINTX (round to nearest, ties to even)
+        case 0xD5: // FRINTA (round away from zero)
+        case 0xD6: // FRINTZ (round toward zero)
+        case 0xD7: // FRINTM (round toward -inf)
+        case 0xD8: // FRINTP (round toward +inf)
+            emitVectorUnaryOp(SpvOpRound, vec4f, dst, src0);
+            break;
+            
+        // ----- Vector Conversion -----
+        case 0xD9: // FCVTN.f32.f16 (narrow: f32 -> f16)
+        case 0xDA: // FCVTXN.f32.f16 (narrow with rounding to odd)
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpConvertFToF, {vec2f, result, getVar(src0)}); // proxy
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0xDB: // FCVTN.i32.f32 / FCVTZS (convert to signed int, toward zero)
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpConvertFToS, {vec4i, result, getVar(src0)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0xDC: // FCVTNU.i32.f32 / FCVTZU (convert to unsigned int, toward zero)
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpConvertFToU, {vec4u, result, getVar(src0)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0xDD: // SCVTF (signed int to float)
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpConvertSToF, {vec4f, result, getVar(src0)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0xDE: // UCVTF (unsigned int to float)
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpConvertUToF, {vec4f, result, getVar(src0)});
+                reg_to_id[dst] = result;
+            }
+            break;
+            
+        // ----- Vector Reciprocal/Sqrt Refinement -----
+        case 0xDF: // FRECPE.f32 (reciprocal estimate)
+            {
+                uint32_t result = getNextId();
+                uint32_t one = getConst(1.0f);
+                emitOp(SpvOpFDiv, {vec4f, result, one, getVar(src0)});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0xE6: // FRECPS.f32 (reciprocal sqrt step: 2 - a*x)
+            {
+                uint32_t result = getNextId();
+                uint32_t two = getConst(2.0f);
+                uint32_t mul = getNextId();
+                emitOp(SpvOpFMul, {vec4f, mul, getVar(src0), getVar(src1)});
+                emitOp(SpvOpFSub, {vec4f, result, two, mul});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0xE7: // FRSQRTE.f32 (reciprocal sqrt estimate)
+            {
+                uint32_t result = getNextId();
+                uint32_t one = getConst(1.0f);
+                uint32_t sqrt_val = getNextId();
+                emitOp(SpvOpSqrt, {vec4f, sqrt_val, getVar(src0)});
+                emitOp(SpvOpFDiv, {vec4f, result, one, sqrt_val});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0xE8: // FRSQRTS.f32 (reciprocal sqrt step)
+            {
+                uint32_t result = getNextId();
+                uint32_t three = getConst(3.0f);
+                uint32_t half = getConst(0.5f);
+                uint32_t mul1 = getNextId();
+                uint32_t mul2 = getNextId();
+                emitOp(SpvOpFMul, {vec4f, mul1, getVar(src0), getVar(src1)});
+                emitOp(SpvOpFMul, {vec4f, mul2, half, getVar(src1)});
+                emitOp(SpvOpFSub, {vec4f, result, three, mul2});
+                reg_to_id[dst] = result;
+            }
+            break;
+            
+        // ----- Vector Data Movement -----
+        case 0xF0: // DUP (duplicate scalar to vector)
+            {
+                uint32_t result = getNextId();
+                uint32_t scalar = getVar(src0);
+                emitOp(SpvOpCompositeConstruct, {vec4f, result, scalar, scalar, scalar, scalar});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0xF1: // MOVI (move immediate to vector)
+            {
+                uint32_t result = getNextId();
+                uint32_t imm = getConst(static_cast<float>(simm8));
+                emitOp(SpvOpCompositeConstruct, {vec4f, result, imm, imm, imm, imm});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0xF2: // FMOV (move float immediate to vector)
+            {
+                uint32_t result = getNextId();
+                uint32_t imm = getConst(static_cast<float>(simm8));
+                emitOp(SpvOpCompositeConstruct, {vec4f, result, imm, imm, imm, imm});
+                reg_to_id[dst] = result;
+            }
+            break;
+            
+        // ----- Vector Permutation -----
+        case 0xF3: // ZIP1/ZIP2 (interleave vectors)
+        case 0xF4: // UZP1/UZP2 (de-interleave vectors)
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpVectorShuffle, {vec4f, result, getVar(src0), getVar(src1), 0, 2, 1, 3});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0xF5: // TRN1/TRN2 (transpose vectors)
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpVectorShuffle, {vec4f, result, getVar(src0), getVar(src1), 0, 2, 4, 6});
+                reg_to_id[dst] = result;
+            }
+            break;
+        case 0xF6: // TBL/TBX (table lookup)
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpVectorShuffle, {vec4f, result, getVar(src0), getVar(src1), getVar(src2)});
+                reg_to_id[dst] = result;
+            }
+            break;
+            
+        // ----- Vector Bitwise -----
+        case 0xF7: // AND (vector)
+            emitVectorBinaryOp(SpvOpBitwiseAnd, vec4u, dst, src0, src1);
+            break;
+        case 0xF8: // ORR (vector)
+            emitVectorBinaryOp(SpvOpBitwiseOr, vec4u, dst, src0, src1);
+            break;
+        case 0xF9: // EOR (vector)
+            emitVectorBinaryOp(SpvOpBitwiseXor, vec4u, dst, src0, src1);
+            break;
+        case 0xFA: // BIC (bit clear)
+            {
+                uint32_t result = getNextId();
+                uint32_t not_src1 = getNextId();
+                emitOp(SpvOpBitwiseNot, {vec4u, not_src1, getVar(src1)});
+                emitOp(SpvOpBitwiseAnd, {vec4u, result, getVar(src0), not_src1});
+                reg_to_id[dst] = result;
+            }
+            break;
+            
+        // ----- Crypto (SHA1/SHA256/AES) -----
+        case 0xFB: // SHA1H (SHA1 hash update)
+        case 0xFC: // SHA1SU1 (SHA1 schedule update 1)
+        case 0xFD: // SHA256H (SHA256 hash update)
+        case 0xFE: // SHA256SU0 (SHA256 schedule update 0)
+        case 0xFF: // AESD/AESE/AESMC/AESIMC (AES round)
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpNop, {});
+                reg_to_id[dst] = result;
+            }
+            break;
+            
+        // ===== DP2A/DOT Product (Int8) =====
+        case 0xC2: // DP2A (dot product accumulate, 2x i8)
+        case 0xC3: // DP4A (dot product accumulate, 4x i8)
+            {
+                uint32_t result = getNextId();
+                emitOp(SpvOpNop, {}); // Placeholder - needs subgroup extension
+                reg_to_id[dst] = result;
+            }
+break;
+        
         // ===== Surface/Texture =====
         case 0xD0: // SULD (surface load)
         case 0xD1: // SUST (surface store)
@@ -1722,27 +2034,27 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
             }
             break;
         case 0x57: // BRKPT (breakpoint)
-            emitOp(SpvOpDebugBreak, {}).
+            emitOp(SpvOpDebugBreak, {});
             break;
         case 0x58: // SSY (set sync)
-            emitOp(SpvOpControlBarrier, {SpvScopeWorkgroup, SpvScopeWorkgroup, SpvMemorySemanticsAcquireReleaseMask}).
+            emitOp(SpvOpControlBarrier, {SpvScopeWorkgroup, SpvScopeWorkgroup, SpvMemorySemanticsAcquireReleaseMask});
             break;
         case 0x59: // SYNC (warp sync) - already handled
         case 0x5A: // NOP
-            emitOp(SpvOpNop, {}).
+            emitOp(SpvOpNop, {});
             break;
         case 0x5B: // TRAP (trap/exception)
-            emitOp(SpvOpKill, {}).
+            emitOp(SpvOpKill, {});
             break;
         case 0x5C: // CONT (continue)
         case 0x5D: // BREAK (break)
             // These would need loop context - simplified for now
-            emitOp(SpvOpNop, {}).
+            emitOp(SpvOpNop, {});
             break;
             
         default: {
             // Unknown: emit NOP
-            emitOp(SpvOpNop, {}).
+            emitOp(SpvOpNop, {});
             break;
         }
     }
