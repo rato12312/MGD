@@ -28,6 +28,7 @@
 #include "Session.h"
 #include "Mutex.h"
 #include "Event.h"
+#include "../loader/NsoLoader.h"
 
 namespace mgd {
 namespace hos {
@@ -151,6 +152,23 @@ public:
         services_.publish("set:sys"); // idioma/região
         services_.publish("fatal:u"); // erros registrados
         services_.publish("pm:dmnt"); // processos
+        
+        // Set applet boot callback to actually boot NSO
+        applet_.setBootCallback([this](uint64_t aid) -> bool {
+            const auto* applet = applet_.getApplet(aid);
+            if (!applet || applet->nso_blob.empty()) return false;
+            
+            // Parse NSO
+            NsoImage img = parseNso(applet->nso_blob.data(), applet->nso_blob.size());
+            if (!img.valid) return false;
+            
+            uint64_t entry = 0;
+            if (!loadNsoInto(img, applet->nso_blob.data(), ram_, ram_size_, 0x10000000, entry)) return false;
+            
+            // Setup CPU for applet (will run on next thread switch)
+            // The applet will run when its thread is scheduled
+            return true;
+        });
     }
 
     // Bomba: um pedido pendente por sessão anda até o serviço dono.

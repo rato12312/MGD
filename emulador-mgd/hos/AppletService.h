@@ -11,13 +11,18 @@
 // cmd 8  = GetSharedFontSharedMemoryHandle -> handle de fonte
 // cmd 9  = GetSharedFontInlines -> dados da fonte
 // cmd 10 = GetLibraryAppletCreator -> para libapplets (web, kb, etc.)
+// cmd 11 = GetAppletOperationMode -> operation mode
+// cmd 12 = RegisterAppletResourceUserId -> register user id
 
 #include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <functional>
 
 #include "Session.h"
+#include "../cpu/Cpu.h"
+#include "../loader/NsoLoader.h"
 
 namespace mgd {
 namespace hos {
@@ -37,11 +42,17 @@ struct Applet {
     uint64_t stack_top = 0;
     AppletState state = AppletState::CREATED;
     std::vector<uint8_t> nso_blob; // main.nso carregado
+    
+    // Boot callback (set by emulator)
+    std::function<bool(uint64_t)> on_boot;
 };
 
 class AppletService {
 public:
     AppletService() = default;
+    
+    // Set boot callback (called when applet NSO should be booted)
+    void setBootCallback(std::function<bool(uint64_t)> cb) { boot_cb_ = std::move(cb); }
 
     bool dispatch(const IpcMessage& req, IpcMessage& rep) {
         if (req.cmd == 1) { // GetAppletResourceUserId
@@ -86,6 +97,16 @@ public:
                 a.entry_point = entry_off;
             }
             a.state = AppletState::RUNNING;
+            
+            // Boot the applet NSO
+            if (boot_cb_) {
+                bool ok = boot_cb_(aid);
+                if (!ok) {
+                    a.state = AppletState::EXITED;
+                    rep.cmd = 0;
+                    return true;
+                }
+            }
             rep.cmd = 1;
             return true;
         }
@@ -130,6 +151,16 @@ public:
         if (req.cmd == 10) { // GetLibraryAppletCreator
             rep.cmd = 1; return true;
         }
+        if (req.cmd == 11) { // GetAppletOperationMode
+            // 0 = normal, 1 = debug, etc.
+            rep.cmd = 1;
+            rep.payload = {0, 0, 0, 0, 0, 0, 0, 0}; return true;
+        }
+        if (req.cmd == 12) { // RegisterAppletResourceUserId
+            // Registra user id para applet
+            rep.cmd = 1;
+            rep.payload = {0}; return true;
+        }
         return false;
     }
 
@@ -138,7 +169,44 @@ public:
         auto it = applets_.find(id);
         return it != applets_.end() ? &it->second : nullptr;
     }
+    Applet* getApplet(uint64_t id) {
+        auto it = applets_.find(id);
+        return it != applets_.end() ? &it->second : nullptr;
+    }
     std::vector<uint64_t> stack() const { return stack_; }
+
+    // Boot applet NSO (called by emulator)
+    bool bootApplet(uint64_t aid, Cpu& cpu, Mmu& mmu) {
+        auto it = applets_.find(aid);
+        if (it == applets_.end()) return false;
+        Applet& a = it->second;
+        
+        if (a.nso_blob.empty()) return false;
+        
+        // Parse NSO
+        NsoImage img = parseNso(a.nso_blob.data(), a.nso_blob.size());
+        if (!img.valid) return false;
+        
+        uint64_t entry = 0;
+        if (!loadNsoInto(img, a.nso_blob.data(), cpu.ram(), cpu.ramSize(), 0x10000000, entry)) return false;
+        
+        a.entry_point = entry;
+        
+        // Setup CPU for applet
+        cpu.setSp(0x80000000); // applet stack
+        cpu.setPc(entry + 0x80); // skip header
+        
+        return true;
+    }
+
+    // Get applet NSO for manual boot
+    const std::vector<uint8_t>* getAppletNso(uint64_t aid) const {
+        auto it = applets_.find(aid);
+        if (it != applets_.end() && !it->second.nso_blob.empty()) {
+            return &it->second.nso_blob;
+        }
+        return nullptr;
+    }
 
 private:
     static uint32_t rd32(const std::vector<uint8_t>& v, size_t o) {
@@ -155,6 +223,7 @@ private:
     std::unordered_map<uint64_t, Applet> applets_;
     std::vector<uint64_t> stack_;
     uint64_t next_applet_ = 1;
+    std::function<bool(uint64_t)> boot_cb_;
 };
 
 } // namespace hos
