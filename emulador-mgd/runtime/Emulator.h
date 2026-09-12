@@ -23,6 +23,8 @@
 #include "../core/bridge/EmulatorHandoff.h"
 #include "../core/bridge/MentalMapRuntime.h"
 #include "../core/query/CameraMentalMapQuery.h"
+#include "../core/query/Polygon.h"
+#include "../core/gpu/FramebufferOptimizer.h"
 #include "../config/MgdSwitches.h"
 
 namespace mgd {
@@ -65,6 +67,15 @@ public:
         camera_query_.setViewDistance(switches_.cheapForLevel().lod_aggressive ? 60.0f : 100.0f);
         camera_query_.enableLOD(true);
         camera_query_.setLODDistances(20.0f, 60.0f);
+        
+        // Inicializa Framebuffer Optimizer (MFO)
+        if (!mfo_manager_) {
+            mfo_manager_ = std::make_unique<gpu::MFOManager>();
+            uint32_t w = 1280, h = 720;
+            if (kernel_.nv().getVulkanContext()) {
+                mfo_manager_->init(kernel_.nv().getVulkanContext(), w, h);
+            }
+        }
     }
 
     bool present(const char* path) {
@@ -82,13 +93,50 @@ public:
         
         // 2. Mental Map + Camera -> frustum culling -> visible polygons
         bridge::RuntimeFrameStats stats;
+        std::vector<Polygon> visible_polys;
         if (has_handoff) {
-            stats = world_.runtime().step(hf, {});
+            stats = world_.runtime().step(hf, visible_polys);
         } else {
-            bootWorld(npolys);
+            stats = bootWorld(npolys);
+            // Create synthetic visible polygons for MFO
+            for (uint32_t i = 1; i <= npolys; ++i) {
+                Polygon p;
+                p.position = core::Vec3(static_cast<float>(i), 0.0f, 0.0f);
+                p.polygon_id = 9000 + i;
+                p.asset_id = 42;
+                p.flags = PolygonFlag::VISIBLE;
+                visible_polys.push_back(p);
+            }
         }
         
-        // 3. Mali render nativo na resolução configurada
+        // 3. Framebuffer Optimizer (MFO): compute dirty tiles from visible polygons
+        gpu::MFOInput mfo_input;
+        mfo_input.frame_index = frames_;
+        mfo_input.camera.x = world_.runtime().pipeline().camera().position.x;
+        mfo_input.camera.y = world_.runtime().pipeline().camera().position.y;
+        mfo_input.camera.z = world_.runtime().pipeline().camera().position.z;
+        mfo_input.camera.pitch = world_.runtime().pipeline().camera().pitch;
+        mfo_input.camera.yaw = world_.runtime().pipeline().camera().yaw;
+        mfo_input.camera.roll = world_.runtime().pipeline().camera().roll;
+        mfo_input.camera.fov = world_.runtime().pipeline().camera().fov_degrees;
+        mfo_input.camera.aspect = world_.runtime().pipeline().camera().aspect;
+        
+        // Add visible polygon hashes for tile caching
+        for (const auto& p : visible_polys) {
+            mfo_input.visible_polygon_ids.push_back(p.polygon_id);
+            mfo_input.polygon_hashes.push_back(p.polygon_id * 1000003ull); // simple hash
+        }
+        
+        // Add visible tile indices from camera query
+        auto visible_tiles = camera_query_.getVisibleTiles();
+        mfo_input.visible_tile_indices = visible_tiles;
+        
+        gpu::MFOOutput mfo_output;
+        if (mfo_manager_) {
+            mfo_manager_->processFrame(mfo_input, mfo_output);
+        }
+        
+        // 4. Mali render nativo na resolução configurada
         // O mental map + camera já filtraram o que é visível
         kernel_.nv().renderFrameNative();
         
@@ -255,6 +303,7 @@ private:
     emu::KeyManager key_mgr_;
     odyssey::OdysseyHandoffSource handoff_;
     core::CameraMentalMapQuery camera_query_;
+    std::unique_ptr<gpu::MFOManager> mfo_manager_;
     double last_frame_ms_ = 0.0;
     double avg_ms_ = 0.0;
     uint64_t frames_ = 0;

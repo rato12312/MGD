@@ -261,6 +261,10 @@ public:
         return vk_executor_ ? vk_executor_->totalBytesExecuted() : executor_.totalBytesExecuted();
     }
 
+    gpu::VulkanContext* getVulkanContext() const {
+        return vk_executor_ ? vk_executor_->getVulkanContext() : nullptr;
+    }
+
     size_t channelCount() const { return channels_.size(); }
     size_t pendingCount() const { return pending_.size(); }
     uint64_t submitCount() const { return submit_count_; }
