@@ -151,6 +151,12 @@ set(MGD_CORE_SOURCES
     core/gpu/SeedPredictor.cpp
 )
 
+# Loader (header-only)
+set(LOADER_SOURCES
+    emulador-mgd/loader/NcaDecrypt.h
+)
+target_sources(mgd_core PUBLIC ${LOADER_SOURCES})
+
 add_library(mgd_core STATIC ${MGD_CORE_SOURCES})
 target_include_directories(mgd_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -207,6 +213,7 @@ add_executable(mgd_tests
     tests/test_mmap_runtime.cpp
     tests/test_emulator_odyssey.cpp
     tests/test_emulator_machine.cpp
+    tests/test_nca_decrypt.cpp
 )
 target_link_libraries(mgd_tests mgd_core)
 target_compile_definitions(mgd_tests PRIVATE MGD_TESTING)
