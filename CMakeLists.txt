@@ -148,6 +148,7 @@ set(MGD_CORE_SOURCES
     core/gpu/TileGrid.cpp
     core/gpu/DirtyRegionTracker.cpp
     core/gpu/MFOManager.cpp
+    core/gpu/SeedPredictor.cpp
 )
 
 add_library(mgd_core STATIC ${MGD_CORE_SOURCES})

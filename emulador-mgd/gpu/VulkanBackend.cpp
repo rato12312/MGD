@@ -1908,8 +1908,30 @@ void VulkanGpuExecutor::setResolution(uint32_t roughW, uint32_t roughH, uint32_t
     if(painter_) { painter_->shutdown(); painter_->init(vk_ctx_.get(), fb_mgr_.get()); }
 }
 
+void VulkanGpuExecutor::initSeedPredictor(core::CameraMentalMapQuery* camera_query,
+                                          core::MentalMapRuntime* mental_map) {
+    seed_predictor_ = std::make_unique<SeedPredictor>();
+    if (seed_predictor_) {
+        seed_predictor_->init(recompiler_.get(), camera_query, mental_map);
+    }
+}
+
+void VulkanGpuExecutor::updateSeedPredictor(const SeedPredictor::GameStateSnapshot& state) {
+    if (seed_predictor_) {
+        seed_predictor_->updateGameState(state);
+    }
+}
+
+void VulkanGpuExecutor::processSeedPredictions(uint64_t frame) {
+    if (seed_predictor_) {
+        auto seeds = seed_predictor_->predictSeeds(frame);
+        seed_predictor_->processSeeds(seeds, frame);
+    }
+}
+
 void VulkanGpuExecutor::shutdown() {
     if(vk_ctx_) vk_ctx_->waitIdle();
+    seed_predictor_.reset();
     asset_pipeline_.reset();
     painter_.reset();
     fb_mgr_.reset();

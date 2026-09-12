@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include "core/gpu/SeedPredictor.h"
+
 namespace mgd {
 namespace emu {
 
@@ -47,6 +49,9 @@ bool MarioOdysseyRunner::initialize(const MarioOdysseyConfig& config) {
         return false;
     }
 
+    // Inicializa Seed Predictor
+    gpu_->initSeedPredictor(&emulator_->getCameraQuery(), &emulator_->getWorld().runtime());
+
     // Aplica configurações de qualidade
     applyQualitySettings();
 
@@ -83,6 +88,30 @@ bool MarioOdysseyRunner::runFrame() {
 
     char frame_path[64];
     snprintf(frame_path, sizeof(frame_path), "/sdcard/mgd_frame_%llu.ppm", frame_count_);
+
+    // Atualiza Seed Predictor com estado atual do jogo
+    if (gpu_ && gpu_->getSeedPredictor()) {
+        SeedPredictor::GameStateSnapshot snapshot;
+        // Mario state
+        auto& world = emulator_->getWorld();
+        auto& runtime = world.runtime();
+        auto& camera = runtime.pipeline().camera();
+        snapshot.mario_x = camera.position.x;
+        snapshot.mario_y = camera.position.y;
+        snapshot.mario_z = camera.position.z;
+        // Camera state
+        snapshot.cam_x = camera.position.x;
+        snapshot.cam_y = camera.position.y;
+        snapshot.cam_z = camera.position.z;
+        snapshot.cam_pitch = camera.pitch;
+        snapshot.cam_yaw = camera.yaw;
+        snapshot.cam_roll = camera.roll;
+        snapshot.cam_fov = camera.fov_degrees;
+        snapshot.frame_index = frame_count_;
+        
+        gpu_->updateSeedPredictor(snapshot);
+        gpu_->processSeedPredictions(frame_count_);
+    }
 
     bool ok = emulator_->frame(frame_path, 64);
 

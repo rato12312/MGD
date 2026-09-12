@@ -41,6 +41,8 @@ public:
     MgdSwitches& switches() { return switches_; }
     emu::KeyManager& keys() { return key_mgr_; }
     odyssey::OdysseyHandoffSource& handoff() { return handoff_; }
+    core::CameraMentalMapQuery& getCameraQuery() { return camera_query_; }
+    core::MentalMapRuntime& getMentalMapRuntime() { return world_.runtime(); }
 
     // Aplica as chaves: MMU liga/desliga, barato segue a Mali, painter obedece.
     void applySwitches() {

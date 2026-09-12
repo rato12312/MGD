@@ -24,6 +24,7 @@
 #include "core/gpu/FramebufferManager.h"
 #include "core/gpu/PainterCompute.h"
 #include "core/gpu/AssetPipeline.h"
+#include "core/gpu/SeedPredictor.h"
 
 namespace mgd {
 namespace gpu {
@@ -302,6 +303,13 @@ public:
     bool uploadAllAssets();
     void setResolution(uint32_t roughW, uint32_t roughH, uint32_t finalW, uint32_t finalH);
 
+    // Seed Predictor
+    void initSeedPredictor(core::CameraMentalMapQuery* camera_query,
+                           core::MentalMapRuntime* mental_map);
+    void updateSeedPredictor(const SeedPredictor::GameStateSnapshot& state);
+    void processSeedPredictions(uint64_t frame);
+    SeedPredictor* getSeedPredictor() const { return seed_predictor_.get(); }
+
     // Stats
     uint64_t totalDrawCalls() const { return draw_calls_; }
     uint64_t totalComputeDispatches() const { return compute_dispatches_; }
@@ -312,6 +320,7 @@ public:
     PainterCompute* getPainter() const { return painter_.get(); }
     FramebufferManager* getFramebufferManager() const { return fb_mgr_.get(); }
     AssetPipeline* getAssetPipeline() const { return asset_pipeline_.get(); }
+    ShaderRecompiler* getRecompiler() const { return recompiler_.get(); }
 
 private:
     std::unique_ptr<VulkanContext> vk_ctx_;
@@ -320,6 +329,7 @@ private:
     std::unique_ptr<FramebufferManager> fb_mgr_;
     std::unique_ptr<PainterCompute> painter_;
     std::unique_ptr<AssetPipeline> asset_pipeline_;
+    std::unique_ptr<SeedPredictor> seed_predictor_;
 
     GpuState state_;
     std::unordered_map<uint32_t, Shader> shaders_;
