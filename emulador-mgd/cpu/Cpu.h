@@ -97,19 +97,22 @@ public:
         uint64_t fpcr = 0, fpsr = 0;
         uint64_t sctlr = 0, ttbr0 = 0, ttbr1 = 0, tcr = 0;
         uint64_t mair = 0, vbar = 0, cpacr = 0;
-        // Exception state
-        uint64_t elr = 0, spsr = 0, esr = 0, far = 0;
+        // Exception state (per-EL)
+        uint64_t elr_el1 = 0, spsr_el1 = 0;
+        uint64_t elr_el2 = 0, spsr_el2 = 0;
+        uint64_t elr_el3 = 0, spsr_el3 = 0;
+        uint64_t esr = 0, far = 0;
         uint64_t current_el = 1; // start at EL1
         uint64_t sctlr_el1 = 0, sctlr_el2 = 0, sctlr_el3 = 0;
         uint64_t vbar_el1 = 0, vbar_el2 = 0, vbar_el3 = 0;
         bool n = false, z = false, c = false, v = false;
         // Timer state
-        uint64_t cntp_ctl = 0, cntp_cval = 0, cntp_tval = 0;
-        uint64_t cntv_ctl = 0, cntv_cval = 0, cntv_tval = 0;
+        uint64_t cntp_ctl = 0, cntp_cval = 0, cntp_tval = 0, cntpct = 0;
+        uint64_t cntv_ctl = 0, cntv_cval = 0, cntv_tval = 0, cntvct = 0;
         bool cntp_enabled = false, cntv_enabled = false;
         // Interrupt state
         bool irq_mask = true, fiq_mask = true;
-        bool irq_pending = false, fiq_pending = false, serror_pending = false;
+        bool serror_pending = false;
     };
     State save() const {
         State s;
@@ -119,16 +122,19 @@ public:
         s.fpcr = fpcr_; s.fpsr = fpsr_;
         s.sctlr = sctlr_; s.ttbr0 = ttbr0_; s.ttbr1 = ttbr1_; s.tcr = tcr_;
         s.mair = mair_; s.vbar = vbar_; s.cpacr = cpacr_;
-        s.elr = elr_; s.spsr = spsr_; s.esr = esr_; s.far = far_;
+        s.elr_el1 = elr_el1_; s.spsr_el1 = spsr_el1_;
+        s.elr_el2 = elr_el2_; s.spsr_el2 = spsr_el2_;
+        s.elr_el3 = elr_el3_; s.spsr_el3 = spsr_el3_;
+        s.esr = esr_; s.far = far_;
         s.current_el = current_el_;
         s.sctlr_el1 = sctlr_el1_; s.sctlr_el2 = sctlr_el2_; s.sctlr_el3 = sctlr_el3_;
         s.vbar_el1 = vbar_el1_; s.vbar_el2 = vbar_el2_; s.vbar_el3 = vbar_el3_;
         s.n = flag_n_; s.z = flag_z_; s.c = flag_c_; s.v = flag_v_;
-        s.cntp_ctl = cntp_ctl_; s.cntp_cval = cntp_cval_; s.cntp_tval = cntp_tval_;
-        s.cntv_ctl = cntv_ctl_; s.cntv_cval = cntv_cval_; s.cntv_tval = cntv_tval_;
+        s.cntp_ctl = cntp_ctl_; s.cntp_cval = cntp_cval_; s.cntp_tval = cntp_tval_; s.cntpct = cntpct_;
+        s.cntv_ctl = cntv_ctl_; s.cntv_cval = cntv_cval_; s.cntv_tval = cntv_tval_; s.cntvct = cntvct_;
         s.cntp_enabled = cntp_enabled_; s.cntv_enabled = cntv_enabled_;
         s.irq_mask = irq_mask_; s.fiq_mask = fiq_mask_;
-        s.irq_pending = irq_pending_; s.fiq_pending = fiq_pending_; s.serror_pending = serror_pending_;
+        s.serror_pending = serror_pending_;
         return s;
     }
     void load(const State& s) {
@@ -138,16 +144,19 @@ public:
         fpcr_ = s.fpcr; fpsr_ = s.fpsr;
         sctlr_ = s.sctlr; ttbr0_ = s.ttbr0; ttbr1_ = s.ttbr1; tcr_ = s.tcr;
         mair_ = s.mair; vbar_ = s.vbar; cpacr_ = s.cpacr;
-        elr_ = s.elr; spsr_ = s.spsr; esr_ = s.esr; far_ = s.far;
+        elr_el1_ = s.elr_el1; spsr_el1_ = s.spsr_el1;
+        elr_el2_ = s.elr_el2; spsr_el2_ = s.spsr_el2;
+        elr_el3_ = s.elr_el3; spsr_el3_ = s.spsr_el3;
+        esr_ = s.esr; far_ = s.far;
         current_el_ = s.current_el;
         sctlr_el1_ = s.sctlr_el1; sctlr_el2_ = s.sctlr_el2; sctlr_el3_ = s.sctlr_el3;
         vbar_el1_ = s.vbar_el1; vbar_el2_ = s.vbar_el2; vbar_el3_ = s.vbar_el3;
         flag_n_ = s.n; flag_z_ = s.z; flag_c_ = s.c; flag_v_ = s.v;
-        cntp_ctl_ = s.cntp_ctl; cntp_cval_ = s.cntp_cval; cntp_tval_ = s.cntp_tval;
-        cntv_ctl_ = s.cntv_ctl; cntv_cval_ = s.cntv_cval; cntv_tval_ = s.cntv_tval;
+        cntp_ctl_ = s.cntp_ctl; cntp_cval_ = s.cntp_cval; cntp_tval_ = s.cntp_tval; cntpct_ = s.cntpct;
+        cntv_ctl_ = s.cntv_ctl; cntv_cval_ = s.cntv_cval; cntv_tval_ = s.cntv_tval; cntvct_ = s.cntvct;
         cntp_enabled_ = s.cntp_enabled; cntv_enabled_ = s.cntv_enabled;
         irq_mask_ = s.irq_mask; fiq_mask_ = s.fiq_mask;
-        irq_pending_ = s.irq_pending; fiq_pending_ = s.fiq_pending; serror_pending_ = s.serror_pending;
+        serror_pending_ = s.serror_pending;
         stopped_ = false;
         exit_code_ = 0;
     }
@@ -159,14 +168,16 @@ public:
     uint32_t lastSvc() const { return last_svc_; }
 
     // External interrupt injection (for HOS services, device emulation)
-    void triggerIrq() { irq_pending_ = true; }
-    void triggerFiq() { fiq_pending_ = true; }
+    void triggerIrq(uint64_t source = 0) { irq_pending_vec_.push_back(source); }
+    void triggerFiq(uint64_t source = 0) { fiq_pending_vec_.push_back(source); }
     void triggerSError() { serror_pending_ = true; }
-    bool isIrqPending() const { return irq_pending_; }
-    bool isFiqPending() const { return fiq_pending_; }
+    bool isIrqPending() const { return !irq_pending_vec_.empty(); }
+    bool isFiqPending() const { return !fiq_pending_vec_.empty(); }
     bool isSErrorPending() const { return serror_pending_; }
     // Timer access for HOS
     uint64_t getCntpCval() const { return cntp_cval_; }
+    uint64_t getCntpct() const { return cntpct_; }
+    uint64_t getCntvct() const { return cntvct_; }
     uint64_t getCntpCtl() const { return cntp_ctl_; }
     void setCntpCval(uint64_t v) { cntp_cval_ = v; }
     void setCntpCtl(uint64_t v) { cntp_ctl_ = v; cntp_enabled_ = (v & 1) != 0; }
@@ -242,10 +253,12 @@ public:
         }
         if ((insn & 0xFFFFFFFF) == 0xD65F03E0) { // ERET (Exception Return)
             // Return from exception: restore PSTATE from SPSR, PC from ELR
-            unpackPstate(spsr_);
-            pc_ = elr_;
+            uint64_t spsr = getSpsrForEl(current_el_);
+            uint64_t elr = getElrForEl(current_el_);
+            unpackPstate(spsr);
+            pc_ = elr;
             // Determine target EL from SPSR.M[3:0]
-            uint64_t target_el = (spsr_ >> 2) & 0x3;
+            uint64_t target_el = (spsr >> 2) & 0x3;
             if (target_el <= 3) current_el_ = target_el;
             steps_++;
             return true;
@@ -256,9 +269,11 @@ public:
             uint32_t base = insn & 0xFFFFFC1F;
             int n = static_cast<int>((insn >> 5) & 0x1F);
             uint64_t v = (n == 31) ? 0 : regs_[n];
-            if (base == 0xD518401F) elr_ = v;
-            else if (base == 0xD518403F) { /* ELR_EL2 */ }
-            else { /* ELR_EL3 */ }
+            uint64_t el = 1;
+            if (base == 0xD518401F) el = 1;
+            else if (base == 0xD518403F) el = 2;
+            else el = 3;
+            getElrForEl(el) = v;
             pc_ += 4;
             steps_++;
             return true;
@@ -269,9 +284,11 @@ public:
             uint32_t base = insn & 0xFFFFFC1F;
             int n = static_cast<int>((insn >> 5) & 0x1F);
             uint64_t v = (n == 31) ? 0 : regs_[n];
-            if (base == 0xD518409F) spsr_ = v;
-            else if (base == 0xD51840BF) { /* SPSR_EL2 */ }
-            else { /* SPSR_EL3 */ }
+            uint64_t el = 1;
+            if (base == 0xD518409F) el = 1;
+            else if (base == 0xD51840BF) el = 2;
+            else el = 3;
+            getSpsrForEl(el) = v;
             pc_ += 4;
             steps_++;
             return true;
@@ -329,9 +346,9 @@ public:
             uint32_t base = insn & 0xFFFFFC1F;
             int d = static_cast<int>(dec.rd);
             uint64_t v = 0;
-            if (base == 0xD538401F) v = elr_;
-            else if (base == 0xD538403F) v = 0; // ELR_EL2
-            else v = 0; // ELR_EL3
+            if (base == 0xD538401F) v = getElrForEl(1);
+            else if (base == 0xD538403F) v = getElrForEl(2);
+            else v = getElrForEl(3);
             if (d != 31) regs_[d] = v;
             pc_ += 4;
             steps_++;
@@ -343,9 +360,9 @@ public:
             uint32_t base = insn & 0xFFFFFC1F;
             int d = static_cast<int>(dec.rd);
             uint64_t v = 0;
-            if (base == 0xD538409F) v = spsr_;
-            else if (base == 0xD53840BF) v = 0;
-            else v = 0;
+            if (base == 0xD538409F) v = getSpsrForEl(1);
+            else if (base == 0xD53840BF) v = getSpsrForEl(2);
+            else v = getSpsrForEl(3);
             if (d != 31) regs_[d] = v;
             pc_ += 4;
             steps_++;
@@ -3208,10 +3225,28 @@ private:
         fiq_mask_ = (pstate >> 9) & 1;
     }
 
+    // Get SPSR/ELR for current EL
+    uint64_t& getSpsrForEl(uint64_t el) {
+        switch (el) {
+            case 1: return spsr_el1_;
+            case 2: return spsr_el2_;
+            case 3: return spsr_el3_;
+            default: return spsr_el1_;
+        }
+    }
+    uint64_t& getElrForEl(uint64_t el) {
+        switch (el) {
+            case 1: return elr_el1_;
+            case 2: return elr_el2_;
+            case 3: return elr_el3_;
+            default: return elr_el1_;
+        }
+    }
+
     // Exception entry for IRQ/FIQ/SError
     void takeException(uint64_t esr_ec, uint64_t vector_offset, uint64_t target_el) {
-        spsr_ = packPstate();
-        elr_ = pc_ + 4;
+        getSpsrForEl(target_el) = packPstate();
+        getElrForEl(target_el) = pc_ + 4;
         esr_ = esr_ec;
         current_el_ = target_el;
         uint64_t vbar = (target_el == 1) ? vbar_el1_ : (target_el == 2) ? vbar_el2_ : vbar_el3_;
@@ -3224,16 +3259,29 @@ private:
 
     // Check and handle pending interrupts (called each instruction)
     void checkInterrupts() {
-        // IRQ exception (EL1, vector 0x80)
-        if (irq_pending_ && !irq_mask_ && current_el_ <= 1) {
-            takeException(0x00, 0x80, 1); // IRQ sync exception
-            irq_pending_ = false;
-            return;
+        // Increment timer counters
+        cntpct_++;
+        cntvct_++;
+        
+        // EL1 Physical Timer interrupt (CNTP)
+        if (cntp_enabled_ && cntpct_ >= cntp_cval_) {
+            irq_pending_vec_.push_back(0); // Timer IRQ source
         }
-        // FIQ exception (EL1, vector 0x100)
-        if (fiq_pending_ && !fiq_mask_ && current_el_ <= 1) {
+        // EL1 Virtual Timer interrupt (CNTV)
+        if (cntv_enabled_ && cntvct_ >= cntv_cval_) {
+            irq_pending_vec_.push_back(1); // Virtual timer IRQ source
+        }
+        
+        // Vectorized IRQ handling - process all pending IRQs
+        while (!irq_pending_vec_.empty() && !irq_mask_ && current_el_ <= 1) {
+            takeException(0x00, 0x80, 1); // IRQ sync exception
+            irq_pending_vec_.erase(irq_pending_vec_.begin());
+            return; // Handle one at a time
+        }
+        // Vectorized FIQ handling
+        while (!fiq_pending_vec_.empty() && !fiq_mask_ && current_el_ <= 1) {
             takeException(0x01, 0x100, 1); // FIQ sync exception
-            fiq_pending_ = false;
+            fiq_pending_vec_.erase(fiq_pending_vec_.begin());
             return;
         }
         // SError exception (EL1, vector 0x180)
@@ -3241,10 +3289,6 @@ private:
             takeException(0x2F, 0x180, 1); // SError sync exception
             serror_pending_ = false;
             return;
-        }
-        // EL1 Physical Timer interrupt (CNTP)
-        if (cntp_enabled_ && (steps_ >= cntp_cval_)) {
-            irq_pending_ = true; // Timer fires as IRQ
         }
     }
 
@@ -3363,8 +3407,11 @@ private:
     uint64_t fpcr_ = 0, fpsr_ = 0;
     uint64_t sctlr_ = 0, ttbr0_ = 0, ttbr1_ = 0, tcr_ = 0;
     uint64_t mair_ = 0, vbar_ = 0, cpacr_ = 0;
-    // Exception state
-    uint64_t elr_ = 0, spsr_ = 0, esr_ = 0, far_ = 0;
+    // Exception state (per-EL)
+    uint64_t elr_el1_ = 0, spsr_el1_ = 0;
+    uint64_t elr_el2_ = 0, spsr_el2_ = 0;
+    uint64_t elr_el3_ = 0, spsr_el3_ = 0;
+    uint64_t esr_ = 0, far_ = 0;
     uint64_t current_el_ = 1;
     uint64_t sctlr_el1_ = 0, sctlr_el2_ = 0, sctlr_el3_ = 0;
     uint64_t vbar_el1_ = 0, vbar_el2_ = 0, vbar_el3_ = 0;
@@ -3374,17 +3421,19 @@ private:
     // Interrupt masks (from PSTATE)
     bool irq_mask_ = true;
     bool fiq_mask_ = true;
-    // Interrupt pending state
-    bool irq_pending_ = false;
-    bool fiq_pending_ = false;
+    // Interrupt pending state (vectorized)
+    std::vector<uint64_t> irq_pending_vec_;  // multiple IRQ sources
+    std::vector<uint64_t> fiq_pending_vec_;  // multiple FIQ sources
     bool serror_pending_ = false;
     // Generic Timer registers (EL1)
     uint64_t cntp_ctl_ = 0;      // CNTP_CTL_EL0
     uint64_t cntp_cval_ = 0;     // CNTP_CVAL_EL0
     uint64_t cntp_tval_ = 0;     // CNTP_TVAL_EL0
+    uint64_t cntpct_ = 0;        // CNTPCT_EL0 (physical counter)
     uint64_t cntv_ctl_ = 0;      // CNTV_CTL_EL0
     uint64_t cntv_cval_ = 0;     // CNTV_CVAL_EL0
     uint64_t cntv_tval_ = 0;     // CNTV_TVAL_EL0
+    uint64_t cntvct_ = 0;        // CNTVCT_EL0 (virtual counter)
     bool cntp_enabled_ = false;
     bool cntv_enabled_ = false;
 };

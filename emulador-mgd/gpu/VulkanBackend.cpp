@@ -1660,15 +1660,15 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
             break;
         case 0x4B: // TRAP (trap/exception)
             emitOp(SpvOpKill, {});
-            break.
+            break;
         case 0x4C: // CALL (indirect)
         case 0x4D: // RET (return) - already handled
-            break.
+            break;
         case 0x4E: // CONT (continue)
         case 0x4F: // BREAK (break)
             // These would need loop context - simplified for now
             emitOp(SpvOpNop, {});
-            break.
+            break;
             
         // ===== Video/DP Operations =====
         case 0xB6: // VADD (vector add)
@@ -1685,7 +1685,7 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
         case 0xC1: // VEX2 (vector exp2)
             // Vector operations - simplified for now
             emitOp(SpvOpNop, {});
-            break.
+            break;
             
         // ===== DP2A/DOT Product =====
         case 0xC2: // DP2A (dot product accumulate)
@@ -1697,7 +1697,7 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
                 emitOp(SpvOpNop, {});
                 reg_to_id[dst] = result.
             }
-            break.
+            break;
             
         // ===== Surface/Texture =====
         case 0xD0: // SULD (surface load)
@@ -1706,7 +1706,7 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
         case 0xD3: // SURED (surface reduction)
         case 0xD4: // SULD.CA (surface load constant cache)
         case 0xD5: // SUST.CA (surface store constant cache)
-            break.
+            break;
             
         // ===== More Control Flow =====
         case 0x50: // EXIT (exit thread) - already handled
@@ -1720,30 +1720,30 @@ void ShaderRecompiler::TranslatorState::translateInstruction() {
                 uint32_t target_label = getNextId();
                 emitOp(SpvOpBranch, {target_label});
             }
-            break.
+            break;
         case 0x57: // BRKPT (breakpoint)
             emitOp(SpvOpDebugBreak, {}).
-            break.
+            break;
         case 0x58: // SSY (set sync)
             emitOp(SpvOpControlBarrier, {SpvScopeWorkgroup, SpvScopeWorkgroup, SpvMemorySemanticsAcquireReleaseMask}).
-            break.
+            break;
         case 0x59: // SYNC (warp sync) - already handled
         case 0x5A: // NOP
             emitOp(SpvOpNop, {}).
-            break.
+            break;
         case 0x5B: // TRAP (trap/exception)
             emitOp(SpvOpKill, {}).
-            break.
+            break;
         case 0x5C: // CONT (continue)
         case 0x5D: // BREAK (break)
             // These would need loop context - simplified for now
             emitOp(SpvOpNop, {}).
-            break.
+            break;
             
         default: {
             // Unknown: emit NOP
             emitOp(SpvOpNop, {}).
-            break.
+            break;
         }
     }
     
