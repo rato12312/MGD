@@ -7,6 +7,9 @@
 #include <cstdint>
 #include <deque>
 #include <vector>
+#include <utility>
+
+#include "Hipc.h"
 
 namespace mgd {
 namespace hos {
@@ -62,6 +65,24 @@ public:
             if (buf.guest_ptr + buf.size > ram_size) continue;
             out_mappings.emplace_back(buf.guest_ptr, ram + buf.guest_ptr);
         }
+    }
+
+    // Convert between Session buffers and HIPC buffers
+    static HipcBufferDesc toHipcBuffer(const Buffer& b) {
+        HipcBufferDesc h;
+        h.type = static_cast<HipcBufferType>(b.kind);
+        h.flags = b.flags;
+        h.addr = b.guest_ptr;
+        h.size = b.size;
+        return h;
+    }
+    static Buffer fromHipcBuffer(const HipcBufferDesc& h) {
+        Buffer b;
+        b.guest_ptr = h.addr;
+        b.size = h.size;
+        b.kind = static_cast<uint32_t>(h.type);
+        b.flags = h.flags;
+        return b;
     }
 
 private:
