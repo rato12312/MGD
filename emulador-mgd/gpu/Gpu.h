@@ -125,6 +125,7 @@ struct GpuState {
     uint32_t scissor_w = 1280, scissor_h = 720;
     uint32_t draw_count = 0;
     uint32_t compute_dispatch_count = 0;
+    uint64_t frame_index = 0; // for framebuffer manager
 };
 
 // Command buffer parser

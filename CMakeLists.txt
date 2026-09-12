@@ -16,6 +16,15 @@ else()
     add_compile_options(-Wall -Wextra)
 endif()
 
+# Catch2 for integration tests (FetchContent)
+include(FetchContent)
+FetchContent_Declare(
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG v3.5.3
+)
+FetchContent_MakeAvailable(Catch2)
+
 # SDL2 detection
 find_package(PkgConfig QUIET)
 if(PKG_CONFIG_FOUND)
@@ -46,6 +55,18 @@ if(NOT SDL2_FOUND)
         set(SDL2_INCLUDE_DIRS "")
         set(SDL2_LIBRARIES "")
     endif()
+endif()
+
+# Vulkan detection
+find_package(Vulkan QUIET)
+if(Vulkan_FOUND)
+    message(STATUS "Found Vulkan: ${Vulkan_VERSION}")
+    set(VULKAN_INCLUDE_DIRS ${Vulkan_INCLUDE_DIRS})
+    set(VULKAN_LIBRARIES ${Vulkan_LIBRARIES})
+else()
+    message(WARNING "Vulkan SDK not found - GPU backend will use stub")
+    set(VULKAN_INCLUDE_DIRS "")
+    set(VULKAN_LIBRARIES "")
 endif()
 
 # Include root for <core/...> style includes
@@ -113,6 +134,20 @@ set(MGD_CORE_SOURCES
     # Renderer (SDL2 parts)
     core/renderer/renderer.cpp
     core/renderer/SDL2Presenter.cpp
+
+    # GPU Core (shared with emulator)
+    core/gpu/Fsr10.cpp
+    core/gpu/FramebufferOptimizer.cpp
+    core/gpu/PainterCompute.cpp
+    core/gpu/AssetPipeline.cpp
+    core/gpu/Fsr2EasuCompute.cpp
+    core/gpu/Fsr2TaaCompute.cpp
+    core/gpu/Fsr2RcasCompute.cpp
+    core/gpu/FrustumCullingCompute.cpp
+    core/gpu/TileCache.cpp
+    core/gpu/TileGrid.cpp
+    core/gpu/DirtyRegionTracker.cpp
+    core/gpu/MFOManager.cpp
 )
 
 add_library(mgd_core STATIC ${MGD_CORE_SOURCES})
@@ -123,6 +158,21 @@ if(SDL2_FOUND)
     target_link_libraries(mgd_core PUBLIC ${SDL2_LIBRARIES})
     target_compile_definitions(mgd_core PUBLIC MGD_HAS_SDL2)
 endif()
+
+if(Vulkan_FOUND)
+    target_include_directories(mgd_core PUBLIC ${VULKAN_INCLUDE_DIRS})
+    target_link_libraries(mgd_core PUBLIC ${VULKAN_LIBRARIES})
+    target_compile_definitions(mgd_core PUBLIC MGD_HAS_VULKAN)
+endif()
+
+# Emulator GPU sources (compiled as part of mgd_core for tests)
+# These are header-only except for Gpu.cpp and VulkanBackend.cpp
+set(EMULATOR_GPU_SOURCES
+    emulador-mgd/gpu/Gpu.cpp
+    emulador-mgd/gpu/VulkanBackend.cpp
+    emulador-mgd/runtime/MarioOdysseyRunner.cpp
+)
+target_sources(mgd_core PRIVATE ${EMULATOR_GPU_SOURCES})
 
 # ========== MAIN EXECUTABLE ==========
 if(SDL2_FOUND)
@@ -165,8 +215,11 @@ add_test(NAME mgd_unit_tests COMMAND mgd_tests)
 add_executable(mgd_tests_integration
     tests/test_integration_complete.cpp
 )
-target_link_libraries(mgd_tests_integration mgd_core)
+target_link_libraries(mgd_tests_integration mgd_core Catch2::Catch2WithMain)
 target_compile_definitions(mgd_tests_integration PRIVATE MGD_TESTING)
+if(Vulkan_FOUND)
+    target_link_libraries(mgd_tests_integration ${VULKAN_LIBRARIES})
+endif()
 add_test(NAME mgd_integration_tests COMMAND mgd_tests_integration)
 
 # ========== BENCHMARK — consultador por polígonos ==========

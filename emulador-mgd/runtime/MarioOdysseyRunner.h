@@ -3,8 +3,6 @@
 // MarioOdysseyRunner - Boot real do Super Mario Odyssey com melhores gráficos
 // Integra todos os sistemas: Mental Map, Culling, Shaders, FSR, Framebuffer Optimizer
 
-#pragma once
-
 #include <memory>
 #include <string>
 #include <vector>
@@ -20,7 +18,6 @@
 #include "../gpu/FrustumCullingCompute.h"
 #include "../odyssey/OdysseyWorld.h"
 #include "../odyssey/OdysseyHandoff.h"
-#include "../odyssey/OdysseyHandoff.h"
 #include "../loader/Keys.h"
 #include "../loader/NspLoader.h"
 #include "../loader/NcaSections.h"
@@ -35,11 +32,6 @@
 #include "../core/query/FrustumCullingCompute.h"
 #include "../core/query/RegionPolygonCache.h"
 #include "../core/query/PolygonConsultant.h"
-#include "../gpu/FramebufferOptimizer.h"
-#include "../gpu/PainterCompute.h"
-#include "../gpu/Fsr2Compute.h"
-#include "../gpu/FrustumCullingCompute.h"
-#include "../core/bridge/MentalMapRuntime.h"
 
 namespace mgd {
 namespace emu {
@@ -244,33 +236,21 @@ private:
     std::function<void(const PerformanceStats&)> debug_callback_;
     bool debug_overlay_enabled_ = false;
     
-    // Subsistemas
-    std::unique_ptr<Emulator> emulator_;
-    std::unique_ptr<gpu::VulkanGpuExecutor> gpu_;
-    std::unique_ptr<FramebufferOptimizer> mfo_manager_;
-    
     odyssey::OdysseyWorld world_;
     odyssey::OdysseyHandoffSource handoff_;
     core::CameraMentalMapQuery camera_query_;
     
-    // Métricas
-    std::chrono::steady_clock::time_point frame_start_;
     std::chrono::steady_clock::time_point last_fps_update_;
-    int fps_update_interval_ = 60; // Atualiza FPS a cada 60 frames
+    int fps_update_interval_ = 60;
     int frames_since_fps_update_ = 0;
     
-    bool initializeSubsystems();
     void updatePerformanceMetrics();
-    void updateQualitySettings();
     void applyQualitySettings();
-    void updatePerformanceMetrics();
-    void renderDebugOverlay();
     void updateThermalState();
     
     bool loadGameInternal(const std::string& nsp_path);
     bool loadKeys(const std::string& keys_dir);
     void setupQualityPreset();
-    void applyQualitySettings();
 };
 
 } // namespace emu

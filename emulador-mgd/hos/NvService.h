@@ -1,14 +1,15 @@
 #pragma once
 
-// nvdrv:a (GPU) — esqueleto honesto: abre canal, fecha, ioctl nega.
-// Os comandos reais de submit vêm quando o renderer existir.
+// nvdrv:a (GPU) — backend real Vulkan + fallback stub para CI sem Vulkan.
 
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
+#include <memory>
 
 #include "Session.h"
 #include "../gpu/Gpu.h"
+#include "../gpu/VulkanBackend.h"
 
 namespace mgd {
 namespace hos {
@@ -17,10 +18,31 @@ class NvService {
 public:
     NvService() = default;
 
+    // Inicializa backend Vulkan (opcional: window_handle para swapchain)
+    bool initVulkan(void* window_handle = nullptr) {
+        vk_executor_ = std::make_unique<gpu::VulkanGpuExecutor>();
+        return vk_executor_->init(window_handle);
+    }
+
+    // Inicializa com device/swapchain existentes (Android)
+    bool initVulkanFromExisting(VkDevice device, VkPhysicalDevice physical_device,
+                                 VkQueue graphics_queue, VkQueue present_queue,
+                                 VkSurfaceKHR surface, VkSwapchainKHR swapchain) {
+        vk_executor_ = std::make_unique<gpu::VulkanGpuExecutor>();
+        return vk_executor_->initFromExisting(device, physical_device, graphics_queue, present_queue, surface, swapchain);
+    }
+
+    void shutdownVulkan() {
+        if (vk_executor_) {
+            vk_executor_->shutdown();
+            vk_executor_.reset();
+        }
+    }
+
     // cmd 1 = Open: payload[0] = device tag; responde id do canal ou 0.
     // cmd 2 = Close: payload = id; responde 1 ok / 0 inválido.
     // cmd 3 = Submit: payload = id(4) + bytes do command buffer;
-    //         enfileira e responde fence id. Execução via GpuExecutor.
+    //         enfileira e responde fence id. Execução via VulkanGpuExecutor.
     // cmd 4 = QueryFence: payload = fence; responde 1 pronto / 0 fila.
     // cmd 5 = GetFence: payload = fence; responde 1 pronto / 0 fila (alias).
     // cmd 6 = WaitFence: payload = fence; bloqueia até pronto (simulado).
@@ -66,8 +88,12 @@ public:
                 if (n > 65536) n = 65536;
                 last_submit_.assign(req.payload.begin() + 4, req.payload.begin() + 4 + n);
                 submit_count_++;
-                // Execute command buffer immediately (stub renderer)
-                executor_.execute(last_submit_.data(), last_submit_.size());
+                // Execute command buffer via Vulkan backend (or stub)
+                if (vk_executor_) {
+                    vk_executor_->execute(last_submit_.data(), last_submit_.size());
+                } else {
+                    executor_.execute(last_submit_.data(), last_submit_.size());
+                }
             }
             rep.cmd = 1;
             uint32_t f = next_fence_ - 1;
@@ -105,14 +131,15 @@ public:
             return true;
         }
         // Extended GPU resource creation (game can call these via ioctl)
+        auto& exec = vk_executor_ ? *vk_executor_ : executor_;
         if (req.cmd == 8) { // CreateTexture
             if (req.payload.size() < 12) { rep.cmd = 0; return true; }
             uint32_t w = rd32(req.payload, 0);
             uint32_t h = rd32(req.payload, 4);
             uint32_t fmt = rd32(req.payload, 8);
-            uint32_t tex_id = executor_.createTexture(w, h, static_cast<gpu::TexFormat>(fmt),
-                                                      req.payload.size() > 12 ? &req.payload[12] : nullptr,
-                                                      req.payload.size() > 12 ? req.payload.size() - 12 : 0);
+            uint32_t tex_id = exec.createTexture(w, h, static_cast<gpu::TexFormat>(fmt),
+                                                 req.payload.size() > 12 ? &req.payload[12] : nullptr,
+                                                 req.payload.size() > 12 ? req.payload.size() - 12 : 0);
             rep.cmd = 1;
             rep.payload = {static_cast<uint8_t>(tex_id & 0xFF),
                            static_cast<uint8_t>((tex_id >> 8) & 0xFF),
@@ -126,7 +153,7 @@ public:
             uint32_t mag_f = rd32(req.payload, 4);
             uint32_t wrap_s = rd32(req.payload, 8);
             uint32_t wrap_t = rd32(req.payload, 12);
-            uint32_t samp_id = executor_.createSampler(min_f, mag_f, wrap_s, wrap_t);
+            uint32_t samp_id = exec.createSampler(min_f, mag_f, wrap_s, wrap_t);
             rep.cmd = 1;
             rep.payload = {static_cast<uint8_t>(samp_id & 0xFF),
                            static_cast<uint8_t>((samp_id >> 8) & 0xFF),
@@ -138,7 +165,7 @@ public:
             if (req.payload.size() < 8) { rep.cmd = 0; return true; }
             uint32_t w = rd32(req.payload, 0);
             uint32_t h = rd32(req.payload, 4);
-            uint32_t rt_id = executor_.createRenderTarget(w, h);
+            uint32_t rt_id = exec.createRenderTarget(w, h);
             rep.cmd = 1;
             rep.payload = {static_cast<uint8_t>(rt_id & 0xFF),
                            static_cast<uint8_t>((rt_id >> 8) & 0xFF),
@@ -151,7 +178,7 @@ public:
             uint8_t stage = req.payload[0];
             std::vector<uint32_t> code((req.payload.size() - 1) / 4);
             for (size_t i = 0; i < code.size(); i++) code[i] = rd32(req.payload, 1 + i * 4);
-            uint32_t shader_id = executor_.createShader(static_cast<gpu::ShaderStage>(stage), code);
+            uint32_t shader_id = exec.createShader(static_cast<gpu::ShaderStage>(stage), code);
             rep.cmd = 1;
             rep.payload = {static_cast<uint8_t>(shader_id & 0xFF),
                            static_cast<uint8_t>((shader_id >> 8) & 0xFF),
@@ -185,7 +212,6 @@ public:
         while (!pending_.empty()) {
             completeUpTo(pending_.front().fence);
         }
-        // Resolução final já configurada via setQualityPreset
     }
 
     // Presets de qualidade
@@ -212,11 +238,11 @@ public:
                 use_fsr_ = true; sharpness_ = 0.7f;
                 break;
         }
-        // Recria framebuffer com nova resolução
-        // TODO: recriar framebuffers se resolução mudou
+        if (vk_executor_) {
+            vk_executor_->setResolution(rough_w_, rough_h_, final_w_, final_h_);
+        }
     }
 
-    void setQualityPreset(QualityPreset preset);
     uint32_t roughWidth() const { return rough_w_; }
     uint32_t roughHeight() const { return rough_h_; }
     uint32_t finalWidth() const { return final_w_; }
@@ -224,23 +250,16 @@ public:
     bool useFSR() const { return use_fsr_; }
     float sharpness() const { return sharpness_; }
 
-    // Renderer nativo na resolução configurada
-    void renderFrameNative() {
-        while (!pending_.empty()) {
-            completeUpTo(pending_.front().fence);
-        }
-    }
-
-private:
-    uint32_t rough_w_ = 512, rough_h_ = 288;
-    uint32_t final_w_ = 1280, final_h_ = 720;
-    bool use_fsr_ = true;
-    float sharpness_ = 0.5f;
-
     // Stats from executor
-    uint64_t drawCalls() const { return executor_.totalDrawCalls(); }
-    uint64_t computeDispatches() const { return executor_.totalComputeDispatches(); }
-    uint64_t bytesExecuted() const { return executor_.totalBytesExecuted(); }
+    uint64_t drawCalls() const {
+        return vk_executor_ ? vk_executor_->totalDrawCalls() : executor_.totalDrawCalls();
+    }
+    uint64_t computeDispatches() const {
+        return vk_executor_ ? vk_executor_->totalComputeDispatches() : executor_.totalComputeDispatches();
+    }
+    uint64_t bytesExecuted() const {
+        return vk_executor_ ? vk_executor_->totalBytesExecuted() : executor_.totalBytesExecuted();
+    }
 
     size_t channelCount() const { return channels_.size(); }
     size_t pendingCount() const { return pending_.size(); }
@@ -265,7 +284,13 @@ private:
     uint32_t next_channel_ = 1;
     uint32_t next_fence_ = 1;
     uint32_t completed_fence_ = 0;
-    gpu::GpuExecutor executor_;
+    gpu::GpuExecutor executor_; // Fallback stub
+    std::unique_ptr<gpu::VulkanGpuExecutor> vk_executor_;
+
+    uint32_t rough_w_ = 512, rough_h_ = 288;
+    uint32_t final_w_ = 1280, final_h_ = 720;
+    bool use_fsr_ = true;
+    float sharpness_ = 0.5f;
 
     void completeUpTo(uint32_t f) {
         if (f > completed_fence_) completed_fence_ = f;

@@ -307,6 +307,12 @@ public:
     uint64_t totalComputeDispatches() const { return compute_dispatches_; }
     uint64_t totalBytesExecuted() const { return bytes_executed_; }
 
+    // Getters for subsystems
+    VulkanContext* getVulkanContext() const { return vk_ctx_.get(); }
+    PainterCompute* getPainter() const { return painter_.get(); }
+    FramebufferManager* getFramebufferManager() const { return fb_mgr_.get(); }
+    AssetPipeline* getAssetPipeline() const { return asset_pipeline_.get(); }
+
 private:
     std::unique_ptr<VulkanContext> vk_ctx_;
     std::unique_ptr<ShaderRecompiler> recompiler_;

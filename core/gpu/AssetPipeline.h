@@ -17,22 +17,25 @@
 #include "core/scanner/normalize/TextureRecord.h"
 #include "core/scanner/normalize/MeshRecord.h"
 #include "VulkanContext.h"
+#include "core/common/Types.h"
+#include "core/common/AABB.h"
+#include "core/common/Vec4.h"
 
 namespace mgd {
 namespace gpu {
 
 // GPU resource wrappers
 struct GpuMesh {
-    VulkanBufferPtr vertex_buffer;
-    VulkanBufferPtr index_buffer;
+    std::unique_ptr<VulkanBuffer> vertex_buffer;
+    std::unique_ptr<VulkanBuffer> index_buffer;
     uint32_t index_count = 0;
     VkIndexType index_type = VK_INDEX_TYPE_UINT16;
     AABB bounds{};
 };
 
 struct GpuTexture {
-    VulkanImagePtr image;
-    VulkanSamplerPtr sampler;
+    std::unique_ptr<VulkanImage> image;
+    std::unique_ptr<VulkanSampler> sampler;
     VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
     uint32_t width = 0, height = 0;
     uint32_t mip_levels = 1;
@@ -93,7 +96,7 @@ private:
     std::vector<GpuMesh> meshes_;
     std::vector<GpuTexture> textures_;
     std::vector<GpuMaterial> materials_;
-    VulkanSamplerPtr default_sampler_;
+    std::unique_ptr<VulkanSampler> default_sampler_;
 
     size_t total_vertex_mem_ = 0;
     size_t total_index_mem_ = 0;

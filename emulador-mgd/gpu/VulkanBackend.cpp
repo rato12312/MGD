@@ -2,6 +2,7 @@
 #include <cstring>
 #include <vector>
 #include <array>
+#include "core/common/Vec3.h"
 
 namespace mgd {
 namespace gpu {
@@ -1919,9 +1920,9 @@ void VulkanGpuExecutor::shutdown() {
 bool VulkanGpuExecutor::execute(const uint8_t* cmd_buf, size_t size) {
     if(!cmd_buf || size<4) return false;
     if(!vk_ctx_) return false;
-    
+
     // Begin frame for rascunho
-    fb_mgr_->beginFrame(state_.steps);
+    fb_mgr_->beginFrame(state_.frame_index++);
     vk_ctx_->beginFrame();
     
     // Execute rascunho command buffer

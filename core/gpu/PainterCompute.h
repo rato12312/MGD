@@ -98,6 +98,17 @@ private:
     VkBuffer push_buffer_ = VK_NULL_HANDLE;
     VkDeviceMemory push_memory_ = VK_NULL_HANDLE;
     
+    VulkanContext* ctx_ = nullptr;
+    FramebufferManager* fb_mgr_ = nullptr;
+    VkPipeline pipeline_ = VK_NULL_HANDLE;
+    VkPipelineLayout layout_ = VK_NULL_HANDLE;
+    VkDescriptorSetLayout desc_layout_ = VK_NULL_HANDLE;
+    VkDescriptorPool desc_pool_ = VK_NULL_HANDLE;
+    std::vector<VkDescriptorSet> desc_sets_;
+    VkShaderModule cs_module_ = VK_NULL_HANDLE;
+    VkBuffer push_buffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory push_memory_ = VK_NULL_HANDLE;
+    
     bool use_fsr2_ = true;
     struct Fsr2Constants {
         // EASU
@@ -119,19 +130,6 @@ private:
         float disocclusion_threshold = 0.1f;
         float motion_threshold = 0.5f;
     } fsr2_const_;
-    
-    bool use_fsr2_ = true;
-
-    VulkanContext* ctx_ = nullptr;
-    FramebufferManager* fb_mgr_ = nullptr;
-    VkPipeline pipeline_ = VK_NULL_HANDLE;
-    VkPipelineLayout layout_ = VK_NULL_HANDLE;
-    VkDescriptorSetLayout desc_layout_ = VK_NULL_HANDLE;
-    VkDescriptorPool desc_pool_ = VK_NULL_HANDLE;
-    std::vector<VkDescriptorSet> desc_sets_;
-    VkShaderModule cs_module_ = VK_NULL_HANDLE;
-    VkBuffer push_buffer_ = VK_NULL_HANDLE;
-    VkDeviceMemory push_memory_ = VK_NULL_HANDLE;
 };
 
 } // namespace gpu

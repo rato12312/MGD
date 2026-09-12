@@ -116,26 +116,22 @@ bool PainterCompute::init(VulkanContext* ctx, FramebufferManager* fb_mgr) {
     ctx_ = ctx;
     fb_mgr_ = fb_mgr;
     
-    // Initialize FSR constants
-    fsr_easu_const_.input_width = fb_mgr_->roughWidth();
-    fsr_easu_const_.input_height = fb_mgr_->roughHeight();
-    fsr_easu_const_.output_width = fb_mgr_->finalWidth();
-    fsr_easu_const_.output_height = fb_mgr_->finalHeight();
-    fsr_easu_const_.scale_x = static_cast<float>(fsr_easu_const_.output_width) / fsr_easu_const_.input_width;
-    fsr_easu_const_.scale_y = static_cast<float>(fsr_easu_const_.output_height) / fsr_easu_const_.input_height;
-    fsr_easu_const_.inv_scale_x = 1.0f / fsr_easu_const_.scale_x;
-    fsr_easu_const_.inv_scale_y = 1.0f / fsr_easu_const_.scale_y;
-    fsr_easu_const_.texel_size_x = 1.0f / fsr_easu_const_.input_width;
-    fsr_easu_const_.texel_size_y = 1.0f / fsr_easu_const_.input_height;
-    fsr_easu_const_.edge_threshold = 0.05f;
-    fsr_easu_const_.edge_threshold_min = 0.01f;
-    fsr_easu_const_.edge_threshold_max = 0.2f;
+    // Initialize FSR 2.x constants
+    fsr2_const_.scale_x = static_cast<float>(fb_mgr_->finalWidth()) / fb_mgr_->roughWidth();
+    fsr2_const_.scale_y = static_cast<float>(fb_mgr_->finalHeight()) / fb_mgr_->roughHeight();
+    fsr2_const_.inv_scale_x = 1.0f / fsr2_const_.scale_x;
+    fsr2_const_.inv_scale_y = 1.0f / fsr2_const_.scale_y;
+    fsr2_const_.texel_size_x = 1.0f / fb_mgr_->roughWidth();
+    fsr2_const_.texel_size_y = 1.0f / fb_mgr_->roughHeight();
+    fsr2_const_.edge_threshold = 0.05f;
+    fsr2_const_.sharpness = 0.5f;
+    fsr2_const_.temporal_alpha = 0.9f;
+    fsr2_const_.motion_vector_scale_x = 1.0f;
+    fsr2_const_.motion_vector_scale_y = 1.0f;
+    fsr2_const_.disocclusion_threshold = 0.1f;
+    fsr2_const_.motion_threshold = 0.5f;
     
-    fsr_rcas_const_.sharpness = 0.5f;
-    fsr_rcas_const_.scale_x = 1.0f;
-    fsr_rcas_const_.scale_y = 1.0f;
-    
-    use_fsr_ = true;
+    use_fsr2_ = true;
     
     if (!createShaders(ctx)) return false;
     if (!createPipeline(ctx)) return false;
@@ -223,7 +219,7 @@ bool PainterCompute::execute(const FramebufferManager::FrameHistory* rough_histo
     bool isNative = (pc.rough_w == pc.final_w && pc.rough_h == pc.final_h);
     // Passo 3: 720p nativo = RCAS+TAA leve, 0.4x = FSR 2.x EASU+RCAS+TAA
     if (isNative) pc.mode = 1; // native TAA+RCAS
-    else pc.mode = use_fsr_ ? 3 : 0; // FSR 1.0 vs simples
+    else pc.mode = use_fsr2_ ? 3 : 0; // FSR 2.x vs simples
     
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, layout_, 0, 1, &desc_sets_[0], 0, nullptr);
