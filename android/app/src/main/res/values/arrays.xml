@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="quality_presets">
+        <item>Ultra (720p nativo)</item>
+        <item>Quality (960×540 → 720p)</item>
+        <item>Balanced (854×480 → 720p)</item>
+        <item>Performance (512×288 → 720p)</item>
+        <item>Ultra Performance (480×270 → 720p)</item>
+    </string-array>
+</resources>

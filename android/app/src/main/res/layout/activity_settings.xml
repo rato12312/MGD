@@ -1,0 +1,390 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/paper_dark">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/settingsAppBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/kingdom_navy"
+        android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar"
+        android:elevation="0dp">
+
+        <com.google.android.material.appbar.CollapsingToolbarLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="16dp"
+            android:background="@color/kingdom_navy"
+            app:contentScrim="@color/kingdom_navy"
+            app:expandedTitleGravity="start|bottom"
+            app:titleEnabled="false">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:gravity="bottom"
+                app:layout_collapseMode="parallax">
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Kicker"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Ajuste fino • sem templates"
+                    android:textColor="@color/cappy_teal" />
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Headline"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Ajustes que mudam o jogo"
+                    android:textColor="@android:color/white" />
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Body1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Escolha onde gastar boldness: aqui é densidade e controle, não decoração. Um risco: o chapéu como transição."
+                    android:textColor="@android:color/white"
+                    android:alpha="0.85"
+                    android:maxLines="2"
+                    android:maxWidth="280dp" />
+
+            </LinearLayout>
+
+        </com.google.android.material.appbar.CollapsingToolbarLayout>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="14dp"
+            android:paddingBottom="100dp">
+
+            <!-- Quality Preset Field -->
+            <LinearLayout
+                style="@style/Widget.MGD.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Caption"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Qualidade • onde gasta GPU" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Balanced"
+                            android:textColor="@color/ink"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="854×480 → 1280×720 • FSR 2.x • 0.67×"
+                            android:textColor="@color/ink_secondary"
+                            android:textSize="11sp" />
+
+                    </LinearLayout>
+
+                    <Spinner
+                        android:id="@+id/presetSelect"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_spinner"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="8dp"
+                        android:layout_marginStart="8dp"
+                        android:spinnerMode="dropdown"
+                        android:entries="@array/quality_presets" />
+
+                </LinearLayout>
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Caption"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="preset = Balanced  // 0.67× • FSR 2.x • RCAS 0.5 • TAA on"
+                    android:textColor="@color/cappy_teal"
+                    android:background="@color/kingdom_navy"
+                    android:padding="8dp 10dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:layout_marginTop="4dp"
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="4dp"
+                    android:layout_gravity="start"
+                    android:background="@drawable/bg_code" />
+
+            </LinearLayout>
+
+            <!-- Sharpness -->
+            <LinearLayout
+                style="@style/Widget.MGD.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Caption"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Nitidez (RCAS)" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical">
+
+                    <SeekBar
+                        android:id="@+id/sharpRange"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="100"
+                        android:progress="50"
+                        android:thumb="@drawable/thumb_seekbar"
+                        android:progressTint="@color/odyssey_red"
+                        android:progressBackgroundTint="@color/line" />
+
+                    <TextView
+                        android:id="@+id/sharpVal"
+                        style="@style/TextAppearance.MGD.Metric"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:minWidth="36dp"
+                        android:gravity="end"
+                        android:text="0.50" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Toggle Section -->
+            <LinearLayout
+                style="@style/Widget.MGD.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Caption"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="Recursos Gráficos" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="8dp"
+                    android:paddingVertical="4dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="FSR 2.x" />
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Body2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Upscale temporal"
+                            android:textColor="@color/ink_secondary" />
+                    </LinearLayout>
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/toggleFsr"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:theme="@style/Widget.MGD.Toggle" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="8dp"
+                    android:paddingVertical="4dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="TAA" />
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Body2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Histórico + disocclusion"
+                            android:textColor="@color/ink_secondary" />
+                    </LinearLayout>
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/toggleTaa"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:theme="@style/Widget.MGD.Toggle" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingVertical="4dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Frame Reuse" />
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Body2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="MFO • dirty tiles"
+                            android:textColor="@color/ink_secondary" />
+                    </LinearLayout>
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/toggleFrameReuse"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:theme="@style/Widget.MGD.Toggle" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Signature Feature - Hat Transition -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginBottom="12dp"
+                android:padding="12dp"
+                android:background="@color/kingdom_navy"
+                style="@style/Widget.MGD.Card">
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Caption"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:text="Assinatura • risco justificado"
+                    android:textColor="@color/cappy_teal" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Transição do Chapéu"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Ao tocar Jogar, o Cappy faz um arco por cima da UI e \"captura\" o reino. É a vernacular do Odyssey como transição — lúdica, mas informa: você está entrando no mundo."
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp"
+                    android:lineSpacingExtra="2sp"
+                    android:alpha="0.9"
+                    android:layout_marginTop="6dp" />
+
+                <Button
+                    android:id="@+id/demoHat"
+                    style="@style/Widget.MGD.Button.Paper"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:backgroundTint="@color/odyssey_red"
+                    android:text="Ver arco do chapéu" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>
+
+</LinearLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

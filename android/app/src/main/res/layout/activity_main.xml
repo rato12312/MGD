@@ -1,0 +1,565 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/coordinator"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/paper_dark"
+    android:fitsSystemWindows="true">
+
+    <!-- App Bar -->
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/kingdom_navy"
+        android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar"
+        app:elevation="0dp"
+        android:fitsSystemWindows="true">
+
+        <com.google.android.material.appbar.CollapsingToolbarLayout
+            android:id="@+id/collapsingToolbar"
+            android:layout_width="match_parent"
+            android:layout_height="240dp"
+            android:fitsSystemWindows="true"
+            app:contentScrim="@color/kingdom_navy"
+            app:expandedTitleGravity="start|bottom"
+            android:layout_marginBottom="16dp"
+            app:expandedTitleMarginStart="16dp"
+            app:expandedTitleMarginBottom="16dp"
+            app:expandedTitleMarginEnd="16dp"
+            app:titleEnabled="false">
+
+            <!-- Custom Passport Header -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:gravity="bottom"
+                android:fitsSystemWindows="true"
+                app:layout_collapseMode="parallax">
+
+                <!-- Eyebrow -->
+                <TextView
+                    style="@style/TextAppearance.MGD.Kicker"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Passaporte • Mario Odyssey • MGD" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp"
+                    android:gravity="bottom|center_vertical">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            style="@style/TextAppearance.MGD.Display"
+                            android:text="MGD Odyssey" />
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Caption"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Travel • Capture • Play"
+                            android:textColor="@android:color/white"
+                            android:alpha="0.8" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/perfPill"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="10dp"
+                        android:paddingVertical="8dp"
+                        android:background="@color/cappy_teal_translucent"
+                        android:gravity="center"
+                        android:layout_marginEnd="12dp"
+                        android:layout_marginBottom="4dp">
+
+                        <TextView
+                            android:id="@+id/fpsTop"
+                            style="@style/TextAppearance.MGD.Metric"
+                            android:text="60" />
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Overline"
+                            android:layout_marginStart="4dp"
+                            android:text="FPS" />
+
+                        <View
+                            android:layout_width="1px"
+                            android:layout_height="16dp"
+                            android:layout_marginHorizontal="8dp"
+                            android:background="@android:color/white"
+                            android:alpha="0.3" />
+
+                        <TextView
+                            android:id="@+id/msTop"
+                            style="@style/TextAppearance.MGD.Metric"
+                            android:layout_marginStart="8dp"
+                            android:text="12.4 ms" />
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </com.google.android.material.appbar.CollapsingToolbarLayout>
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!-- Main Content -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="100dp">
+
+            <!-- Hero Card - The Thesis -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/heroCard"
+                style="@style/Widget.MGD.Card.Elevated"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="16dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp"
+                app:cardBackgroundColor="@color/odyssey_red"
+                app:cardCornerRadius="22dp">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp">
+
+                    <!-- Hat SVG -->
+                    <ImageView
+                        android:id="@+id/heroHat"
+                        android:layout_width="132dp"
+                        android:layout_height="132dp"
+                        android:layout_gravity="end|top"
+                        android:layout_marginTop="-16dp"
+                        android:layout_marginEnd="8dp"
+                        android:src="@drawable/ic_cappy"
+                        android:contentDescription="@string/app_name"
+                        android:alpha="0.95" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginBottom="8dp">
+
+                            <TextView
+                                style="@style/TextAppearance.MGD.Kicker"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Cap Kingdom • 1-1" />
+
+                            <TextView
+                                android:id="@+id/heroStatus"
+                                style="@style/TextAppearance.MGD.Caption"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                android:text="Ready to capture" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/heroTitle"
+                            style="@style/TextAppearance.MGD.Display"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:layout_marginBottom="4dp"
+                            android:text="Continue\nCap Kingdom"
+                            android:textColor="@android:color/white" />
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Body1"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="14dp"
+                            android:text="Seu progresso salvo em Cascade. 124 Power Moons. Toque no chapéu pra retomar."
+                            android:textColor="@android:color/white"
+                            android:alpha="0.92"
+                            android:maxWidth="220dp" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center"
+                            android:layout_marginTop="4dp"
+                            android:gravity="center_horizontal">
+
+                            <Button
+                                android:id="@+id/btnPlayHero"
+                                style="@style/Widget.MGD.Button.Primary"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Continuar" />
+
+                            <Button
+                                android:id="@+id/btnStamps"
+                                style="@style/Widget.MGD.Button.Ghost"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                android:text="Passaporte" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                </FrameLayout>
+
+            </androidx.cardview.widget.CardView>
+
+            <!-- Sections - Stamps Grid -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="14dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="8dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="bottom"
+                    android:layout_marginBottom="10dp">
+
+                    <TextView
+                        style="@style/TextAppearance.MGD.Headline"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Reinos" />
+
+                    <TextView
+                        style="@style/TextAppearance.MGD.Body2"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="end"
+                        android:text="Seus mundos como carimbos postais"
+                        android:textAlignment="viewEnd" />
+
+                </LinearLayout>
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/stampRecycler"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:overScrollMode="never"
+                    android:nestedScrollingEnabled="false"
+                    app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
+                    app:spanCount="2" />
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/filterChips"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="10dp"
+                    android:singleLine="true"
+                    android:chipSpacing="8dp">
+
+                    <com.google.android.material.chip.Chip
+                        style="@style/Widget.MGD.Chip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Todos"
+                        android:checked="true" />
+
+                    <com.google.android.material.chip.Chip
+                        style="@style/Widget.MGD.Chip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Recentes" />
+
+                    <com.google.android.material.chip.Chip
+                        style="@style/Widget.MGD.Chip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="100%" />
+
+                    <com.google.android.material.chip.Chip
+                        style="@style/Widget.MGD.Chip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Capturas" />
+                </com.google.android.material.chip.ChipGroup>
+
+            </LinearLayout>
+
+            <!-- Bottom Sheet - Detail Sheet -->
+            <com.google.android.material.bottomsheet.BottomSheetBehavior
+                android:id="@+id/sheetBehavior"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior"
+                app:behavior_hideable="true"
+                app:behavior_peekHeight="0dp"
+                app:behavior_fitToContents="true">
+
+                <LinearLayout
+                    android:id="@+id/sheet"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="@android:color/white"
+                    android:padding="14px"
+                    app:behavior_hideable="true"
+                    android:layout_margin="10px">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="12dp">
+
+                        <ImageView
+                            android:id="@+id/sheetThumb"
+                            android:layout_width="52dp"
+                            android:layout_height="52dp"
+                            android:layout_marginEnd="12dp"
+                            android:background="@drawable/ic_cappy_placeholder"
+                            android:scaleType="centerCrop" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/sheetTitle"
+                                style="@style/TextAppearance.MGD.Title"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="Cap Kingdom" />
+
+                            <TextView
+                                android:id="@+id/sheetSub"
+                                style="@style/TextAppearance.MGD.Body2"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="Bonneton • 854×480 → 1280×720 • FSR 2.x" />
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginTop="12dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginBottom="10dp">
+
+                            <LinearLayout
+                                style="@style/Widget.MGD.Card"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="5dp"
+                                android:padding="10dp"
+                                android:background="@color/paper">
+
+                                <TextView
+                                    style="@style/TextAppearance.MGD.Caption"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Preset" />
+
+                                <TextView
+                                    style="@style/TextAppearance.MGD.Body1"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="4dp"
+                                    android:text="Balanced"
+                                    android:textColor="@color/ink" />
+
+                                <TextView
+                                    style="@style/TextAppearance.MGD.Caption"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="4dp"
+                                    android:text="0.67× • FSR 2.x"
+                                    android:textColor="@color/ink_secondary" />
+                            </LinearLayout>
+
+                            <LinearLayout
+                                style="@style/Widget.MGD.Card"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginStart="5dp"
+                                android:padding="10dp"
+                                android:background="@color/paper">
+
+                                <TextView
+                                    style="@style/TextAppearance.MGD.Caption"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Shader cache" />
+
+                                <TextView
+                                    style="@style/TextAppearance.MGD.Body1"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="4dp"
+                                    android:text="86%"
+                                    android:textColor="@color/ink" />
+
+                                <TextView
+                                    style="@style/TextAppearance.MGD.Caption"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="4dp"
+                                    android:text="hit rate • 2.4 ms"
+                                    android:textColor="@color/ink_secondary" />
+                            </LinearLayout>
+
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginBottom="10dp">
+
+                            <LinearLayout
+                                style="@style/Widget.MGD.Card"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="5dp"
+                                android:padding="10dp"
+                                android:background="@color/paper">
+
+                                <TextView
+                                    style="@style/TextAppearance.MGD.Caption"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Save" />
+
+                                <TextView
+                                    style="@style/TextAppearance.MGD.Body1"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="4dp"
+                                    android:text="Slot 1"
+                                    android:textColor="@color/ink" />
+
+                                <TextView
+                                    style="@style/TextAppearance.MGD.Caption"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="4dp"
+                                    android:text="12:41 • 124 luas"
+                                    android:textColor="@color/ink_secondary" />
+                            </LinearLayout>
+
+                            <LinearLayout
+                                style="@style/Widget.MGD.Card"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginStart="5dp"
+                                android:padding="10dp"
+                                android:background="@color/paper">
+
+                                <TextView
+                                    style="@style/TextAppearance.MGD.Caption"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Controles" />
+
+                                <TextView
+                                    style="@style/TextAppearance.MGD.Body1"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="4dp"
+                                    android:text="Hat Arc"
+                                    android:textColor="@color/ink" />
+
+                                <TextView
+                                    style="@style/TextAppearance.MGD.Caption"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="4dp"
+                                    android:text="toque no Cappy = captura"
+                                    android:textColor="@color/ink_secondary" />
+                            </LinearLayout>
+
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="12dp"
+                            android:gravity="center_horizontal">
+
+                            <Button
+                                android:id="@+id/btnLaunch"
+                                style="@style/Widget.MGD.Button.Primary"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:backgroundTint="@color/odyssey_red"
+                                android:text="Lançar" />
+
+                            <Button
+                                android:id="@+id/btnCloseSheet"
+                                style="@style/Widget.MGD.Button.Ghost"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginStart="8dp"
+                                android:text="Fechar" />
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+            </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

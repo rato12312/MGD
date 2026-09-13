@@ -1,0 +1,93 @@
+<style name="Theme.MGD" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/odyssey_red</item>
+        <item name="colorPrimaryVariant">@color/kingdom_navy</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorSecondary">@color/cappy_teal</item>
+        <item name="colorSecondaryVariant">@color/cappy_teal_dark</item>
+        <item name="colorOnSecondary">@android:color/black</item>
+        <item name="android:statusBarColor">@color/kingdom_navy</item>
+        <item name="android:navigationBarColor">@color/kingdom_navy</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        
+        <!-- Typography - using system fonts for now, can be replaced with downloadable fonts later -->
+        <item name="fontFamily">sans-serif</item>
+        <item name="android:textViewStyle">@style/TextAppearance.MGD.Body1</item>
+        <item name="buttonStyle">@style/Widget.MGD.Button</item>
+        <item name="chipStyle">@style/Widget.MGD.Chip</item>
+        
+        <!-- Shapes - rounded, not pill-heavy -->
+        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.MGD.Small</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.MGD.Medium</item>
+        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.MGD.Large</item>
+    </style>
+    
+    <!-- Typography - using system fonts with intentional weights -->
+    <style name="TextAppearance.MGD.Display" parent="TextAppearance.MaterialComponents.Headline1">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textSize">34sp</item>
+        <item name="android:fontWeight">800</item>
+        <item name="android:letterSpacing">-0.02em</item>
+    </style>
+    
+    <style name="TextAppearance.MGD.Headline" parent="TextAppearance.MaterialComponents.Headline5">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textSize">22sp</item>
+        <item name="android:fontWeight">800</item>
+    </style>
+    
+    <style name="TextAppearance.MGD.Title" parent="TextAppearance.MaterialComponents.Subtitle1">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:fontWeight">700</item>
+        <item name="android:letterSpacing">-0.01em</item>
+    </style>
+    
+    <style name="TextAppearance.MGD.Body1" parent="TextAppearance.MaterialComponents.Body1">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:fontWeight">500</item>
+        <item name="android:lineSpacingExtra">2sp</item>
+    </style>
+    
+    <style name="TextAppearance.MGD.Body2" parent="TextAppearance.MaterialComponents.Body2">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:fontWeight">400</item>
+    </style>
+    
+    <style name="TextAppearance.MGD.Caption" parent="TextAppearance.MaterialComponents.Caption">
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:fontWeight">700</item>
+        <item name="android:letterSpacing">0.1em</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
+    
+    <style name="TextAppearance.MGD.Overline" parent="TextAppearance.MaterialComponents.Overline">
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:fontWeight">700</item>
+        <item name="android:letterSpacing">0.08em</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
+    
+    <style name="TextAppearance.MGD.Kicker" parent="TextAppearance.MaterialComponents.Overline">
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:fontWeight">700</item>
+        <item name="android:letterSpacing">0.14em</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
+    
+    <style name="TextAppearance.MGD.Metric" parent="TextAppearance.MaterialComponents.Caption">
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:fontWeight">700</item>
+    </style>
+    
+    <style name="TextAppearance.MGD.MetricLarge" parent="TextAppearance.MaterialComponents.Body1">
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:fontWeight">700</item>
+    </style>

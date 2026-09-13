@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MGD Odyssey</string>
+    
+    <!-- Main -->
+    <string name="app_title">MGD Odyssey</string>
+    <string name="subtitle">Mario Odyssey Debugger</string>
+    <string name="play">Jogar</string>
+    <string name="continue_game">Continuar</string>
+    <string name="load_game">Carregar NSP</string>
+    <string name="no_game_loaded">Nenhum jogo carregado</string>
+    <string name="game_loaded">Jogo carregado</string>
+    <string name="loading">Carregando…</string>
+    
+    <!-- Passport / Library -->
+    <string name="passport_title">Passaporte</string>
+    <string name="passport_subtitle">Reinos como carimbos postais</string>
+    <string name="kingdoms">Reinos</string>
+    <string name="recent_games">Jogos recentes</string>
+    <string name="no_games">Nenhum jogo na biblioteca</string>
+    <string name="add_first_game">Adicionar seu primeiro jogo</string>
+    <string name="stamps">Carimbos</string>
+    
+    <!-- Game info -->
+    <string name="moons">luas</string>
+    <string name="fps">FPS</string>
+    <string name="ms">ms</string>
+    <string name="save_slot">Slot %d</string>
+    <string name="play_time">Tempo de jogo</string>
+    
+    <!-- Settings -->
+    <string name="settings_title">Ajustes que mudam o jogo</string>
+    <string name="settings_subtitle">Ajuste fino • sem templates</string>
+    <string name="quality">Qualidade</string>
+    <string name="sharpness">Nitidez (RCAS)</string>
+    <string name="fsr2">FSR 2.x</string>
+    <string name="fsr2_desc">Upscale temporal</string>
+    <string name="taa">TAA</string>
+    <string name="taa_desc">Histórico + disocclusion</string>
+    <string name="frame_reuse">Frame Reuse (MFO)</string>
+    <string name="frame_reuse_desc">Dirty tiles • reaproveito</string>
+    <string name="preset">Preset de qualidade</string>
+    <string name="preset_ultra">Ultra (720p nativo)</string>
+    <string name="preset_quality">Quality (960×540 → 720p)</string>
+    <string name="preset_balanced">Balanced (854×480 → 720p)</string>
+    <string name="preset_performance">Performance (512×288 → 720p)</string>
+    <string name="preset_ultra_perf">Ultra Performance (480×270 → 720p)</string>
+    <string name="sharpness">Nitidez (RCAS)</string>
+    <string name="fsr2_enabled">FSR 2.x ativado</string>
+    <string name="taa_enabled">TAA ativado</string>
+    <string name="frame_reuse_enabled">Frame reuse ativado</string>
+    
+    <!-- UI -->
+    <string name="play">Jogar</string>
+    <string name="pause">Pausar</string>
+    <string name="resume">Retomar</string>
+    <string name="close">Fechar</string>
+    <string name="save">Salvar</string>
+    <string name="load">Carregar</string>
+    <string name="cancel">Cancelar</string>
+    <string name="confirm">Confirmar</string>
+    <string name="done">Concluído</string>
+    
+    <!-- Gamepad / Controls -->
+    <string name="cap_button">Capturar</string>
+    <string name="button_a">A</string>
+    <string name="button_b">B</string>
+    <string name="button_x">X</string>
+    <string name="button_y">Y</string>
+    <string name="l_stick">L-Stick</string>
+    <string name="r_stick">R-Stick</string>
+    <string name="capture">Capturar</string>
+    
+    <!-- Performance -->
+    <string name="fps_label">FPS</string>
+    <string name="frame_time_label">ms</string>
+    <string name="draw_calls">Draw Calls</string>
+    <string name="vram_label">VRAM</string>
+    <string name="ram_label">RAM</string>
+    <string name="vram_used">VRAM Usada</string>
+    <string name="ram_used">RAM Usada</string>
+    <string name="vram_budget">VRAM Budget</string>
+    
+    <!-- Game Library -->
+    <string name="library_title">Biblioteca</string>
+    <string name="library_subtitle">Seus mundos como carimbos postais</string>
+    <string name="no_games">Nenhum jogo na biblioteca</string>
+    <string name="add_game">Adicionar jogo</string>
+    <string name="add_first_game">Adicionar seu primeiro jogo</string>
+    <string name="search_games">Buscar jogos…</string>
+    
+    <!-- App Name -->
+    <string name="app_name">MGD Odyssey</string>
+</resources>

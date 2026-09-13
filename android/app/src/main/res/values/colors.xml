@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Odyssey palette - distinctive, not templated -->
+    <color name="odyssey_red">#E32321</color>
+    <color name="cappy_teal">#00C2D1</color>
+    <color name="cappy_teal_dark">#0097A7</color>
+    <color name="moon_gold">#FFC300</color>
+    <color name="kingdom_navy">#0F1A3D</color>
+    <color name="paper">#FFF8E1</color>
+    <color name="paper_dark">#FFFDF4</color>
+    <color name="ink">#121417</color>
+    <color name="ink_secondary">#4A5568</color>
+    <color name="line">#E2D9BC</color>
+    <color name="teal_light">#7DD3E8</color>
+    <color name="cappy_teal_translucent">#1A00C2D1</color>
+    <color name="odyssey_red_translucent">#1AE32321</color>
+    <color name="moon_gold_translucent">#1AFFC300</color>
+    <color name="cappy_teal_translucent_strong">#3300C2D1</color>
+    <color name="success_green">#00C853</color>
+    <color name="error_red">#E32321</color>
+    <color name="warning_amber">#FFB300</color>
+    <color name="paper_translucent">#CCFFF8E1</color>
+    <color name="navy_translucent">#800F1A3D</color>
+</resources>
