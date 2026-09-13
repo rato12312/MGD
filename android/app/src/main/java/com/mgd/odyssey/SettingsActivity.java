@@ -2,7 +2,9 @@ package com.mgd.odyssey;
 
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.widget.ArrayAdapter;
 import android.widget.SeekBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -80,6 +82,22 @@ public class SettingsActivity extends AppCompatActivity {
         toggleSeed.setChecked(prefs.getBoolean("seed_predictor_enabled", true));
         toggleSeed.setOnCheckedChangeListener((buttonView, isChecked) -> 
             prefs.edit().putBoolean("seed_predictor_enabled", isChecked).apply());
+
+        // Painter Type Selector
+        Spinner painterTypeSelect = findViewById(R.id.painterTypeSelect);
+        ArrayAdapter<CharSequence> painterAdapter = ArrayAdapter.createFromResource(
+            this, R.array.painter_types, android.R.layout.simple_spinner_item);
+        painterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        painterTypeSelect.setAdapter(painterAdapter);
+        painterTypeSelect.setSelection(prefs.getInt("painter_type", 0));
+        painterTypeSelect.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(android.widget.AdapterView<?> parent, android.view.View view, int position, long id) {
+                prefs.edit().putInt("painter_type", position).apply();
+            }
+            @Override
+            public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
 
         // Debug Overlay Switch
         SwitchMaterial toggleDebug = findViewById(R.id.toggleDebug);
@@ -162,12 +180,6 @@ public class SettingsActivity extends AppCompatActivity {
                 int value = progress + 30;
                 updateTargetFpsValue(value, targetFpsVal);
                 prefs.edit().putInt("target_fps", value).apply();
-            }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-        });
-
-prefs.edit().putInt("target_fps", value).apply();
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
