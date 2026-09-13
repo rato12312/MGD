@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0D0D0D">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>MGD — Mario Odyssey Emulator</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app" id="app">
+        <!-- Status Bar Spacer -->
+        <div class="status-bar-spacer" aria-hidden="true"></div>
+
+        <!-- Header -->
+        <header class="header" role="banner">
+            <div class="header__left">
+                <span class="brand" aria-label="MGD Mario Odyssey Debugger">
+                    <span class="brand__mark" aria-hidden="true">MGD</span>
+                </span>
+            </div>
+            <div class="header__center">
+                <div class="game-status" id="gameStatus">
+                    <span class="status-dot" id="statusDot" aria-hidden="true"></span>
+                    <span class="game-title" id="gameTitle">No game loaded</span>
+                </div>
+            </div>
+            <div class="header__right">
+                <button class="btn btn--icon btn--primary" id="menuBtn" aria-label="Menu" aria-expanded="false" aria-controls="drawer">
+                    <svg class="icon" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main" id="mainContent" role="main">
+            <!-- Dashboard -->
+            <section class="tab-panel active" id="tab-dashboard" role="tabpanel" aria-labelledby="tab-dashboard-label">
+                <header class="content-header">
+                    <h1>Dashboard</h1>
+                    <p class="subtitle">Emulator status and quick actions</p>
+                </header>
+
+                <div class="grid grid--2">
+                    <article class="card stat-card">
+                        <header class="card__header">
+                            <span class="card__icon" aria-hidden="true">▣</span>
+                            <h2 class="card__title">CPU</h2>
+                        </header>
+                        <div class="card__body">
+                            <dl class="stats">
+                                <div><dt>PC</dt><dd id="regPC">0x00000000</dd></div>
+                                <div><dt>SP</dt><dd id="regSP">0x00000000</dd></div>
+                                <div><dt>Threads</dt><dd id="threadCount">0</dd></div>
+                                <div><dt>Steps/Frame</dt><dd id="stepsPerFrame">0</dd></div>
+                            </dl>
+                        </article>
+
+                        <article class="card stat-card">
+                            <header class="card__header">
+                                <span class="card__icon" aria-hidden="true">◢</span>
+                                <h2 class="card__title">GPU</h2>
+                            </header>
+                            <div class="card__body">
+                                <dl class="stats">
+                                    <div><dt>Draw Calls</dt><dd id="drawCalls">0</dd></div>
+                                    <div><dt>Compute</dt><dd id="computeDispatches">0</dd></div>
+                                    <div><dt>VRAM</dt><dd id="vramUsed">0 MB</dd></div>
+                                    <div><dt>Pipeline</dt><dd id="pipelineStatus">Idle</dd></div>
+                                </dl>
+                            </div>
+                        </article>
+
+                        <article class="card stat-card">
+                            <header class="card__header">
+                                <span class="card__icon" aria-hidden="true">▮</span>
+                                <h2 class="card__title">Memory</h2>
+                            </header>
+                            <div class="card__body">
+                                <dl class="stats">
+                                    <div><dt>RAM</dt><dd id="ramUsed">0 MB / 64 MB</dd></div>
+                                    <div><dt>VRAM</dt><dd id="vramTotal">0 MB / 256 MB</dd></div>
+                                    <div><dt>Heap</dt><dd id="heapUsed">0 MB</dd></div>
+                                    <div><dt>Mapped</dt><dd id="mappedRegions">0</dd></div>
+                                </dl>
+                            </div>
+                        </article>
+
+                        <article class="card stat-card">
+                            <header class="card__header">
+                                <span class="card__icon" aria-hidden="true">◢</span>
+                                <h2 class="card__title">GPU Pipeline</h2>
+                            </header>
+                            <div class="card__body">
+                                <dl class="stats">
+                                    <div><dt>Draw Calls</dt><dd id="drawCalls">0</dd></div>
+                                    <div><dt>Compute</dt><dd id="computeDispatches">0</dd></div>
+                                    <div><dt>VRAM</dt><dd id="vramUsed">0 MB</dd></div>
+                                    <div><dt>Status</dt><dd id="pipelineStatus">Idle</dd></div>
+                                </dl>
+                            </div>
+                        </article>
+                    </div>
+
+                    <div class="action-grid" style="margin-top: var(--space-4);">
+                        <button class="btn btn--primary btn--large" id="quickLoadBtn">
+                            <span class="btn__icon" aria-hidden="true">▣</span>
+                            <span>Load NSP</span>
+                        </button>
+                        <button class="btn btn--secondary btn--large" id="quickPauseBtn" disabled>
+                            <span class="btn__icon" aria-hidden="true">⏸</span>
+                            <span>Pause</span>
+                        </button>
+                        <button class="btn btn--secondary btn--large" id="quickStepBtn" disabled>
+                            <span class="btn__icon" aria-hidden="true">⏵</span>
+                            <span>Step Frame</span>
+                        </button>
+                        <button class="btn btn--ghost btn--large" id="quickSaveBtn" disabled>
+                            <span class="btn__icon" aria-hidden="true">▣</span>
+                            <span>Save State</span>
+                        </button>
+                    </div>
+
+                    <article class="card" style="margin-top: var(--space-4);">
+                        <header class="card__header">
+                            <h2 class="card__title">Recent Games</h2>
+                        </header>
+                        <div class="game-list" id="recentGames">
+                            <p class="empty-state">No recent games. <a href="#" data-action="open-games">Load an NSP</a> to get started.
+                            </p>
+                        </div>
+                    </article>
+                </section>
+
+                <!-- Games Tab -->
+                <section class="tab-panel" id="tab-games" role="tabpanel" hidden aria-labelledby="tab-games-label">
+                    <header class="content-header">
+                        <h1>Games</h1>
+                        <p class="subtitle">Manage your game library</p>
+                    </header>
+                    <div class="toolbar">
+                        <input type="search" class="search-input" placeholder="Search games..." id="gameSearch" aria-label="Search games">
+                        <button class="btn btn--primary" id="addGameBtn">Add Game</button>
+                    </div>
+                    <div class="game-grid" id="gameGrid">
+                        <div class="empty-state">
+                            <span class="empty-icon" aria-hidden="true">◇</span>
+                            <p>No games in library</p>
+                            <button class="btn btn--primary" id="addFirstGameBtn">Add your first game</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- CPU Debugger Tab -->
+                <section class="tab-panel" id="tab-cpu" role="tabpanel" hidden aria-labelledby="tab-cpu-label">
+                    <header class="content-header">
+                        <h1>CPU Registers</h1>
+                        <p class="subtitle">ARM64 register inspection and control</p>
+                    </header>
+                    <div class="debugger-toolbar">
+                        <button class="btn btn--secondary" id="cpuStepBtn" disabled>
+                            <span class="btn__icon" aria-hidden="true">⏵</span>
+                            Step
+                        </button>
+                        <button class="btn btn--secondary" id="cpuRunBtn" disabled>
+                            <span class="btn__icon" aria-hidden="true">▶</span>
+                            Run
+                        </button>
+                        <button class="btn btn--secondary" id="cpuPauseBtn" disabled>
+                            <span class="btn__icon" aria-hidden="true">⏸</span>
+                            Pause
+                        </button>
+                        <div class="toolbar-spacer"></div>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="cpuAutoRefresh"> Auto-refresh
+                        </label>
+                    </div>
+                    <div class="register-grid" id="registerGrid">
+                        <section class="register-block">
+                            <h3>General Purpose Registers</h3>
+                            <div class="register-table" id="gprTable"></div>
+                        </section>
+                        <section class="register-block">
+                            <h3>System Registers</h3>
+                            <div class="register-table" id="sysRegTable"></div>
+                        </section>
+                        <section class="register-block">
+                            <h3>FP/SIMD Registers (V0-V31)</h3>
+                            <div class="register-table" id="fprTable"></div>
+                        </section>
+                    </div>
+                </section>
+
+                <!-- Memory Map Tab -->
+                <section class="tab-panel" id="tab-memory" role="tabpanel" hidden aria-labelledby="tab-memory-label">
+                    <header class="content-header">
+                        <h1>Memory Map</h1>
+                        <p class="subtitle">Virtual memory regions and permissions</p>
+                    </header>
+                    <div class="toolbar">
+                        <input type="search" class="search-input" placeholder="Filter regions..." id="memFilter" aria-label="Filter regions">
+                        <button class="btn btn--secondary" id="memRefreshBtn">Refresh</button>
+                    </div>
+                    <div class="memory-table-wrapper">
+                        <table class="memory-table" id="memoryTable">
+                            <thead>
+                                <tr>
+                                    <th>Base</th>
+                                    <th>End</th>
+                                    <th>Size</th>
+                                    <th>Perm</th>
+                                    <th>Type</th>
+                                    <th>Name</th>
+                                </tr>
+                            </thead>
+                            <tbody id="memoryBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="memory-visualization" id="memViz">
+                        <canvas id="memCanvas" width="100%" height="60"></canvas>
+                    </div>
+                </section>
+
+                <!-- GPU Pipeline Tab -->
+                <section class="tab-panel" id="tab-gpu" role="tabpanel" hidden aria-labelledby="tab-gpu-label">
+                    <header class="content-header">
+                        <h1>GPU Pipeline</h1>
+                        <p class="subtitle">Maxwell GPU pipeline visualization and control</p>
+                    </header>
+                    <div class="pipeline-viz" id="pipelineViz"></div>
+                    <div class="pipeline-stages" id="pipelineStages"></div>
+                </section>
+
+                <!-- Shaders Tab -->
+                <section class="tab-panel" id="tab-shaders" role="tabpanel" hidden aria-labelledby="tab-shaders-label">
+                    <header class="content-header">
+                        <h1>Shaders</h1>
+                        <p class="subtitle">Maxwell shader recompilation and cache</p>
+                    </header>
+                    <div class="toolbar">
+                        <input type="search" class="search-input" placeholder="Search shaders..." id="shaderSearch" aria-label="Search shaders">
+                        <button class="btn btn--secondary" id="shaderClearCacheBtn">Clear Cache</button>
+                    </div>
+                    <div class="shader-list" id="shaderList"></div>
+                </section>
+            </main>
+
+            <!-- Bottom Navigation -->
+            <nav class="bottom-nav" role="navigation" aria-label="Main navigation">
+                <button class="nav-btn active" data-tab="dashboard" aria-label="Dashboard" aria-selected="true">
+                    <span class="nav-icon" aria-hidden="true">◈</span>
+                    <span class="nav-label">Dashboard</span>
+                </button>
+                <button class="nav-btn" data-tab="games" aria-label="Games" aria-selected="false">
+                    <span class="nav-icon" aria-hidden="true">◇</span>
+                    <span class="nav-label">Games</span>
+                </button>
+                <button class="nav-btn" data-tab="cpu" aria-label="CPU Debugger" aria-selected="false">
+                    <span class="nav-icon" aria-hidden="true">⌘</span>
+                    <span class="nav-label">CPU</span>
+                </button>
+                <button class="nav-btn" data-tab="memory" aria-label="Memory" aria-selected="false">
+                    <span class="nav-icon" aria-hidden="true">▮</span>
+                    <span class="nav-label">Memory</span>
+                </button>
+                <button class="nav-btn" data-tab="gpu" aria-label="GPU Pipeline" aria-selected="false">
+                    <span class="nav-icon" aria-hidden="true">◢</span>
+                    <span class="nav-label">GPU</span>
+                </button>
+                <button class="nav-btn" data-tab="shaders" aria-label="Shaders" aria-selected="false">
+                    <span class="nav-icon" aria-hidden="true">◆</span>
+                    <span class="nav-label">Shaders</span>
+                </button>
+            </nav>
+
+            <!-- Bottom Bar - Logs/Console -->
+            <footer class="bottom-bar" id="bottomBar" role="contentinfo">
+                <div class="bottom-bar__tabs">
+                    <button class="tab-btn active" data-log-tab="output" aria-selected="true">Output</button>
+                    <button class="tab-btn" data-log-tab="errors" aria-selected="false">Errors</button>
+                    <button class="tab-btn" data-log-tab="debug" aria-selected="false">Debug</button>
+                    <button class="tab-btn" data-log-tab="ipc" aria-selected="false">IPC</button>
+                </div>
+                <div class="log-panel">
+                    <div class="log-entries" id="logOutput" aria-live="polite"></div>
+                </div>
+                <div class="command-line">
+                    <span class="cmd-prompt" aria-hidden="true">mgd></span>
+                    <input type="text" class="cmd-input" id="cmdInput" placeholder="Enter command..." autocomplete="off" spellcheck="false" aria-label="Command input">
+                </div>
+            </footer>
+        </div>
+
+        <!-- Side Drawer (Mobile Menu) -->
+        <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Navigation menu" hidden>
+            <div class="drawer__backdrop" id="drawerBackdrop"></div>
+            <div class="drawer__panel">
+                <header class="drawer__header">
+                    <h2>Navigation</h2>
+                    <button class="btn btn--ghost btn--icon" id="drawerClose" aria-label="Close menu">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12Z"/></svg>
+                    </button>
+                </header>
+                <nav class="drawer__nav">
+                    <div class="drawer__section">
+                        <span class="drawer__label">EMULATOR</span>
+                        <button class="drawer__item active" data-tab="dashboard">
+                            <span class="drawer__icon" aria-hidden="true">◈</span>
+                            <span>Dashboard</span>
+                        </button>
+                        <button class="drawer__item" data-tab="games">
+                            <span class="drawer__icon" aria-hidden="true">◇</span>
+                            <span>Games</span>
+                        </button>
+                        <button class="drawer__item" data-tab="settings">
+                            <span class="drawer__icon" aria-hidden="true">⚙</span>
+                            <span>Settings</span>
+                        </button>
+                    </div>
+                    <div class="drawer__section">
+                        <span class="drawer__label">DEBUGGER</span>
+                        <button class="drawer__item" data-tab="cpu">
+                            <span class="drawer__icon" aria-hidden="true">⌘</span>
+                            <span>CPU Registers</span>
+                        </button>
+                        <button class="drawer__item" data-tab="memory">
+                            <span class="drawer__icon" aria-hidden="true">▮</span>
+                            <span>Memory Map</span>
+                        </button>
+                        <button class="drawer__item" data-tab="gpu">
+                            <span class="drawer__icon" aria-hidden="true">◢</span>
+                            <span>GPU Pipeline</span>
+                        </button>
+                        <button class="drawer__item" data-tab="shaders">
+                            <span class="drawer__icon" aria-hidden="true">◆</span>
+                            <span>Shaders</span>
+                        </button>
+                    </div>
+                    <div class="drawer__section">
+                        <span class="drawer__label">TOOLS</span>
+                        <button class="drawer__item" data-tab="logs">
+                            <span class="drawer__icon" aria-hidden="true">⬿</span>
+                            <span>Logs</span>
+                        </button>
+                        <button class="drawer__item" data-tab="save-states">
+                            <span class="drawer__icon" aria-hidden="true">▣</span>
+                            <span>Save States</span>
+                        </button>
+                    </div>
+                </nav>
+            </div>
+        </aside>
+
+        <!-- Load Game Modal -->
+        <dialog class="modal" id="loadGameModal" aria-modal="true" aria-labelledby="loadGameTitle">
+            <div class="modal__backdrop"></div>
+            <div class="modal__panel">
+                <header class="modal__header">
+                    <h2 id="loadGameTitle">Load Game</h2>
+                    <button class="btn btn--ghost btn--icon" id="loadGameClose" aria-label="Close">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12Z"/></svg>
+                    </button>
+                </header>
+                <div class="modal__body">
+                    <form id="loadGameForm">
+                        <div class="form-group">
+                            <label for="nspPath">NSP File</label>
+                            <div class="file-input-wrapper">
+                                <input type="file" id="nspPath" accept=".nsp" required>
+                                <button type="button" class="btn btn--secondary" id="browseNspBtn">Browse</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="keysDir">Keys Directory</label>
+                            <div class="file-input-wrapper">
+                                <input type="text" id="keysDir" placeholder="/sdcard/MGD/keys/" readonly>
+                                <button type="button" class="btn btn--secondary" id="browseKeysBtn">Browse</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="offsetsFile">Offsets File (optional)</label>
+                            <div class="file-input-wrapper">
+                                <input type="file" id="offsetsFile" accept=".json">
+                                <button type="button" class="btn btn--secondary" id="browseOffsetsBtn">Browse</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="saveDir">Save Directory</label>
+                            <input type="text" id="saveDir" placeholder="/sdcard/MGD/saves/" value="/sdcard/MGD/saves/">
+                        </div>
+                        <div class="form-group">
+                            <fieldset>
+                                <legend>Quality Preset</legend>
+                                <div class="radio-group">
+                                    <label><input type="radio" name="qualityPreset" value="ultra"> Ultra (720p native)</label>
+                                    <label><input type="radio" name="qualityPreset" value="quality"> Quality (960×540 → 720p)</label>
+                                    <label><input type="radio" name="qualityPreset" value="balanced" checked> Balanced (854×480 → 720p)</label>
+                                    <label><input type="radio" name="qualityPreset" value="performance"> Performance (512×288 → 720p)</label>
+                                    <label><input type="radio" name="qualityPreset" value="ultra-performance"> Ultra Performance (480×270 → 720p)</label>
+                                </div>
+                            </fieldset>
+                        </div>
+                    </form>
+                </div>
+                <footer class="modal__footer">
+                    <button class="btn btn--secondary" id="loadGameCancel">Cancel</button>
+                    <button class="btn btn--primary" id="loadGameConfirm">Load Game</button>
+                </footer>
+            </dialog>
+
+            <!-- Settings Modal -->
+            <dialog class="modal" id="settingsModal" aria-modal="true" aria-labelledby="settingsTitle">
+                <div class="modal__backdrop"></div>
+                <div class="modal__panel">
+                    <header class="modal__header">
+                        <h2 id="settingsTitle">Settings</h2>
+                        <button class="btn btn--ghost btn--icon" id="settingsClose" aria-label="Close">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12Z"/></svg>
+                        </button>
+                    </header>
+                    <div class="modal__body">
+                        <div class="settings-section">
+                            <h3>Graphics</h3>
+                            <div class="form-group">
+                                <label for="resolutionScale">Resolution Scale</label>
+                                <input type="range" id="resolutionScale" min="0.25" max="1" step="0.05" value="0.67">
+                                <span id="resolutionScaleValue">0.67</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="sharpness">Sharpness</label>
+                                <input type="range" id="sharpness" min="0" max="1" step="0.05" value="0.5">
+                                <span id="sharpnessValue">0.5</span>
+                            </div>
+                            <div class="form-group checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="fsrEnabled" checked> Enable FSR 2.x
+                                </label>
+                            </div>
+                            <div class="form-group checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="taaEnabled" checked> Enable TAA
+                                </label>
+                            </div>
+                            <div class="form-group checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="rcasEnabled" checked> Enable RCAS
+                                </label>
+                            </div>
+                        </div>
+                        <div class="settings-section">
+                            <h3>Debug</h3>
+                            <div class="form-group checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="debugOverlay"> Debug Overlay
+                                </label>
+                            </div>
+                            <div class="form-group checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="showFps"> Show FPS Counter
+                                </label>
+                            </div>
+                        </div>
+                        <div class="settings-section">
+                            <h3>Storage</h3>
+                            <div class="form-group">
+                                <label for="saveDirSetting">Save Directory</label>
+                                <input type="text" id="saveDirSetting" placeholder="/sdcard/MGD/saves/" value="/sdcard/MGD/saves/">
+                            </div>
+                        </div>
+                    </div>
+                    <footer class="modal__footer">
+                        <button class="btn btn--secondary" id="settingsCancel">Cancel</button>
+                        <button class="btn btn--primary" id="settingsSave">Save</button>
+                    </footer>
+                </dialog>
+            </div>
+        </div>
+        <script type="module" src="app.js"></script>
+</body>
+</html>
