@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_title">MGD Odyssey</string>
-    <string name="boot">Jogar</string>
-    <string name="settings">Ajustes</string>
-    <string name="fps_none">FPS: --</string>
-    <string name="mode_stable">Estável</string>
-    <string name="mode_edge">MGD Edge</string>
-</resources>

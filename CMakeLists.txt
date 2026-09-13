@@ -9,7 +9,7 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Compiler flags - relaxed for initial build
+# Compiler flags
 if(MSVC)
     add_compile_options(/W3)
 else()
@@ -69,86 +69,19 @@ else()
     set(VULKAN_LIBRARIES "")
 endif()
 
-# Include root for <core/...> style includes
+# Include root for <emulador-mgd/...> style includes
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-# ========== CORE LIBRARY ==========
+# ========== CORE LIBRARY (emulador-mgd only) ==========
 set(MGD_CORE_SOURCES
-    # Common
-    core/common/Mat4.cpp
-    core/common/Vec4.cpp
-
-    # Mental Map
-    core/mental_map/MentalMap.cpp
-    core/mental_map/builder/MentalMapBuilder.cpp
-
-    # Cache
-    core/cache/FileCache.cpp
-
-    # Collision
-    core/collision/CollisionSystem.cpp
-    core/collision/spatial/GridIndex.cpp
-    core/collision/queries/Raycast.cpp
-
-    # Camera
-    core/camera/camera.cpp
-    core/camera/CameraController.cpp
-
-    # Visibility
-    core/visibility/BasicVisibility.cpp
-
-    # Painter
-    core/painter/painter.cpp
-    core/painter/framebuffer/Framebuffer.cpp
-    core/painter/framebuffer/DepthBuffer.cpp
-    core/painter/material/MaterialSystem.cpp
-    core/painter/texture/TextureSystem.cpp
-    core/painter/texture/TextureSampler.cpp
-    core/painter/lighting/LightSystem.cpp
-    core/painter/sky/SkyRenderer.cpp
-    core/painter/debug/DebugRenderer.cpp
-    core/painter/rasterizer/VertexProcessor.cpp
-    core/painter/rasterizer/Rasterizer.cpp
-    core/painter/resources/MockResourceProvider.cpp
-
-    # Scanner
-    core/scanner/Scanner.cpp
-    core/scanner/FileDiscovery.cpp
-    core/scanner/HashService.cpp
-    core/scanner/AssetRegistry.cpp
-    core/scanner/DependencyResolver.cpp
-    core/scanner/ScanProgress.cpp
-    core/scanner/normalize/Infector.cpp
-    core/scanner/analyzers/MeshAnalyzer.cpp
-    core/scanner/analyzers/TextureAnalyzer.cpp
-    core/scanner/analyzers/MetadataAnalyzer.cpp
-    core/scanner/analyzers/BSAAnalyzer.cpp
-    core/scanner/analyzers/ESPAnalyzer.cpp
-    core/scanner/adapters/SkyrimXbox360Adapter.cpp
-    core/scanner/adapters/SkyrimPCAdapter.cpp
-
-    # Query — consulta por polígonos (CACHE -> REGIAO -> POLIGONOS -> AssetID -> ASSET -> MAPA MENTAL)
-    core/query/RegionPolygonCache.cpp
-    core/query/PolygonConsultant.cpp
-
-    # Renderer (SDL2 parts)
-    core/renderer/renderer.cpp
-    core/renderer/SDL2Presenter.cpp
-
     # GPU Core (shared with emulator)
-    core/gpu/Fsr10.cpp
-    core/gpu/FramebufferOptimizer.cpp
-    core/gpu/PainterCompute.cpp
-    core/gpu/AssetPipeline.cpp
-    core/gpu/Fsr2EasuCompute.cpp
-    core/gpu/Fsr2TaaCompute.cpp
-    core/gpu/Fsr2RcasCompute.cpp
-    core/gpu/FrustumCullingCompute.cpp
-    core/gpu/TileCache.cpp
-    core/gpu/TileGrid.cpp
-    core/gpu/DirtyRegionTracker.cpp
-    core/gpu/MFOManager.cpp
-    core/gpu/SeedPredictor.cpp
+    emulador-mgd/core/gpu/Fsr10.cpp
+    emulador-mgd/core/gpu/Fsr10.h
+    
+    # Emulator GPU sources
+    emulador-mgd/gpu/Gpu.cpp
+    emulador-mgd/gpu/VulkanBackend.cpp
+    emulador-mgd/runtime/MarioOdysseyRunner.cpp
 )
 
 # Loader (header-only)
@@ -172,72 +105,30 @@ if(Vulkan_FOUND)
     target_compile_definitions(mgd_core PUBLIC MGD_HAS_VULKAN)
 endif()
 
-# Emulator GPU sources (compiled as part of mgd_core for tests)
-# These are header-only except for Gpu.cpp and VulkanBackend.cpp
-set(EMULATOR_GPU_SOURCES
-    emulador-mgd/gpu/Gpu.cpp
-    emulador-mgd/gpu/VulkanBackend.cpp
-    emulador-mgd/runtime/MarioOdysseyRunner.cpp
-)
-target_sources(mgd_core PRIVATE ${EMULATOR_GPU_SOURCES})
-
-# ========== MAIN EXECUTABLE ==========
-if(SDL2_FOUND)
-    add_executable(mgd_prototype src/main.cpp)
-    target_link_libraries(mgd_prototype mgd_core)
-    add_executable(mgd_launcher src/mgd_launcher.cpp)
-    target_link_libraries(mgd_launcher mgd_core)
-else()
-    message(STATUS "SDL2 not found - mgd_prototype/mgd_launcher executables will not be built")
-endif()
-
 # ========== TESTS ==========
 enable_testing()
 add_executable(mgd_tests
-    tests/test_main.cpp
-    tests/test_types.cpp
-    tests/test_entity.cpp
-    tests/test_mental_map.cpp
-    tests/test_camera.cpp
-    tests/test_collision.cpp
-    tests/test_visibility.cpp
-    tests/test_framebuffer.cpp
-    tests/test_rasterizer.cpp
-    tests/test_painter.cpp
-    tests/test_polygon_query.cpp
-    tests/test_dna_pipeline.cpp
-    tests/test_handoff_mock.cpp
-    tests/test_shader_cache.cpp
-    tests/test_pipeline_full.cpp
-    tests/test_seed_provider.cpp
-    tests/test_mmap_runtime.cpp
-    tests/test_emulator_odyssey.cpp
-    tests/test_emulator_machine.cpp
-    tests/test_nca_decrypt.cpp
-    tests/test_ipc_buffers.cpp
     tests/test_applet_service.cpp
-    tests/test_save_state.cpp
+    tests/test_emulator_odyssey.cpp
     tests/test_integration_full.cpp
+    tests/test_ipc_buffers.cpp
+    tests/test_nca_decrypt.cpp
+    tests/test_save_state.cpp
 )
-target_link_libraries(mgd_tests mgd_core)
+target_link_libraries(mgd_tests mgd_core Catch2::Catch2WithMain)
 target_compile_definitions(mgd_tests PRIVATE MGD_TESTING)
-add_test(NAME mgd_unit_tests COMMAND mgd_tests)
-
-# Integration tests (requer build completo com GPU)
-add_executable(mgd_tests_integration
-    tests/test_integration_complete.cpp
-)
-target_link_libraries(mgd_tests_integration mgd_core Catch2::Catch2WithMain)
-target_compile_definitions(mgd_tests_integration PRIVATE MGD_TESTING)
 if(Vulkan_FOUND)
-    target_link_libraries(mgd_tests_integration ${VULKAN_LIBRARIES})
+    target_link_libraries(mgd_tests ${VULKAN_LIBRARIES})
 endif()
-add_test(NAME mgd_integration_tests COMMAND mgd_tests_integration)
+add_test(NAME mgd_unit_tests COMMAND mgd_tests)
+add_test(NAME mgd_integration_tests COMMAND mgd_tests)
 
-# ========== BENCHMARK — consultador por polígonos ==========
-add_executable(benchmark_polygon tools/benchmark_polygon.cpp)
-target_link_libraries(benchmark_polygon mgd_core)
-
-# ========== FERRAMENTA — inspetor NSP (só loaders, sem core) ==========
-add_executable(mgd_nsp tools/mgd_nsp.cpp)
-target_include_directories(mgd_nsp PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+# ========== INSTALL ==========
+install(TARGETS mgd_core
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+)
+install(DIRECTORY emulador-mgd/
+    DESTINATION include/mgd
+    FILES_MATCHING PATTERN "*.h"
+)

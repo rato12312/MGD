@@ -1,7 +1,0 @@
-************************************* Invoked: Thu Aug 27 21:13:42 2026
-[0] Arguments: C:\Users\orugh\Downloads\msys2-x86_64-20260611.exe, --inroot, --quiet, --no-shortcuts, --accept-messages
-[0] Warning: Found command line only option "accept-messages". This will not have any effect when running in graphical mode.
-[16] Operations sanity check succeeded.
-[22] Warning: Cannot create lock file "C:\Users\orugh\AppData\Local\Temp\msys2-x86_64-202606111234865.lock": O arquivo já está sendo usado por outro processo.
- (0x00000020)
-[59] UnableToStart : Unable to start installer : Another msys2-x86_64-20260611 instance is already running. Wait until it finishes, close it, or restart your system.

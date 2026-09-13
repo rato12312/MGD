@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<full-backup-content>
-    <include domain="sharedpref" path="."/>
-    <include domain="database" path="."/>
-    <include domain="files" path="."/>
-    <exclude domain="files" path="mgd_frames/"/>
-    <exclude domain="files" path="mgd_cache/"/>
-</full-backup-content>

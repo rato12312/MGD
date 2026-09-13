@@ -1,8 +1,0 @@
-Patch 1 — vendor do ShaderCache do MGD dentro do Eden
-======================================================
-Onde: /workspaces/eden (não commitado lá; este arquivo documenta)
-
-mkdir -p src/mgd/common src/mgd/painter/shader
-cp /workspaces/MGD/core/common/Types.h src/mgd/common/
-cp /workspaces/MGD/core/painter/shader/ShaderCache.h src/mgd/painter/shader/
-# (depois ampliado pelo sync completo — ver 02-mgd-core-sync.txt)
