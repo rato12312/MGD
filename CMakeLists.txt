@@ -77,6 +77,11 @@ set(MGD_CORE_SOURCES
     # GPU Core (shared with emulator)
     emulador-mgd/core/gpu/Fsr10.cpp
     emulador-mgd/core/gpu/Fsr10.h
+    emulador-mgd/core/gpu/Painter.h
+    emulador-mgd/core/gpu/PainterFactory.cpp
+    emulador-mgd/core/gpu/SimplePainter.cpp
+    emulador-mgd/core/gpu/IntelligentPainter.h
+    emulador-mgd/core/gpu/IntelligentPainter.cpp
     
     # Emulator GPU sources
     emulador-mgd/gpu/Gpu.cpp

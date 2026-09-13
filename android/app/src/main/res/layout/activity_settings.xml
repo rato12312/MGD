@@ -23,6 +23,14 @@
             app:expandedTitleGravity="start|bottom"
             app:titleEnabled="false">
 
+            <androidx.appcompat.widget.Toolbar
+                android:id="@+id/toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                android:layout_gravity="top"
+                app:layout_collapseMode="pin"
+                app:contentScrim="@color/kingdom_navy" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -152,6 +160,66 @@
                     android:paddingVertical="4dp"
                     android:layout_gravity="start"
                     android:background="@drawable/bg_code" />
+
+            </LinearLayout>
+
+            <!-- Painter Type Selector -->
+            <LinearLayout
+                style="@style/Widget.MGD.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Caption"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Pintor • escolha o motor de renderização" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/painterTypeTitle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Inteligente"
+                            android:textColor="@color/ink"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="FSR2 + TAA + RCAS + MFO + Seed Predictor"
+                            android:textColor="@color/ink_secondary"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <Spinner
+                        android:id="@+id/painterTypeSelect"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_spinner"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="8dp"
+                        android:layout_marginStart="8dp"
+                        android:spinnerMode="dropdown"
+                        android:entries="@array/painter_types" />
+                </LinearLayout>
 
             </LinearLayout>
 

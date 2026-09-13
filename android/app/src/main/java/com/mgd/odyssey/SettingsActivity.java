@@ -3,10 +3,10 @@ package com.mgd.odyssey;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.widget.SeekBar;
-import android.widget.Switch;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import androidx.preference.PreferenceManager;
 
 import com.google.android.material.switchmaterial.SwitchMaterial;
@@ -167,23 +167,11 @@ public class SettingsActivity extends AppCompatActivity {
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
 
-        // VSync Switch
-        SwitchMaterial toggleVsync = findViewById(R.id.toggleVsync);
-        toggleVsync.setChecked(prefs.getBoolean("vsync_enabled", true));
-        toggleVsync.setOnCheckedChangeListener((buttonView, isChecked) -> 
-            prefs.edit().putBoolean("vsync_enabled", isChecked).apply());
-
-        // Debug Overlay Switch
-        SwitchMaterial toggleDebug = findViewById(R.id.toggleDebug);
-        toggleDebug.setChecked(prefs.getBoolean("debug_overlay_enabled", false));
-        toggleDebug.setOnCheckedChangeListener((buttonView, isChecked) -> 
-            prefs.edit().putBoolean("debug_overlay_enabled", isChecked).apply());
-
-        // Shader Cache Switch
-        SwitchMaterial toggleShaderCache = findViewById(R.id.toggleShaderCache);
-        toggleShaderCache.setChecked(prefs.getBoolean("shader_cache_enabled", true));
-        toggleShaderCache.setOnCheckedChangeListener((buttonView, isChecked) -> 
-            prefs.edit().putBoolean("shader_cache_enabled", isChecked).apply());
+prefs.edit().putInt("target_fps", value).apply();
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
 
         // VSync Switch
         SwitchMaterial toggleVsync = findViewById(R.id.toggleVsync);
@@ -203,41 +191,6 @@ public class SettingsActivity extends AppCompatActivity {
         toggleShaderCache.setOnCheckedChangeListener((buttonView, isChecked) -> 
             prefs.edit().putBoolean("shader_cache_enabled", isChecked).apply());
 
-        // VSync Switch
-        SwitchMaterial toggleVsync = findViewById(R.id.toggleVsync);
-        toggleVsync.setChecked(prefs.getBoolean("vsync_enabled", true));
-        toggleVsync.setOnCheckedChangeListener((buttonView, isChecked) -> 
-            prefs.edit().putBoolean("vsync_enabled", isChecked).apply());
-
-        // Debug Overlay Switch
-        SwitchMaterial toggleDebug = findViewById(R.id.toggleDebug);
-        toggleDebug.setChecked(prefs.getBoolean("debug_overlay_enabled", false));
-        toggleDebug.setOnCheckedChangeListener((buttonView, isChecked) -> 
-            prefs.edit().putBoolean("debug_overlay_enabled", isChecked).apply());
-
-        // Shader Cache Switch
-        SwitchMaterial toggleShaderCache = findViewById(R.id.toggleShaderCache);
-        toggleShaderCache.setChecked(prefs.getBoolean("shader_cache_enabled", true));
-        toggleShaderCache.setOnCheckedChangeListener((buttonView, isChecked) -> 
-            prefs.edit().putBoolean("shader_cache_enabled", isChecked).apply());
-
-        // VSync Switch
-        SwitchMaterial toggleVsync = findViewById(R.id.toggleVsync);
-        toggleVsync.setChecked(prefs.getBoolean("vsync_enabled", true));
-        toggleVsync.setOnCheckedChangeListener((buttonView, isChecked) -> 
-            prefs.edit().putBoolean("vsync_enabled", isChecked).apply());
-
-        // Debug Overlay Switch
-        SwitchMaterial toggleDebug = findViewById(R.id.toggleDebug);
-        toggleDebug.setChecked(prefs.getBoolean("debug_overlay_enabled", false));
-        toggleDebug.setOnCheckedChangeListener((buttonView, isChecked) -> 
-            prefs.edit().putBoolean("debug_overlay_enabled", isChecked).apply());
-
-        // Shader Cache Switch
-        SwitchMaterial toggleShaderCache = findViewById(R.id.toggleShaderCache);
-        toggleShaderCache.setChecked(prefs.getBoolean("shader_cache_enabled", true));
-        toggleShaderCache.setOnCheckedChangeListener((buttonView, isChecked) -> 
-            prefs.edit().putBoolean("shader_cache_enabled", isChecked).apply());
     }
 
     private void updateSharpValue(int progress) {

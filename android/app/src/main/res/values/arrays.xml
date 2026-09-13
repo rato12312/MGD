@@ -7,4 +7,9 @@
         <item>Performance (512×288 → 720p)</item>
         <item>Ultra Performance (480×270 → 720p)</item>
     </string-array>
+
+    <string-array name="painter_types">
+        <item>Inteligente (FSR2 + TAA + RCAS + MFO + Seed Predictor)</item>
+        <item>Simples (Direto, sem upscale)</item>
+    </string-array>
 </resources>
