@@ -30,6 +30,19 @@ bool MarioOdysseyRunner::initialize(const MarioOdysseyConfig& config) {
     graphics_config_ = config.graphics;
     current_preset_ = config.graphics.preset;
 
+    // Load encryption keys
+    if (!config.keys_dir.empty()) {
+        if (!emulator_->loadKeys(config.keys_dir)) {
+            std::cerr << "[WARN] Failed to load keys from " << config.keys_dir << std::endl;
+        }
+    }
+
+    // Load Odyssey offsets if provided
+    if (!config.keys_dir.empty()) {
+        std::string offsets_file = config.keys_dir + "/odyssey_offsets.json";
+        emulator_->loadOdysseyOffsets(offsets_file);
+    }
+
     // Inicializa emulador
     emulator_ = std::make_unique<Emulator>();
     emulator_->applySwitches();
@@ -234,7 +247,11 @@ bool MarioOdysseyRunner::loadGame(const std::string& nsp_path) {
     file.read(reinterpret_cast<char*>(buffer.data()), size);
     file.close();
 
-    return emulator_->bootNsp(buffer.data(), buffer.size());
+    // Use proper NSP boot with keys
+    int header_key_slot = 0; // slot 0 for header key
+    int section_key_slots[4] = {1, 2, 3, 4}; // slots 1-4 for sections
+    
+    return emulator_->bootNspWithKeys(buffer.data(), buffer.size(), 0, section_key_slots);
 }
 
 bool MarioOdysseyRunner::loadSave(const std::string& save_path) {

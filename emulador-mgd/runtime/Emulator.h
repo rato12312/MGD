@@ -467,6 +467,15 @@ private:
     double last_frame_ms_ = 0.0;
     double avg_ms_ = 0.0;
     uint64_t frames_ = 0;
+
+    // Load encryption keys from prod.keys/title.keys
+    bool loadKeys(const std::string& keys_dir);
+    
+    // Boot NSP with full NCA decryption using keys
+    bool bootNspWithKeys(const uint8_t* nsp, size_t nsp_size, int header_key_slot, const int section_key_slots[4]);
+
+    // Load Odyssey offsets from RE
+    bool loadOdysseyOffsets(const std::string& offsets_file);
 };
 
 } // namespace emu
