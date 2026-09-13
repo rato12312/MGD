@@ -380,11 +380,513 @@
 
             </LinearLayout>
 
+</LinearLayout>
+
+            <!-- LOD Bias -->
+            <LinearLayout
+                style="@style/Widget.MGD.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Caption"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="LOD Bias" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical">
+
+                    <SeekBar
+                        android:id="@+id/lodBiasRange"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="200"
+                        android:progress="100"
+                        android:thumb="@drawable/thumb_seekbar"
+                        android:progressTint="@color/odyssey_red"
+                        android:progressBackgroundTint="@color/line" />
+
+                    <TextView
+                        android:id="@+id/lodBiasVal"
+                        style="@style/TextAppearance.MGD.Metric"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:minWidth="36dp"
+                        android:gravity="end"
+                        android:text="0.00" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Resolution Scale -->
+            <LinearLayout
+                style="@style/Widget.MGD.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Caption"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Resolution Scale" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical">
+
+                    <SeekBar
+                        android:id="@+id/resolutionRange"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="100"
+                        android:progress="67"
+                        android:thumb="@drawable/thumb_seekbar"
+                        android:progressTint="@color/odyssey_red"
+                        android:progressBackgroundTint="@color/line" />
+
+                    <TextView
+                        android:id="@+id/resolutionVal"
+                        style="@style/TextAppearance.MGD.Metric"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:minWidth="36dp"
+                        android:gravity="end"
+                        android:text="0.67x" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Max Polygons Per Frame -->
+            <LinearLayout
+                style="@style/Widget.MGD.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Caption"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Max Polygons Per Frame" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical">
+
+                    <SeekBar
+                        android:id="@+id/maxPolysRange"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="200"
+                        android:progress="100"
+                        android:thumb="@drawable/thumb_seekbar"
+                        android:progressTint="@color/odyssey_red"
+                        android:progressBackgroundTint="@color/line" />
+
+                    <TextView
+                        android:id="@+id/maxPolysVal"
+                        style="@style/TextAppearance.MGD.Metric"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:minWidth="36dp"
+                        android:gravity="end"
+                        android:text="100k" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Target FPS -->
+            <LinearLayout
+                style="@style/Widget.MGD.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Caption"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Target FPS" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical">
+
+                    <SeekBar
+                        android:id="@+id/targetFpsRange"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:max="90"
+                        android:progress="30"
+                        android:thumb="@drawable/thumb_seekbar"
+                        android:progressTint="@color/odyssey_red"
+                        android:progressBackgroundTint="@color/line" />
+
+                    <TextView
+                        android:id="@+id/targetFpsVal"
+                        style="@style/TextAppearance.MGD.Metric"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:minWidth="36dp"
+                        android:gravity="end"
+                        android:text="60 FPS" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- VSync Switch -->
+            <LinearLayout
+                style="@style/Widget.MGD.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Caption"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="VSync" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="VSync" />
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Body2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Vertical sync"
+                            android:textColor="@color/ink_secondary" />
+                    </LinearLayout>
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/toggleVsync"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:theme="@style/Widget.MGD.Toggle" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Debug Overlay Switch -->
+            <LinearLayout
+                style="@style/Widget.MGD.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Caption"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Debug Overlay" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Debug Overlay" />
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Body2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Show FPS, frame time, draw calls"
+                            android:textColor="@color/ink_secondary" />
+                    </LinearLayout>
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/toggleDebug"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="false"
+                        android:theme="@style/Widget.MGD.Toggle" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Shader Cache Switch -->
+            <LinearLayout
+                style="@style/Widget.MGD.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Caption"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Shader Cache" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Shader Cache" />
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Body2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Cache compiled SPIR-V shaders"
+                            android:textColor="@color/ink_secondary" />
+                    </LinearLayout>
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/toggleShaderCache"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:theme="@style/Widget.MGD.Toggle" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- MFO (Framebuffer Optimizer) Switch -->
+            <LinearLayout
+                style="@style/Widget.MGD.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Caption"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Framebuffer Optimizer (MFO)" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="MFO" />
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Body2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Framebuffer optimizer • dirty tiles"
+                            android:textColor="@color/ink_secondary" />
+                    </LinearLayout>
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/toggleMfo"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:theme="@style/Widget.MGD.Toggle" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Seed Predictor Switch -->
+            <LinearLayout
+                style="@style/Widget.MGD.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Caption"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Seed Predictor" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Seed Predictor" />
+
+                        <TextView
+                            style="@style/TextAppearance.MGD.Body2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Predictive shader caching"
+                            android:textColor="@color/ink_secondary" />
+                    </LinearLayout>
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/toggleSeed"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:theme="@style/Widget.MGD.Toggle" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Signature Feature - Hat Transition -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginBottom="12dp"
+                android:padding="12dp"
+                android:background="@color/kingdom_navy"
+                style="@style/Widget.MGD.Card">
+
+                <TextView
+                    style="@style/TextAppearance.MGD.Caption"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:text="Assinatura • risco justificado"
+                    android:textColor="@color/cappy_teal" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Transição do Chapéu"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Ao tocar Jogar, o Cappy faz um arco por cima da UI e \"captura\" o reino. É a vernacular do Odyssey como transição — lúdica, mas informa: você está entrando no mundo."
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp"
+                    android:lineSpacingExtra="2sp"
+                    android:alpha="0.9"
+                    android:layout_marginTop="6dp" />
+
+                <Button
+                    android:id="@+id/demoHat"
+                    style="@style/Widget.MGD.Button.Paper"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:backgroundTint="@color/odyssey_red"
+                    android:text="Ver arco do chapéu" />
+
+            </LinearLayout>
+
         </LinearLayout>
 
     </LinearLayout>
-
-</LinearLayout>
 
 </LinearLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
