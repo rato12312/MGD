@@ -18,7 +18,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y g++
 
-      - name: Build
+      - name: Build (C++ core)
         run: |
           chmod +x build.sh
           ./build.sh
@@ -56,7 +56,7 @@ jobs:
           msystem: MINGW64
           install: mingw-w64-x86_64-gcc
 
-      - name: Build EXE (MGD obra-prima)
+      - name: Build EXE (MGDobra-prima)
         shell: msys2 {0}
         run: |
           g++ --version
@@ -90,10 +90,17 @@ jobs:
 
   build-android:
     runs-on: ubuntu-latest
-    
+
+    env:
+      # Keystore base64 encoded - set as repository secret SIGNING_KEY_BASE64
+      SIGNING_KEY_BASE64: ${{ secrets.SIGNING_KEY_BASE64 }}
+      SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+      SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+      SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+
     steps:
       - uses: actions/checkout@v5
-      
+
       - name: Install Android SDK + NDK
         run: |
           sudo apt-get update
@@ -108,8 +115,13 @@ jobs:
           sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;27.0.12077973" "cmake;3.22.1"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.0.12077973" >> $GITHUB_ENV
-          
-      - name: Build Android APK
+
+      - name: Set up signing keystore
+        run: |
+          echo "$SIGNING_KEY_BASE64" | base64 -d > /tmp/mgd-release-key.keystore
+          chmod 600 /tmp/mgd-release-key.keystore
+
+      - name: Build Android Release APK
         env:
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
@@ -117,11 +129,33 @@ jobs:
           export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon -Dorg.gradle.jvmargs="-Xmx4g"
+          # Create signing properties file
+          cat > /tmp/keystore.properties <<'EOF'
+          storeFile=../mgd-release-key.keystore
+          storePassword=${SIGNING_STORE_PASSWORD}
+          keyAlias=${SIGNING_KEY_ALIAS}
+          keyPassword=${SIGNING_KEY_PASSWORD}
+          EOF
+          # Copy to android directory
+          cp /tmp/keystore.properties android/keystore.properties
+          # Build release APK
+          ./gradlew assembleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx4g"
           
-      - name: Upload Android APK
+      - name: Upload Release APK
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: mgd-apk-android
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: mgd-apk-release
+          path: android/app/build/outputs/apk/release/app-release.apk
+
+      - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: android/app/build/outputs/apk/release/app-release.apk
+          tag_name: mgd-release-${{ github.run_number }}
+          name: "MGD Release - Run #${{ github.run_number }}"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
