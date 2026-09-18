@@ -50,7 +50,6 @@
     <string name="frame_reuse_enabled">Frame reuse ativado</string>
     
     <!-- UI -->
-    <string name="play">Jogar</string>
     <string name="pause">Pausar</string>
     <string name="resume">Retomar</string>
     <string name="close">Fechar</string>
