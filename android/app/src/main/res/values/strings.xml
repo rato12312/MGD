@@ -45,7 +45,6 @@
     <string name="preset_balanced">Balanced (854×480 → 720p)</string>
     <string name="preset_performance">Performance (512×288 → 720p)</string>
     <string name="preset_ultra_perf">Ultra Performance (480×270 → 720p)</string>
-    <string name="sharpness">Nitidez (RCAS)</string>
     <string name="fsr2_enabled">FSR 2.x ativado</string>
     <string name="taa_enabled">TAA ativado</string>
     <string name="frame_reuse_enabled">Frame reuse ativado</string>
