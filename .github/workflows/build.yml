@@ -155,8 +155,8 @@ jobs:
           keyAlias=${SIGNING_KEY_ALIAS}
           keyPassword=${SIGNING_KEY_PASSWORD}
           EOF
-          # Use gradle wrapper JAR directly to avoid classpath issues
-          java -Xmx4g -Dorg.gradle.jvmargs="-Xmx4g" -cp gradle/wrapper/gradle-wrapper.jar org.gradle.launcher.GradleMain assembleRelease --no-daemon
+          # Use gradle wrapper with bash explicitly and proper JVM args
+          GRADLE_OPTS="-Xmx4g -Dorg.gradle.jvmargs=-Xmx4g" bash ./gradlew assembleRelease --no-daemon
 
       - name: Upload Release APK
         if: always()
