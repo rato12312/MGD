@@ -139,9 +139,9 @@ jobs:
           if [ -n "$SIGNING_KEY_BASE64" ]; then
             echo "$SIGNING_KEY_BASE64" | base64 -d > android/mgd-release-key.keystore
             chmod 600 android/mgd-release-key.keystore
-          fi
+fi
 
-- name: Build Android Release APK
+      - name: Build Android Release APK
         env:
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
@@ -155,7 +155,6 @@ jobs:
           keyAlias=${SIGNING_KEY_ALIAS}
           keyPassword=${SIGNING_KEY_PASSWORD}
           EOF
-          # Use gradle wrapper with explicit java and proper classpath
           bash ./gradlew assembleRelease --no-daemon --stacktrace -Dorg.gradle.jvmargs="-Xmx4g"
 
       - name: Upload Release APK
