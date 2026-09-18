@@ -139,7 +139,7 @@ jobs:
           if [ -n "$SIGNING_KEY_BASE64" ]; then
             echo "$SIGNING_KEY_BASE64" | base64 -d > android/mgd-release-key.keystore
             chmod 600 android/mgd-release-key.keystore
-fi
+          fi
 
       - name: Build Android Release APK
         env:
