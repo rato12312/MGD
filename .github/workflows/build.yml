@@ -137,8 +137,8 @@ jobs:
           keyAlias=${SIGNING_KEY_ALIAS}
           keyPassword=${SIGNING_KEY_PASSWORD}
           EOF
-          # Build release APK
-          ./gradlew assembleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx4g"
+          # Build release APK using bash explicitly
+          bash ./gradlew assembleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx4g"
           
       - name: Upload Release APK
         if: always()
