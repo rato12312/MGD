@@ -26,9 +26,16 @@ tests/test_save_state.cpp
 "
 
 echo "Building mgd_core..."
-$CXX $CXXFLAGS -I. -DMGD_TESTING $CORE_SOURCES -c -o "$BUILD_DIR/mgd_core.o" || exit 1
+# Compile each source file individually to object files
+CORE_OBJECTS=""
+for src in $CORE_SOURCES; do
+    obj_name="$BUILD_DIR/$(basename "$src" .cpp).o"
+    $CXX $CXXFLAGS -I. -DMGD_TESTING "$src" -c -o "$obj_name" || exit 1
+    CORE_OBJECTS="$obj_name $CORE_OBJECTS"
+done
 
 echo "Building mgd_tests..."
-$CXX $CXXFLAGS -I. -DMGD_TESTING $CORE_SOURCES $TEST_SOURCES -o "$BUILD_DIR/mgd_tests" -lCatch2Main -lCatch2 || exit 1
+# Link all core object files with test sources and Catch2
+$CXX $CXXFLAGS -I. -DMGD_TESTING $CORE_OBJECTS $TEST_SOURCES -o "$BUILD_DIR/mgd_tests" -lCatch2Main -lCatch2 || exit 1
 
 echo "Build OK -> $BUILD_DIR/mgd_tests"
