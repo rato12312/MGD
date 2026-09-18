@@ -141,7 +141,7 @@ jobs:
             chmod 600 android/mgd-release-key.keystore
           fi
 
-      - name: Build Android Release APK
+- name: Build Android Release APK
         env:
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
@@ -155,8 +155,8 @@ jobs:
           keyAlias=${SIGNING_KEY_ALIAS}
           keyPassword=${SIGNING_KEY_PASSWORD}
           EOF
-          # Use gradle wrapper with bash explicitly and proper JVM args
-          GRADLE_OPTS="-Xmx4g -Dorg.gradle.jvmargs=-Xmx4g" bash ./gradlew assembleRelease --no-daemon
+          # Use gradle wrapper with explicit java and proper classpath
+          bash ./gradlew assembleRelease --no-daemon --stacktrace -Dorg.gradle.jvmargs="-Xmx4g"
 
       - name: Upload Release APK
         if: always()
