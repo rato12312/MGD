@@ -16,7 +16,17 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++ libcatch2-dev cmake libvulkan-dev vulkan-tools
+          sudo apt-get install -y g++ cmake ninja-build libvulkan-dev vulkan-tools
+
+      - name: Install Catch2 v3
+        run: |
+          git clone --depth 1 --branch v3.5.3 https://github.com/catchorg/Catch2.git /tmp/Catch2
+          cmake -S /tmp/Catch2 -B /tmp/Catch2-build -G Ninja \
+            -DCATCH_BUILD_TESTING=OFF \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/Catch2-build --parallel 2
+          sudo cmake --install /tmp/Catch2-build
+          sudo ldconfig
 
       - name: Build (C++ core)
         run: |
@@ -28,7 +38,10 @@ jobs:
 
       - name: Run polygon benchmark (optional)
         run: |
-          g++ -std=c++17 -Wall -Wextra -I. -I./core -I./emulador-mgd $(find core -name '*.cpp' | tr '\n' ' ') tools/benchmark_polygon.cpp -o build/benchmark_polygon 2>/dev/null && ./build/benchmark_polygon || echo "Benchmark skipped, continuing..."
+          g++ -std=c++17 -Wall -Wextra -I. -I./core -I./emulador-mgd \
+            $(find core emulador-mgd -name '*.cpp' | tr '\n' ' ') \
+            tools/benchmark_polygon.cpp -o build/benchmark_polygon 2>/dev/null && \
+            ./build/benchmark_polygon || echo "Benchmark skipped, continuing..."
 
       - name: Run headless demo (optional)
         run: ./build/mgd_app || echo "Demo skipped, continuing..."
@@ -53,7 +66,10 @@ jobs:
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
-          install: mingw-w64-x86_64-gcc
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-vulkan-headers
+            mingw-w64-x86_64-vulkan-loader
 
       - name: Build EXE (MGDobra-prima)
         shell: msys2 {0}
@@ -62,9 +78,13 @@ jobs:
           mkdir -p build
           CORE_SOURCES=$(find core emulador-mgd -name '*.cpp' | sort | tr '\n' ' ')
           TEST_SOURCES=$(find tests -name '*.cpp' | sort | tr '\n' ' ')
-          g++ -std=c++17 -Wall -Wextra -I. -I./core -I./emulador-mgd -DMGD_TESTING $CORE_SOURCES $TEST_SOURCES -o build/mgd_tests.exe
-          g++ -std=c++17 -Wall -Wextra -I. -I./core -I./emulador-mgd $CORE_SOURCES emulador-mgd/runtime/MarioOdysseyRunner.cpp -o build/mgd_app.exe
-          g++ -std=c++17 -Wall -Wextra -I. -I./core -I./emulador-mgd $CORE_SOURCES emulador-mgd/runtime/MarioOdysseyRunner.cpp -o build/mgd_launcher.exe || echo "launcher build skipped (no SDL2)"
+          g++ -std=c++17 -Wall -Wextra -I. -I./core -I./emulador-mgd \
+            -DMGD_TESTING $CORE_SOURCES $TEST_SOURCES -o build/mgd_tests.exe
+          g++ -std=c++17 -Wall -Wextra -I. -I./core -I./emulador-mgd \
+            $CORE_SOURCES emulador-mgd/runtime/MarioOdysseyRunner.cpp -o build/mgd_app.exe
+          g++ -std=c++17 -Wall -Wextra -I. -I./core -I./emulador-mgd \
+            $CORE_SOURCES emulador-mgd/runtime/MarioOdysseyRunner.cpp \
+            -o build/mgd_launcher.exe || echo "launcher build skipped (no SDL2)"
           ls -lh build/
 
       - name: Run tests (Windows)
@@ -91,7 +111,6 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # Keystore base64 encoded - set as repository secret SIGNING_KEY_BASE64
       SIGNING_KEY_BASE64: ${{ secrets.SIGNING_KEY_BASE64 }}
       SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
       SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
@@ -103,43 +122,41 @@ jobs:
       - name: Install Android SDK + NDK
         run: |
           sudo apt-get update
-          sudo apt-get install -y openjdk-11-jdk wget unzip
+          sudo apt-get install -y openjdk-17-jdk wget unzip
           ANDROID_SDK_ROOT=$HOME/android-sdk
-          mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
+          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-          unzip -q commandlinetools-linux-11076708_latest.zip -d $ANDROID_SDK_ROOT/cmdline-tools
-          mv $ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools $ANDROID_SDK_ROOT/cmdline-tools/latest
-          export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
-          yes | sdkmanager --licenses
+          unzip -q commandlinetools-linux-11076708_latest.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
+          mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+          yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;27.0.12077973" "cmake;3.22.1"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.0.12077973" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.0.12077973" >> "$GITHUB_ENV"
 
       - name: Set up signing keystore
         run: |
-          echo "$SIGNING_KEY_BASE64" | base64 -d > /tmp/mgd-release-key.keystore
-          chmod 600 /tmp/mgd-release-key.keystore
+          if [ -n "$SIGNING_KEY_BASE64" ]; then
+            echo "$SIGNING_KEY_BASE64" | base64 -d > android/mgd-release-key.keystore
+            chmod 600 android/mgd-release-key.keystore
+          fi
 
       - name: Build Android Release APK
         env:
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
         run: |
-          export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
-          # Copy keystore to android directory
-          cp /tmp/mgd-release-key.keystore android/mgd-release-key.keystore
+          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
           cd android
           chmod +x gradlew
-          # Create signing properties file
-          cat > keystore.properties <<'EOF'
+          cat > keystore.properties <<EOF
           storeFile=mgd-release-key.keystore
           storePassword=${SIGNING_STORE_PASSWORD}
           keyAlias=${SIGNING_KEY_ALIAS}
           keyPassword=${SIGNING_KEY_PASSWORD}
           EOF
-          # Build release APK using bash explicitly
           bash ./gradlew assembleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx4g"
-          
+
       - name: Upload Release APK
         if: always()
         uses: actions/upload-artifact@v5
