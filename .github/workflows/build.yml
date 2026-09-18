@@ -16,7 +16,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++ libcatch2-dev cmake
+          sudo apt-get install -y g++ libcatch2-dev cmake libvulkan-dev vulkan-tools
 
       - name: Build (C++ core)
         run: |
@@ -28,7 +28,7 @@ jobs:
 
       - name: Run polygon benchmark (optional)
         run: |
-          g++ -std=c++17 -Wall -Wextra -I. $(find core -name '*.cpp' | tr '\n' ' ') tools/benchmark_polygon.cpp -o build/benchmark_polygon 2>/dev/null && ./build/benchmark_polygon || echo "Benchmark skipped, continuing..."
+          g++ -std=c++17 -Wall -Wextra -I. -I./core -I./emulador-mgd $(find core -name '*.cpp' | tr '\n' ' ') tools/benchmark_polygon.cpp -o build/benchmark_polygon 2>/dev/null && ./build/benchmark_polygon || echo "Benchmark skipped, continuing..."
 
       - name: Run headless demo (optional)
         run: ./build/mgd_app || echo "Demo skipped, continuing..."
@@ -60,11 +60,11 @@ jobs:
         run: |
           g++ --version
           mkdir -p build
-          CORE_SOURCES=$(find core -name '*.cpp' | sort | tr '\n' ' ')
+          CORE_SOURCES=$(find core emulador-mgd -name '*.cpp' | sort | tr '\n' ' ')
           TEST_SOURCES=$(find tests -name '*.cpp' | sort | tr '\n' ' ')
-          g++ -std=c++17 -Wall -Wextra -I. -DMGD_TESTING $CORE_SOURCES $TEST_SOURCES -o build/mgd_tests.exe
-          g++ -std=c++17 -Wall -Wextra -I. $CORE_SOURCES src/main.cpp -o build/mgd_app.exe
-          g++ -std=c++17 -Wall -Wextra -I. $CORE_SOURCES src/mgd_launcher.cpp -o build/mgd_launcher.exe || echo "launcher build skipped (no SDL2)"
+          g++ -std=c++17 -Wall -Wextra -I. -I./core -I./emulador-mgd -DMGD_TESTING $CORE_SOURCES $TEST_SOURCES -o build/mgd_tests.exe
+          g++ -std=c++17 -Wall -Wextra -I. -I./core -I./emulador-mgd $CORE_SOURCES emulador-mgd/runtime/MarioOdysseyRunner.cpp -o build/mgd_app.exe
+          g++ -std=c++17 -Wall -Wextra -I. -I./core -I./emulador-mgd $CORE_SOURCES emulador-mgd/runtime/MarioOdysseyRunner.cpp -o build/mgd_launcher.exe || echo "launcher build skipped (no SDL2)"
           ls -lh build/
 
       - name: Run tests (Windows)
@@ -126,17 +126,17 @@ jobs:
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
         run: |
           export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
+          # Copy keystore to android directory
+          cp /tmp/mgd-release-key.keystore android/mgd-release-key.keystore
           cd android
           chmod +x gradlew
           # Create signing properties file
-          cat > /tmp/keystore.properties <<'EOF'
-          storeFile=../mgd-release-key.keystore
+          cat > keystore.properties <<'EOF'
+          storeFile=mgd-release-key.keystore
           storePassword=${SIGNING_STORE_PASSWORD}
           keyAlias=${SIGNING_KEY_ALIAS}
           keyPassword=${SIGNING_KEY_PASSWORD}
           EOF
-          # Copy to android directory
-          cp /tmp/keystore.properties android/keystore.properties
           # Build release APK
           ./gradlew assembleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx4g"
           
