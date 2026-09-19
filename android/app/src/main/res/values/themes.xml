@@ -1,4 +1,6 @@
-<style name="Theme.MGD" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.MGD" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/odyssey_red</item>
         <item name="colorPrimaryVariant">@color/kingdom_navy</item>
         <item name="colorOnPrimary">@android:color/white</item>
@@ -91,3 +93,4 @@
         <item name="android:textSize">16sp</item>
         <item name="android:fontWeight">700</item>
     </style>
+</resources>
