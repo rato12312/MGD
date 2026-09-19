@@ -85,6 +85,4 @@
     <string name="add_game">Adicionar jogo</string>
     <string name="search_games">Buscar jogos…</string>
     
-    <!-- App Name -->
-    <string name="app_name">MGD Odyssey</string>
-</resources>
+    </resources>
